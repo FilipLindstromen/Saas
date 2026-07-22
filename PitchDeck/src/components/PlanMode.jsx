@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import TemplateSelector from './TemplateSelector'
 import { parsePasteTextToSlideDrafts } from '../utils/parsePasteText'
+import { formatOpenAiError } from '../utils/openaiError'
 import { formatSlidesForTextEdit, parseTextEditToSlides, getNextSlideId } from '../utils/planTextEdit'
 import { searchUnsplashImage } from '../api/unsplashSearch'
 import './PlanMode.css'
@@ -68,6 +69,7 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const [selectedMicrophone, setSelectedMicrophone] = useState(null)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [showGenerate, setShowGenerate] = useState(false)
+  const [showPasteFromText, setShowPasteFromText] = useState(false)
   const [slideCount, setSlideCount] = useState(() => localStorage.getItem('pitchDeckSlideCount') || '')
   const [pasteTextInput, setPasteTextInput] = useState('')
   const [isPastingSlides, setIsPastingSlides] = useState(false)
@@ -756,7 +758,10 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     const text = pasteTextInput.trim()
     if (!text) return
     const drafts = parsePasteTextToSlideDrafts(text)
-    if (drafts.length === 0) return
+    if (drafts.length === 0) {
+      alert('No slides could be parsed from the text. Separate slides with blank lines, or paste from Text Edit using [Slide N] headers.')
+      return
+    }
 
     const slidesNeedImages = drafts.some((draft) => draft.imageQuery && draft.layout !== 'section')
     if (slidesNeedImages && !settings?.unsplashKey?.trim()) {
@@ -806,6 +811,9 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
       setPasteTextInput('')
       setEditingId(newSlides[0]?.id ?? null)
       setEditContent(drafts[0]?.content ?? '')
+    } catch (error) {
+      console.error('Error creating slides from text:', error)
+      alert(`Failed to create slides: ${error.message || 'Unknown error'}`)
     } finally {
       setIsPastingSlides(false)
     }
@@ -882,7 +890,13 @@ Example format:
       })
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.statusText}`)
+        let errData = {}
+        try {
+          errData = await response.json()
+        } catch {
+          errData = {}
+        }
+        throw new Error(formatOpenAiError(response.status, errData))
       }
 
       const data = await response.json()
@@ -1065,7 +1079,7 @@ Example format:
       </div>
       <div className="plan-layout">
         {planView === 'standard' && onLoadTemplate && (
-          <div className={`plan-templates-sidebar ${showTemplates ? 'expanded' : ''}`}>
+          <div className={`plan-templates-sidebar ${showTemplates || showGenerate || showPasteFromText ? 'expanded' : ''}`}>
             <button 
               className="plan-templates-toggle"
               onClick={() => setShowTemplates(!showTemplates)}
@@ -1198,17 +1212,33 @@ Example format:
                     {isGenerating ? 'Generating...' : 'Generate'}
                   </button>
                 </div>
+              </div>
+            )}
+            <button
+              className="plan-generate-toggle"
+              onClick={() => setShowPasteFromText(!showPasteFromText)}
+              title={showPasteFromText ? 'Hide generate from text' : 'Show generate from text'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              <span>Generate From Text</span>
+            </button>
+            {showPasteFromText && (
+              <div className="plan-generate-content show">
                 <div className="plan-generate-section plan-paste-section">
-                  <label className="plan-ramble-label">Paste text</label>
                   <p className="plan-paste-hint">
-                    Blank lines separate slides (extra blank lines are ignored). Use [PART 1] for section slides, [Person thinking] at the start of a slide for Unsplash images, and lines starting with &quot;-&quot; for bullet slides.
+                    Paste from Text Edit using [Slide N] headers, or separate slides with blank lines. Use [PART 1] or [Slide N] (section) for section slides, [Person thinking] for Unsplash images, and lines starting with &quot;-&quot; for bullet slides.
                   </p>
                   <textarea
                     className="plan-generate-input plan-paste-input"
                     placeholder="If you operate at a high level during the day…&#10;&#10;make decisions… carry responsibility… solve problems…&#10;&#10;…but when you lie down at night your brain won't shut off…&#10;&#10;this training is for you."
                     value={pasteTextInput}
                     onChange={(e) => setPasteTextInput(e.target.value)}
-                    rows={5}
+                    rows={8}
                   />
                   <button
                     className="plan-generate-btn plan-paste-btn"

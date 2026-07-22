@@ -1,6 +1,7 @@
 const PART_SECTION_RE = /^\[([^\]]*)\]$/i
 const PART_IN_BRACKETS = /PART/i
 const BRACKET_LINE_RE = /^\[([^\]]+)\]$/
+const SLIDE_HEADER_RE = /^\[Slide\s+\d+\](?:\s*\(([^)]+)\))?\s*$/i
 const BULLET_LINE_RE = /^\s*-\s*/
 
 /** Turn bracket instruction like "Person thinking" into an Unsplash-friendly query. */
@@ -18,8 +19,23 @@ export function normalizePasteText(text) {
   return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
+function layoutFromTag(tag) {
+  if (!tag) return null
+  const t = tag.trim().toLowerCase()
+  if (t === 'bullet list' || t === 'bulletpoints' || t === 'bullets') return 'bulletpoints'
+  if (t === 'section') return 'section'
+  return null
+}
+
 export function splitPasteBlocks(text) {
-  return normalizePasteText(text)
+  const normalized = normalizePasteText(text)
+  if (/\[Slide\s+\d+\]/i.test(normalized)) {
+    return normalized
+      .split(/(?=\[Slide\s+\d+\])/i)
+      .map((part) => part.trim())
+      .filter(Boolean)
+  }
+  return normalized
     .split(/\n\s*\n/)
     .map((block) => block.trim())
     .filter(Boolean)
@@ -46,13 +62,39 @@ export function parsePasteBlock(block) {
   const trimmed = block.trim()
   if (!trimmed) return null
 
+  const lines = trimmed.split('\n')
+  const firstLine = (lines[0] || '').trim()
+
+  // Text Edit format: [Slide N] or [Slide N] (section|bullet list)
+  const slideHeaderMatch = firstLine.match(SLIDE_HEADER_RE)
+  if (slideHeaderMatch) {
+    const layoutTag = slideHeaderMatch[1] || null
+    const taggedLayout = layoutFromTag(layoutTag)
+    const body = lines.slice(1).join('\n').trim()
+
+    if (taggedLayout === 'section') {
+      if (!body) return null
+      return { layout: 'section', content: body }
+    }
+
+    if (taggedLayout === 'bulletpoints') {
+      const parsed = parseSlideBody(body)
+      return {
+        layout: 'bulletpoints',
+        content: parsed?.content || body.replace(/^\s*-\s*/gm, '').trim(),
+      }
+    }
+
+    const parsed = parseSlideBody(body)
+    if (!parsed) return null
+    return parsed
+  }
+
   const sectionMatch = trimmed.match(PART_SECTION_RE)
   if (sectionMatch && PART_IN_BRACKETS.test(sectionMatch[1])) {
     return { layout: 'section', content: sectionMatch[1].trim() }
   }
 
-  const lines = trimmed.split('\n')
-  const firstLine = (lines[0] || '').trim()
   const imageInstructionMatch = firstLine.match(BRACKET_LINE_RE)
 
   if (imageInstructionMatch && !PART_IN_BRACKETS.test(imageInstructionMatch[1])) {
