@@ -116,8 +116,19 @@ export function parseTextEditToSlides(text, existingSlides = [], nextIdStart = 1
 
   return blocks.map((block, index) => {
     const existing = existingSlides[index] || null
-    const layoutFromHeader = layoutFromTag(block.layoutTag)
-    let layout = layoutFromHeader ?? normalizeLayout(existing?.layout || 'default')
+    const hasLayoutTag = block.layoutTag != null && String(block.layoutTag).trim() !== ''
+    const layoutFromHeader = hasLayoutTag ? layoutFromTag(block.layoutTag) : null
+
+    let layout = 'default'
+    if (layoutFromHeader) {
+      layout = layoutFromHeader
+    } else if (existing) {
+      const existingLayout = normalizeLayout(existing.layout || 'default')
+      // Tag removed (or absent): section/bullet list tags control layout — without them, revert to default
+      if (existingLayout !== 'section' && existingLayout !== 'bulletpoints') {
+        layout = existingLayout
+      }
+    }
 
     let content = parseSlideBody(block.body, layout)
 
@@ -126,15 +137,11 @@ export function parseTextEditToSlides(text, existingSlides = [], nextIdStart = 1
     }
 
     if (existing) {
-      const updated = {
+      return {
         ...existing,
         layout,
         content,
       }
-      if (layout === 'section') {
-        updated.layout = 'section'
-      }
-      return updated
     }
 
     const slide = createEmptySlide(nextId++)
