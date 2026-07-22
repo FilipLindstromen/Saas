@@ -11,6 +11,7 @@ import {
   KEN_BURNS_AMOUNT_PCT,
   KEN_BURNS_DURATION_S,
 } from '../utils/backgroundFit'
+import { isVideoUrlReady, markVideoUrlReady } from '../utils/videoReadyCache'
 import './Slide.css'
 
 /**
@@ -76,6 +77,12 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
   }, [slide?.backgroundVideoUrl, layout])
 
   useEffect(() => {
+    const url = slide?.backgroundVideoUrl
+    if (url && isVideoUrlReady(url)) {
+      videoWasReadyRef.current = true
+      setVideoReady(true)
+      return
+    }
     videoWasReadyRef.current = false
     setVideoReady(false)
   }, [slide?.backgroundVideoUrl, backgroundVideoSrc])
@@ -83,7 +90,8 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
   const markVideoReady = useCallback(() => {
     videoWasReadyRef.current = true
     setVideoReady(true)
-  }, [])
+    if (slide?.backgroundVideoUrl) markVideoUrlReady(slide.backgroundVideoUrl)
+  }, [slide?.backgroundVideoUrl])
 
   useEffect(() => {
     if (!slide?.backgroundVideoUrl || layout === 'section' || isPreload) return
@@ -164,7 +172,10 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
         const raw = slide.backgroundVideoUrl
         const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
         const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
-        const showVideo = !isPlayMode || isPreload || videoReady || videoWasReadyRef.current
+        const cachedReady = isVideoUrlReady(raw)
+        const showVideo = isPreload
+          ? (videoReady || videoWasReadyRef.current || cachedReady)
+          : (isPlayMode || videoReady || videoWasReadyRef.current || cachedReady)
         return (
           <div
             className="slide-background slide-background-video"

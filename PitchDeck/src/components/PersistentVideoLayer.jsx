@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { getVideoBackgroundStyle } from '../utils/backgroundFit'
+import { markVideoUrlReady } from '../utils/videoReadyCache'
 
 const VIDEO_TRANSITION_MS = 500
 
@@ -95,7 +96,11 @@ function PersistentVideoLayer({ videoSlide, layout, isSlidingOff, isSlidingIn, c
   useEffect(() => {
     if ((!showVideo && !showSlidingOff) || !videoRef.current || !backgroundVideoSrc) return
     const el = videoRef.current
-    const play = () => el?.play?.().catch(() => {})
+    const play = () => {
+      el?.play?.().catch(() => {})
+      const url = videoSlide?.backgroundVideoUrl
+      if (url) markVideoUrlReady(url)
+    }
     if (el.readyState >= 2) play()
     else {
       el.addEventListener('loadeddata', play, { once: true })

@@ -10,6 +10,7 @@ import { getBackgroundScaleProgress } from '../utils/backgroundFit'
 import { getBulletPointsFromSlide } from '../utils/slidePlainText'
 import { resolveMotionSettings, resolveCanvasPushDirection, resolveTransitionStyle, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
 import { getSubSlides, getActiveSubSlideRect, getSubSlideCameraStyle } from '../utils/subSlides'
+import { markVideoUrlReady } from '../utils/videoReadyCache'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
@@ -704,6 +705,26 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [frozenBgScale, setFrozenBgScale] = useState({ outgoing: 0, incoming: 0 })
   // Outgoing slide kept mounted during transitions so incoming media/text are not remounted at the end
   const [outgoingTransitionSlide, setOutgoingTransitionSlide] = useState(null)
+  const [bgIncomingHold, setBgIncomingHold] = useState(false)
+  const bgIncomingHoldRafRef = useRef(null)
+
+  const finishBackgroundTransition = useCallback(() => {
+    setBgIncomingHold(true)
+    setOutgoingTransitionSlide(null)
+    setPendingIndex(null)
+    setTransitionPhase('idle')
+    setFrozenBgScale({ outgoing: 0, incoming: 0 })
+    setIsWebcamSlidingOff(false)
+    setIsWebcamSlidingIn(false)
+    setIsTransitioning(false)
+    if (bgIncomingHoldRafRef.current) cancelAnimationFrame(bgIncomingHoldRafRef.current)
+    bgIncomingHoldRafRef.current = requestAnimationFrame(() => {
+      bgIncomingHoldRafRef.current = requestAnimationFrame(() => {
+        setBgIncomingHold(false)
+        bgIncomingHoldRafRef.current = null
+      })
+    })
+  }, [])
 
   const clearTransitionTimeouts = useCallback(() => {
     transitionTimeoutsRef.current.forEach((id) => clearTimeout(id))
@@ -716,10 +737,6 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   }, [])
 
   useEffect(() => () => clearTransitionTimeouts(), [clearTransitionTimeouts])
-
-  useEffect(() => {
-    slideEnteredAtRef.current = Date.now()
-  }, [currentIndex])
 
   useEffect(() => {
     if (suppressTextEntranceAfterCanvasPushRef.current) {
@@ -748,6 +765,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const canvasSize = getExportCanvasSize(slideFormat)
 
   const currentSlide = presentationSlides[currentIndex]
+
+  useEffect(() => {
+    slideEnteredAtRef.current = Date.now()
+    if (currentSlide?.backgroundVideoUrl) markVideoUrlReady(currentSlide.backgroundVideoUrl)
+  }, [currentIndex, currentSlide?.backgroundVideoUrl])
+
   const subSlides = useMemo(() => getSubSlides(currentSlide), [currentSlide])
   const activeSubSlideRect = useMemo(
     () => getActiveSubSlideRect(currentSlide, subSlideIndex),
@@ -946,13 +969,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, webcamTransitionMs)
         scheduleTransition(() => {
-          setOutgoingTransitionSlide(null)
-          setPendingIndex(null)
-          setTransitionPhase('idle')
-          setFrozenBgScale({ outgoing: 0, incoming: 0 })
-          setIsWebcamSlidingOff(false)
-          setIsWebcamSlidingIn(false)
-          setIsTransitioning(false)
+          finishBackgroundTransition()
         }, phaseDuration)
       } else if (sameBg) {
         // Same bg, different position/scale: incoming content starts immediately, outgoing text fades out on top
@@ -970,7 +987,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }, phase1Duration)
       }
     }
-  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, transitionSpeed, recordSettings, clearTransitionTimeouts, scheduleTransition])
+  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, transitionSpeed, recordSettings, clearTransitionTimeouts, scheduleTransition, finishBackgroundTransition])
 
   const prevSlide = useCallback(() => {
     if (currentIndex <= 0) return
@@ -1087,13 +1104,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         setTransitionPhase('background-transition')
         const phaseDuration = Math.max(transitionDuration, webcamTransitionMs)
         scheduleTransition(() => {
-          setOutgoingTransitionSlide(null)
-          setPendingIndex(null)
-          setTransitionPhase('idle')
-          setFrozenBgScale({ outgoing: 0, incoming: 0 })
-          setIsWebcamSlidingOff(false)
-          setIsWebcamSlidingIn(false)
-          setIsTransitioning(false)
+          finishBackgroundTransition()
         }, phaseDuration)
       } else if (sameBg) {
         setOutgoingTransitionSlide(currentSlideData)
@@ -1110,7 +1121,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         }, phase1Duration)
       }
     }
-  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, transitionSpeed, recordSettings, clearTransitionTimeouts, scheduleTransition])
+  }, [presentationSlides, currentIndex, isTransitioning, transitionStyle, transitionSpeed, recordSettings, clearTransitionTimeouts, scheduleTransition, finishBackgroundTransition])
 
   const advancePresentation = useCallback(() => {
     if (isTransitioning) return
@@ -1550,7 +1561,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
   // Use target slide for background during same-bg transition so position/scale animates smoothly
   const backgroundSlideForPosScale = sameBgNoTransition && targetSlide ? targetSlide : currentSlide
-  const backgroundSlideForLayer = backgroundTransitionActive && targetSlide ? targetSlide : backgroundSlideForPosScale
+  const persistentBackgroundSlide = backgroundTransitionActive && outgoingTransitionSlide
+    ? outgoingTransitionSlide
+    : backgroundSlideForPosScale
+  const incomingBackgroundSlide = (backgroundTransitionActive && targetSlide)
+    || (bgIncomingHold && slideHasBackgroundMedia(currentSlide) ? currentSlide : null)
   const transitionStyleSlide = targetSlide ?? currentSlide
   const resolvedTransitionStyle = resolveTransitionStyle(transitionStyle, transitionStyleSlide)
   const transitionDurationMs = getTransitionDuration(resolvedTransitionStyle)
@@ -1671,43 +1686,42 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
             recordSettings={recordSettings}
           />
         )}
-        {backgroundTransitionActive && outgoingTransitionSlide && (
+        {incomingBackgroundSlide && (
           <div
-            className={`play-bg-outgoing-overlay play-bg-dual-layer transition-${activeTransitionStyle}`}
-            style={{ position: 'absolute', inset: 0, '--transition-duration': `${transitionDurationMs}ms`, '--bg-opacity': outgoingTransitionSlide?.backgroundOpacity !== undefined ? outgoingTransitionSlide.backgroundOpacity : 0.6 }}
+            className={`play-bg-incoming-overlay ${bgIncomingHold ? 'play-bg-incoming-settled' : `play-bg-incoming-transition transition-${activeTransitionStyle}`}`}
+            style={{
+              '--bg-opacity': incomingBackgroundSlide?.backgroundOpacity !== undefined ? incomingBackgroundSlide.backgroundOpacity : 0.6,
+              '--transition-duration': `${transitionDurationMs}ms`,
+            }}
+            aria-hidden="true"
           >
-            <div
-              className="play-crossfade-layer play-crossfade-out"
-              aria-hidden="true"
-            >
-              <SlideBackground
-                key={getBackgroundMediaKey(outgoingTransitionSlide)}
-                slide={outgoingTransitionSlide}
-                kenBurns={outgoingMotion.kenBurns}
-                backgroundKenBurnsDirection={outgoingMotion.backgroundKenBurnsDirection}
-                frozenScaleProgress={frozenBgScale.outgoing}
-                isPreload={false}
-                isPlayMode={true}
-              />
-            </div>
+            <SlideBackground
+              key={getBackgroundMediaKey(incomingBackgroundSlide)}
+              slide={incomingBackgroundSlide}
+              kenBurns={incomingMotion.kenBurns}
+              backgroundKenBurnsDirection={incomingMotion.backgroundKenBurnsDirection}
+              frozenScaleProgress={frozenBgScale.incoming}
+              isPreload={false}
+              isPlayMode={true}
+            />
           </div>
         )}
         {usePersistentBackground && (
           <div
-            className={`play-background-layer ${backgroundTransitionActive ? `play-bg-incoming-transition transition-${activeTransitionStyle}` : 'play-bg-settled'} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
+            className={`play-background-layer ${backgroundTransitionActive ? `play-bg-outgoing-transition transition-${activeTransitionStyle}` : 'play-bg-settled'} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
             style={{
-              '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6,
+              '--bg-opacity': persistentBackgroundSlide?.backgroundOpacity !== undefined ? persistentBackgroundSlide.backgroundOpacity : 0.6,
               '--pos-scale-duration': `${transitionDurationMs}ms`,
               '--transition-duration': `${transitionDurationMs}ms`,
             }}
             aria-hidden="true"
           >
             <SlideBackground
-              key={getBackgroundMediaKey(backgroundSlideForLayer)}
-              slide={backgroundSlideForLayer}
-              kenBurns={backgroundTransitionActive ? incomingMotion.kenBurns : motion.kenBurns}
-              backgroundKenBurnsDirection={backgroundTransitionActive ? incomingMotion.backgroundKenBurnsDirection : motion.backgroundKenBurnsDirection}
-              frozenScaleProgress={null}
+              key={getBackgroundMediaKey(persistentBackgroundSlide)}
+              slide={persistentBackgroundSlide}
+              kenBurns={backgroundTransitionActive ? outgoingMotion.kenBurns : motion.kenBurns}
+              backgroundKenBurnsDirection={backgroundTransitionActive ? outgoingMotion.backgroundKenBurnsDirection : motion.backgroundKenBurnsDirection}
+              frozenScaleProgress={backgroundTransitionActive ? frozenBgScale.outgoing : null}
               isPreload={false}
               isPlayMode={true}
             />
