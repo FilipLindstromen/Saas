@@ -1,8 +1,18 @@
 const PART_SECTION_RE = /^\[([^\]]*)\]$/i
 const PART_IN_BRACKETS = /PART/i
+const PART_SECTION_BODY_RE = /^PART\s+\d+\s*$/i
 const BRACKET_LINE_RE = /^\[([^\]]+)\]$/
-const SLIDE_HEADER_RE = /^\[Slide\s+\d+\](?:\s*\(([^)]+)\))?\s*$/i
+const SLIDE_HEADER_LINE_RE = /^\[Slides?\s*\d+\](?:\s*\(([^)]+)\))?\s*$/i
+const SLIDE_HEADER_IN_TEXT_RE = /\[Slides?\s*\d+\]/i
 const BULLET_LINE_RE = /^\s*-\s*/
+
+function isSlideBracketInstruction(instruction) {
+  return /^Slides?\s*\d+/i.test(String(instruction || '').trim())
+}
+
+function isPartSectionContent(text) {
+  return PART_SECTION_BODY_RE.test(String(text || '').trim())
+}
 
 /** Turn bracket instruction like "Person thinking" into an Unsplash-friendly query. */
 export function formatImageSearchQuery(instruction) {
@@ -16,7 +26,11 @@ export function formatImageSearchQuery(instruction) {
 /** Collapse 3+ line breaks down to 2 before splitting slides. */
 export function normalizePasteText(text) {
   if (!text || typeof text !== 'string') return ''
-  return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+  return text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function layoutFromTag(tag) {
@@ -29,9 +43,9 @@ function layoutFromTag(tag) {
 
 export function splitPasteBlocks(text) {
   const normalized = normalizePasteText(text)
-  if (/\[Slide\s+\d+\]/i.test(normalized)) {
+  if (SLIDE_HEADER_IN_TEXT_RE.test(normalized)) {
     return normalized
-      .split(/(?=\[Slide\s+\d+\])/i)
+      .split(/(?=\[Slides?\s*\d+\])/i)
       .map((part) => part.trim())
       .filter(Boolean)
   }
@@ -44,6 +58,10 @@ export function splitPasteBlocks(text) {
 function parseSlideBody(body) {
   const trimmed = body.trim()
   if (!trimmed) return null
+
+  if (isPartSectionContent(trimmed)) {
+    return { layout: 'section', content: trimmed }
+  }
 
   const lines = trimmed.split('\n').map((line) => line.trim()).filter(Boolean)
   const isBulletBlock = lines.length > 0 && lines.every((line) => BULLET_LINE_RE.test(line))
@@ -66,13 +84,13 @@ export function parsePasteBlock(block) {
   const firstLine = (lines[0] || '').trim()
 
   // Text Edit format: [Slide N] or [Slide N] (section|bullet list)
-  const slideHeaderMatch = firstLine.match(SLIDE_HEADER_RE)
+  const slideHeaderMatch = firstLine.match(SLIDE_HEADER_LINE_RE)
   if (slideHeaderMatch) {
     const layoutTag = slideHeaderMatch[1] || null
     const taggedLayout = layoutFromTag(layoutTag)
     const body = lines.slice(1).join('\n').trim()
 
-    if (taggedLayout === 'section') {
+    if (taggedLayout === 'section' || isPartSectionContent(body)) {
       if (!body) return null
       return { layout: 'section', content: body }
     }
@@ -95,9 +113,24 @@ export function parsePasteBlock(block) {
     return { layout: 'section', content: sectionMatch[1].trim() }
   }
 
+  const bracketLineMatch = firstLine.match(BRACKET_LINE_RE)
+  if (bracketLineMatch && isSlideBracketInstruction(bracketLineMatch[1])) {
+    const body = lines.slice(1).join('\n').trim()
+    if (isPartSectionContent(body)) {
+      return body ? { layout: 'section', content: body } : null
+    }
+    const parsed = parseSlideBody(body)
+    if (!parsed) return null
+    return parsed
+  }
+
   const imageInstructionMatch = firstLine.match(BRACKET_LINE_RE)
 
-  if (imageInstructionMatch && !PART_IN_BRACKETS.test(imageInstructionMatch[1])) {
+  if (
+    imageInstructionMatch
+    && !PART_IN_BRACKETS.test(imageInstructionMatch[1])
+    && !isSlideBracketInstruction(imageInstructionMatch[1])
+  ) {
     const imageQuery = formatImageSearchQuery(imageInstructionMatch[1])
     const body = lines.slice(1).join('\n').trim()
     const parsed = parseSlideBody(body)

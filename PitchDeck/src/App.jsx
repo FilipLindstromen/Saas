@@ -1797,6 +1797,42 @@ function App() {
     }
   }
 
+  const handleClearAllBackgrounds = () => {
+    const selectionScope = getSlidesForBulkMediaSelection()
+    const slidesWithBackgrounds = selectionScope.filter(
+      (slide) => !!(slide.imageUrl?.trim() || slide.backgroundVideoUrl?.trim())
+    )
+
+    if (slidesWithBackgrounds.length === 0) {
+      alert(selectedSlides.size > 1
+        ? 'None of the selected slides have a background image or video.'
+        : 'No slides in this chapter have a background image or video.')
+      return
+    }
+
+    const scopeLabel = selectedSlides.size > 1
+      ? `${slidesWithBackgrounds.length} selected slide(s)`
+      : `${slidesWithBackgrounds.length} slide(s) in this chapter`
+    if (!window.confirm(`Remove background images and videos from ${scopeLabel}?`)) return
+
+    const idsToClear = new Set(slidesWithBackgrounds.map((slide) => slide.id))
+    const updatedSlides = slides.map((slide) => (
+      idsToClear.has(slide.id)
+        ? { ...slide, imageUrl: '', backgroundVideoUrl: '' }
+        : slide
+    ))
+
+    setSlides(updatedSlides)
+    const newChapters = chapters.map((c) => (c.id === currentChapterId ? { ...c, slides: updatedSlides } : c))
+    setChapters(newChapters)
+    saveToHistory({ slides: updatedSlides, selectedSlideId, chapters: newChapters, currentChapterId, settings, recordSettings })
+  }
+
+  const clearBackgroundsDisabled = !slides.some(
+    (slide) => !!(slide.imageUrl?.trim() || slide.backgroundVideoUrl?.trim())
+      && (selectedSlides.size <= 1 || selectedSlides.has(slide.id))
+  )
+
   const selectedSlide =
     slides.length === 0
       ? null
@@ -2081,6 +2117,8 @@ function App() {
           bulkImagesDisabled={!settings.openaiKey || !settings.unsplashKey}
           onBulkSelectVideos={handleBulkSelectVideos}
           bulkVideosDisabled={isBulkSelectingVideos || !settings.openaiKey || (!settings.pexelsKey && !settings.pixabayKey)}
+          onClearAllBackgrounds={handleClearAllBackgrounds}
+          clearBackgroundsDisabled={clearBackgroundsDisabled}
           bulkSelectSelectedCount={selectedSlides.size}
           onExportProject={handleExportFile}
           onExportPng={handleExportSlidesAsPng}

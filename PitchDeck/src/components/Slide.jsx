@@ -1710,6 +1710,10 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const hasDraggableBackground = !isPlayMode && onUpdate && !previewTextAnimation && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)
   const textAnimSpeed = motion.textAnimationSpeed ?? 1
   const isTopAligned = contentVerticalAlign === 'top'
+  const revealBulletsProgressively = isPlayMode
+    && layout === 'bulletpoints'
+    && visibleBulletIndex !== null
+    && visibleBulletIndex >= 0
   const slideStyle = {
     backgroundColor: hideBackground ? 'transparent' : slideBgColor,
     aspectRatio: aspectRatioValue,
@@ -1762,7 +1766,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   return (
     <div 
-      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
+      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${revealBulletsProgressively ? 'bullets-progressive-reveal' : ''} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onPointerDown={handleSlidePointerDown}

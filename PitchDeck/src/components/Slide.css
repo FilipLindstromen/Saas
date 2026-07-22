@@ -438,6 +438,17 @@
   width: 100%;
   max-width: 66.67%;
 }
+
+/* Progressive bullet reveal: anchor list at top so items stack downward */
+.play-mode .slide.bullets-progressive-reveal .slide-content.bulletpoints {
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding-top: var(--slide-content-top, var(--slide-content-bottom, 12%));
+  padding-bottom: 4%;
+  padding-left: var(--slide-content-edge, 9%);
+  padding-right: 0;
+}
+
 .play-mode .slide .slide-content.right,
 .play-mode .slide .slide-content.right-video {
   justify-content: flex-end;

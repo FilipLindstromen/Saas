@@ -4,6 +4,7 @@ import { parsePasteTextToSlideDrafts } from '../utils/parsePasteText'
 import { formatOpenAiError } from '../utils/openaiError'
 import { formatSlidesForTextEdit, parseTextEditToSlides, getNextSlideId } from '../utils/planTextEdit'
 import { searchUnsplashImage } from '../api/unsplashSearch'
+import { prepareBulletLayoutContent } from '../utils/bulletStyles'
 import './PlanMode.css'
 
 // Convert plain text (with \n) to HTML with <br> for storage - ensures line breaks work in presentation
@@ -789,9 +790,13 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
           }
         }
 
+        const rawContent = draft.layout === 'bulletpoints'
+          ? prepareBulletLayoutContent(draft.content)
+          : draft.content
+
         newSlides.push({
           id: nextId++,
-          content: plainTextToStorage(draft.content),
+          content: plainTextToStorage(rawContent),
           subtitle: '',
           imageUrl,
           layout: draft.layout,
@@ -1231,7 +1236,7 @@ Example format:
               <div className="plan-generate-content show">
                 <div className="plan-generate-section plan-paste-section">
                   <p className="plan-paste-hint">
-                    Paste from Text Edit using [Slide N] headers, or separate slides with blank lines. Use [PART 1] or [Slide N] (section) for section slides, [Person thinking] for Unsplash images, and lines starting with &quot;-&quot; for bullet slides.
+                    Paste from Text Edit using [Slide N] headers, or separate slides with blank lines. Lines like PART 1 become section slides. Use [Slide N] (section) or [PART 1] too. Lines starting with &quot;-&quot; become bullet slides. [Person thinking] fetches Unsplash images.
                   </p>
                   <textarea
                     className="plan-generate-input plan-paste-input"

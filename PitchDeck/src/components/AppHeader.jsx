@@ -132,6 +132,8 @@ function AppHeader({
   bulkImagesDisabled,
   onBulkSelectVideos,
   bulkVideosDisabled,
+  onClearAllBackgrounds,
+  clearBackgroundsDisabled = true,
   bulkSelectSelectedCount = 0,
   onExportProject,
   onExportPng,
@@ -178,6 +180,7 @@ function AppHeader({
   }
 
   const bulkMediaScope = bulkSelectSelectedCount > 1 ? 'selected slides' : 'all slides without image or video backgrounds'
+  const clearBackgroundsScope = bulkSelectSelectedCount > 1 ? 'selected slides' : 'all slides in this chapter'
 
   return (
     <div className="app-header">
@@ -357,6 +360,21 @@ function AppHeader({
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="2" y="4" width="20" height="16" rx="2" />
                     <polygon points="10 8 16 12 10 16 10 8" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-header btn-clear-backgrounds"
+                  onClick={onClearAllBackgrounds}
+                  title={`Remove background images and videos from ${clearBackgroundsScope}`}
+                  aria-label="Remove all background images and videos"
+                  disabled={clearBackgroundsDisabled}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                    <line x1="4" y1="4" x2="20" y2="20" />
                   </svg>
                 </button>
               </div>
