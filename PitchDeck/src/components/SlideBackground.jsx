@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import InfographicBackground from './InfographicBackground'
 import { loadInfographicProjectData } from '../utils/infographicLoader'
 import {
@@ -23,6 +23,7 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
   const [videoReady, setVideoReady] = useState(false)
   const backgroundVideoRef = useRef(null)
   const backgroundVideoBlobUrlRef = useRef(null)
+  const videoWasReadyRef = useRef(false)
 
   const layout = slide?.layout === 'title' ? 'centered' : (slide?.layout || 'default')
   const backgroundOpacity = slide?.backgroundOpacity !== undefined ? slide.backgroundOpacity : 0.6
@@ -75,8 +76,14 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
   }, [slide?.backgroundVideoUrl, layout])
 
   useEffect(() => {
+    videoWasReadyRef.current = false
     setVideoReady(false)
   }, [slide?.backgroundVideoUrl, backgroundVideoSrc])
+
+  const markVideoReady = useCallback(() => {
+    videoWasReadyRef.current = true
+    setVideoReady(true)
+  }, [])
 
   useEffect(() => {
     if (!slide?.backgroundVideoUrl || layout === 'section' || isPreload) return
@@ -157,14 +164,13 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
         const raw = slide.backgroundVideoUrl
         const isExternal = raw.startsWith('http://') || raw.startsWith('https://')
         const videoSrc = isExternal ? (backgroundVideoSrc || raw) : raw
-        const showVideo = !isPlayMode || isPreload || videoReady
+        const showVideo = !isPlayMode || isPreload || videoReady || videoWasReadyRef.current
         return (
           <div
             className="slide-background slide-background-video"
             aria-hidden="true"
             style={{
               opacity: showVideo ? backgroundOpacity : 0,
-              transition: isPlayMode ? 'opacity 0.2s ease-out' : undefined,
             }}
           >
             <video
@@ -177,8 +183,8 @@ function SlideBackground({ slide, kenBurns = false, backgroundKenBurnsDirection 
               playsInline
               preload="auto"
               className="slide-background-video-el"
-              onLoadedData={() => setVideoReady(true)}
-              onCanPlay={() => setVideoReady(true)}
+              onLoadedData={markVideoReady}
+              onCanPlay={markVideoReady}
               style={getVideoBackgroundStyle(
                 slide,
                 { x: currentPosition.x, y: currentPosition.y },

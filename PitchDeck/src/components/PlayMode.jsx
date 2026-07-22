@@ -1674,7 +1674,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         {backgroundTransitionActive && outgoingTransitionSlide && (
           <div
             className={`play-bg-outgoing-overlay play-bg-dual-layer transition-${activeTransitionStyle}`}
-            style={{ position: 'absolute', inset: 0, zIndex: 2, '--transition-duration': `${transitionDurationMs}ms`, '--bg-opacity': outgoingTransitionSlide?.backgroundOpacity !== undefined ? outgoingTransitionSlide.backgroundOpacity : 0.6 }}
+            style={{ position: 'absolute', inset: 0, '--transition-duration': `${transitionDurationMs}ms`, '--bg-opacity': outgoingTransitionSlide?.backgroundOpacity !== undefined ? outgoingTransitionSlide.backgroundOpacity : 0.6 }}
           >
             <div
               className="play-crossfade-layer play-crossfade-out"
@@ -1690,26 +1690,11 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
                 isPlayMode={true}
               />
             </div>
-            <div
-              className="play-crossfade-layer play-crossfade-in"
-              style={{ '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6 }}
-              aria-hidden="true"
-            >
-              <SlideBackground
-                key={getBackgroundMediaKey(backgroundSlideForLayer)}
-                slide={backgroundSlideForLayer}
-                kenBurns={incomingMotion.kenBurns}
-                backgroundKenBurnsDirection={incomingMotion.backgroundKenBurnsDirection}
-                frozenScaleProgress={0}
-                isPreload={false}
-                isPlayMode={true}
-              />
-            </div>
           </div>
         )}
         {usePersistentBackground && (
           <div
-            className={`play-background-layer ${backgroundTransitionActive ? 'play-bg-incoming-hidden' : 'play-bg-settled'} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
+            className={`play-background-layer ${backgroundTransitionActive ? `play-bg-incoming-transition transition-${activeTransitionStyle}` : 'play-bg-settled'} ${sameBgNoTransition ? 'play-bg-pos-scale-transition' : ''}`}
             style={{
               '--bg-opacity': backgroundSlideForLayer?.backgroundOpacity !== undefined ? backgroundSlideForLayer.backgroundOpacity : 0.6,
               '--pos-scale-duration': `${transitionDurationMs}ms`,
@@ -1720,9 +1705,9 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
             <SlideBackground
               key={getBackgroundMediaKey(backgroundSlideForLayer)}
               slide={backgroundSlideForLayer}
-              kenBurns={motion.kenBurns}
-              backgroundKenBurnsDirection={motion.backgroundKenBurnsDirection}
-              frozenScaleProgress={backgroundTransitionActive ? 0 : null}
+              kenBurns={backgroundTransitionActive ? incomingMotion.kenBurns : motion.kenBurns}
+              backgroundKenBurnsDirection={backgroundTransitionActive ? incomingMotion.backgroundKenBurnsDirection : motion.backgroundKenBurnsDirection}
+              frozenScaleProgress={null}
               isPreload={false}
               isPlayMode={true}
             />
@@ -1811,6 +1796,14 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           if (!preloadSlide) return null
           return (
             <div key={preloadSlide.id} className="play-preload-slide">
+              {slideHasBackgroundMedia(preloadSlide) && (
+                <SlideBackground
+                  key={getBackgroundMediaKey(preloadSlide)}
+                  slide={preloadSlide}
+                  isPreload={true}
+                  isPlayMode={true}
+                />
+              )}
               <Slide
                 slide={preloadSlide}
                 {...commonSlideProps}

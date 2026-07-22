@@ -82,16 +82,15 @@
   opacity: 1;
 }
 
+.play-background-layer.play-bg-settled {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
 .play-background-layer.play-bg-settled .slide-background,
 .play-background-layer.play-bg-settled .slide-background-video {
   opacity: var(--bg-opacity, 1);
-}
-
-/* During dual-layer bg transition, hide the persistent layer to avoid double-draw flash */
-.play-background-layer.play-bg-incoming-hidden {
-  opacity: 0 !important;
-  visibility: hidden;
-  pointer-events: none;
 }
 
 /* Layer 4: Webcam — above gradient, below slide text; persists across slide changes */
@@ -234,13 +233,25 @@
   filter: none !important;
 }
 
-/* Incoming background layer animates in during bg transitions (outgoing is a separate overlay) */
 .play-background-layer.play-bg-incoming-transition {
+  z-index: 1;
   animation-duration: var(--transition-duration, 500ms);
   animation-timing-function: ease-in-out;
   animation-fill-mode: both;
+  will-change: opacity, transform, filter;
 }
 
+.play-background-layer.play-bg-incoming-transition .slide-background,
+.play-background-layer.play-bg-incoming-transition .slide-background-video {
+  opacity: var(--bg-opacity, 1);
+}
+
+.play-background-layer.play-bg-incoming-transition .slide-background.background-scale-animation,
+.play-background-layer.play-bg-incoming-transition .slide-background-video .slide-background-video-el {
+  animation: none !important;
+}
+
+/* Incoming background layer animates in during bg transitions (outgoing is a separate overlay) */
 .play-background-layer.play-bg-incoming-transition.transition-default {
   opacity: 0;
   animation-name: fadeIn;
