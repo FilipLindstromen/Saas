@@ -1,18 +1,14 @@
-import { GRAPHIC_COORDINATE_WIDTH, getExportCanvasSize } from './slideFormats'
+import { GRAPHIC_COORDINATE_WIDTH } from './slideFormats'
 
 const ROOT_PX = 16
 
 /**
- * Scale factor from typography rem settings to pixels for the current slide width.
- * Edit preview uses GRAPHIC_COORDINATE_WIDTH (1200); present/export uses the same
- * design density on the wider export canvas so text matches the edit preview.
+ * Scale typography rem settings to pixels for the current slide width.
+ * Same formula in edit preview and present mode so text occupies the same
+ * percentage of the slide canvas in both.
  */
-export function getTypographyCoordScale(slideWidth, { isPlayMode = false, slideFormat = '16:9' } = {}) {
+export function getTypographyCoordScale(slideWidth) {
   if (!slideWidth || slideWidth <= 0) return 1
-  if (isPlayMode) {
-    const exportW = getExportCanvasSize(slideFormat).w
-    return slideWidth / exportW
-  }
   return slideWidth / GRAPHIC_COORDINATE_WIDTH
 }
 
@@ -20,8 +16,8 @@ export function remToSlidePx(rem, coordScale) {
   return rem * ROOT_PX * coordScale
 }
 
-export function computeSlideTypographyPx(slideWidth, options, sizes) {
-  const coordScale = getTypographyCoordScale(slideWidth, options)
+export function computeSlideTypographyPx(slideWidth, sizes) {
+  const coordScale = getTypographyCoordScale(slideWidth)
   return {
     coordScale,
     baseFontSize: remToSlidePx(sizes.defaultTextSize, coordScale),

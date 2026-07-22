@@ -1599,7 +1599,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       if (!slideRef.current) return
       const slideWidth = slideRef.current.offsetWidth
       if (slideWidth <= 0) return
-      setTypographyPx(computeSlideTypographyPx(slideWidth, { isPlayMode, slideFormat }, typographySizes))
+      setTypographyPx(computeSlideTypographyPx(slideWidth, typographySizes))
     }
 
     const timeoutId = setTimeout(updateTypography, 0)
@@ -1630,7 +1630,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       window.removeEventListener('resize', handleResize)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [isPlayMode, slideFormat, defaultTextSize, bulletTextSize, h1Size, h2Size, h3Size])
+  }, [defaultTextSize, bulletTextSize, h1Size, h2Size, h3Size])
 
   const handleImageMouseDown = (e) => {
     if (!onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl && !slide.infographicProjectId)) return
