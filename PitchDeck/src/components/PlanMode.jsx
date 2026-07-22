@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import TemplateSelector from './TemplateSelector'
 import { parsePasteTextToSlideDrafts } from '../utils/parsePasteText'
+import { formatSlidesForTextEdit, parseTextEditToSlides, getNextSlideId } from '../utils/planTextEdit'
 import { searchUnsplashImage } from '../api/unsplashSearch'
 import './PlanMode.css'
 
@@ -33,7 +34,9 @@ function getPlainText(content) {
 }
 
 function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], currentChapterId, onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange }) {
-  const [planView, setPlanView] = useState('standard') // 'standard' | 'overview'
+  const [planView, setPlanView] = useState('standard') // 'standard' | 'overview' | 'text'
+  const [textEditValue, setTextEditValue] = useState('')
+  const textEditRef = useRef(null)
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [draggedId, setDraggedId] = useState(null)
@@ -947,6 +950,34 @@ Example format:
 
   const editingContextKey = () => (isOverview && editingChapterId != null ? editingChapterId : editingId)
 
+  const applyTextEdit = useCallback(() => {
+    const nextId = getNextSlideId(slides, chapters)
+    const newSlides = parseTextEditToSlides(textEditValue, slides, nextId)
+    onUpdateSlides(newSlides)
+  }, [textEditValue, slides, chapters, onUpdateSlides])
+
+  const switchPlanView = (view) => {
+    if (planView === 'text' && view !== 'text') {
+      applyTextEdit()
+    }
+    if (view === 'text') {
+      setTextEditValue(formatSlidesForTextEdit(slides))
+    }
+    if (view !== 'text' && editingId !== null) {
+      handleBlur()
+    }
+    setPlanView(view)
+  }
+
+  useEffect(() => {
+    if (planView !== 'text') return
+    setTextEditValue(formatSlidesForTextEdit(slides))
+  }, [currentChapterId])
+
+  const handleTextEditBlur = () => {
+    applyTextEdit()
+  }
+
   const renderSceneRows = (slidesForList, chapterId) =>
     slidesForList.map((slide, index) => {
       const displayText = getPlainText(slide.content || '')
@@ -1008,19 +1039,26 @@ Example format:
     })
 
   return (
-    <div className={`plan-mode ${showTemplates ? 'templates-visible' : ''} ${planView === 'overview' ? 'plan-view-overview' : ''}`}>
+    <div className={`plan-mode ${showTemplates ? 'templates-visible' : ''} ${planView === 'overview' ? 'plan-view-overview' : ''} ${planView === 'text' ? 'plan-view-text' : ''}`}>
       <div className="plan-view-switcher">
         <button
           type="button"
           className={`plan-view-btn ${planView === 'standard' ? 'active' : ''}`}
-          onClick={() => setPlanView('standard')}
+          onClick={() => switchPlanView('standard')}
         >
           Plan
         </button>
         <button
           type="button"
+          className={`plan-view-btn ${planView === 'text' ? 'active' : ''}`}
+          onClick={() => switchPlanView('text')}
+        >
+          Text Edit
+        </button>
+        <button
+          type="button"
           className={`plan-view-btn ${planView === 'overview' ? 'active' : ''}`}
-          onClick={() => setPlanView('overview')}
+          onClick={() => switchPlanView('overview')}
         >
           Overview
         </button>
@@ -1187,7 +1225,7 @@ Example format:
         <div className="plan-slides-center">
           <div className="plan-slides-area plan-slides-card">
           <div className="plan-standard-column">
-            {planView === 'standard' && (
+            {(planView === 'standard' || planView === 'text') && (
             <div className="plan-title-bar">
               <span className="plan-title-bar-icon" aria-hidden>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1222,7 +1260,23 @@ Example format:
             </div>
             )}
             <div className="plan-standard-row">
-              {planView === 'overview' && chapters?.length ? (
+              {planView === 'text' ? (
+                <div className="plan-text-edit-wrap">
+                  <p className="plan-text-edit-hint">
+                    Edit all slides as plain text. Layout tags like <code>(bullet list)</code> and <code>(section)</code> reflect slide type.
+                    Backgrounds, graphics, and formatting are preserved — only text content changes. Delete a slide block to remove that slide.
+                  </p>
+                  <textarea
+                    ref={textEditRef}
+                    className="plan-text-edit-area"
+                    value={textEditValue}
+                    onChange={(e) => setTextEditValue(e.target.value)}
+                    onBlur={handleTextEditBlur}
+                    spellCheck={true}
+                    placeholder={'[Slide 1]\nYour slide text here\n\n[Slide 2] (bullet list)\n- First point\n- Second point'}
+                  />
+                </div>
+              ) : planView === 'overview' && chapters?.length ? (
                 <div className="plan-overview-scroll">
                   {chapters.map((chapter) => (
               <div
