@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { ensureSiteSettingsSchema } from "@/lib/ensure-site-settings-schema";
 import {
   DEFAULT_ORGANIZE_SYSTEM_PROMPT_EN,
   DEFAULT_ORGANIZE_SYSTEM_PROMPT_SV,
@@ -28,6 +29,7 @@ export function getAiInstructionDefaults(): AiInstructionDefaults {
 }
 
 export async function getAiInstructionOverrides(): Promise<AiInstructionOverrides> {
+  await ensureSiteSettingsSchema(prisma);
   const row = await prisma.siteSettings.findUnique({ where: { id: GLOBAL_ID } });
   return {
     organizeSystemPromptEn: row?.organizeSystemPromptEn ?? null,
@@ -61,6 +63,7 @@ export async function setAiInstructionOverrides(
 
   if (Object.keys(data).length === 0) return;
 
+  await ensureSiteSettingsSchema(prisma);
   await prisma.siteSettings.upsert({
     where: { id: GLOBAL_ID },
     create: { id: GLOBAL_ID, ...data },
