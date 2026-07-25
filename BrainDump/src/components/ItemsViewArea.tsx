@@ -40,13 +40,6 @@ import {
   getPersonalAreasList,
   PERSONAL_AREA_DEFAULTS,
 } from "@/lib/personal-areas";
-import {
-  deriveEntryTitle,
-  parseTextViewBlock,
-  resolveTextSplitScope,
-  splitTextViewBlocks,
-  type TextViewCommitFocus,
-} from "@/lib/text-view-entry-split";
 import { isContentRedundantWithTitle } from "@/lib/entry-content-redundant";
 import {
   filterItemsByDueDatePreset,
@@ -88,7 +81,7 @@ function viewChipProps(i: number): { className: string; style: CSSProperties } {
 
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
-export type ItemsViewType = "kanban" | "list" | "postits" | "calendar" | "flowchart" | "text";
+export type ItemsViewType = "kanban" | "list" | "postits" | "calendar" | "flowchart";
 
 export type ItemContextSubmenu = "workPrivate" | "areaProject" | "type";
 
@@ -173,24 +166,6 @@ function itemTypeFilterKey(it: Pick<ViewItem, "itemType" | "progress" | "kanbanC
     return isTaskCompleted(it) ? "task_completed" : "task";
   }
   return it.itemType;
-}
-
-function loadPersonalAreaIdSetForSplit(): Set<string> {
-  const s = new Set<string>([...PERSONAL_AREA_DEFAULTS]);
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(CUSTOM_AREAS_KEY) : null;
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        for (const c of parsed) {
-          if (typeof c === "string" && c.trim()) s.add(c.trim());
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return s;
 }
 
 const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> = {
@@ -351,7 +326,8 @@ export function loadViewPreference(): ItemsViewType {
   if (typeof window === "undefined") return "list";
   try {
     const v = localStorage.getItem(VIEW_STORAGE_KEY);
-    if (v === "kanban" || v === "list" || v === "postits" || v === "calendar" || v === "flowchart" || v === "text") return v as ItemsViewType;
+    if (v === "text") return "list";
+    if (v === "kanban" || v === "list" || v === "postits" || v === "calendar" || v === "flowchart") return v as ItemsViewType;
   } catch {}
   return "list";
 }
@@ -580,8 +556,8 @@ export function ItemsViewArea({
       cb(false);
       return;
     }
-    const listOrText = viewType === "list" || viewType === "text";
-    cb(listOrText && items.length === 0 && !dumpEmptyHintSuppressed);
+    const listView = viewType === "list";
+    cb(listView && items.length === 0 && !dumpEmptyHintSuppressed);
     return () => {
       cb(false);
     };
@@ -1295,142 +1271,6 @@ export function ItemsViewArea({
       .catch(() => {});
   }, []);
 
-  const commitTextViewContent = useCallback(
-    async (id: string, raw: string): Promise<TextViewCommitFocus | void> => {
-      const item = items.find((i) => i.id === id);
-      if (!item) return;
-
-      const blocks = splitTextViewBlocks(raw);
-      if (blocks.length === 0) {
-        const empty = raw.trim() === "" ? "" : raw.trim();
-        if (empty === (item.content ?? "").trim()) return;
-        fetch(`/api/organized-items/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: empty }),
-        })
-          .then((r) => {
-            if (r.ok) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, content: empty } : it)));
-          })
-          .catch(() => {});
-        return;
-      }
-
-      const parts = blocks.map((b) => parseTextViewBlock(b, showEntryTitles));
-      const scope = resolveTextSplitScope(mode, projectId, category, {
-        personalAreaIds: loadPersonalAreaIdSetForSplit(),
-      });
-
-      const patchFirst = async (): Promise<boolean> => {
-        const p0 = parts[0];
-        const nextTitle = showEntryTitles ? deriveEntryTitle(p0.title, p0.content) : item.title;
-        const nextContent = p0.content;
-        const body: { title?: string; content: string } = { content: nextContent };
-        if (showEntryTitles) body.title = nextTitle;
-        if (
-          parts.length === 1 &&
-          body.content === (item.content ?? "").trim() &&
-          (!showEntryTitles || body.title === item.title)
-        ) {
-          return true;
-        }
-        const r = await fetch(`/api/organized-items/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!r.ok) return false;
-        setItems((prev) =>
-          prev.map((it) =>
-            it.id === id ? { ...it, ...body } : it
-          )
-        );
-        return true;
-      };
-
-      if (parts.length === 1) {
-        await patchFirst();
-        return;
-      }
-
-      const okFirst = await patchFirst();
-      if (!okFirst) return;
-
-      const secondPart = parts[1];
-
-      const resDump = await fetch("/api/dumps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: scope.dumpMode,
-          transcriptRaw: "",
-          transcriptEdited: "",
-          status: "organized",
-        }),
-      });
-      const dumpJson = (await resDump.json()) as { dump?: { id: string } };
-      if (resDump.ok) emitGamificationFromResponseBody(dumpJson);
-      const dumpId = dumpJson.dump?.id;
-      if (!dumpId) {
-        await fetchItems();
-        return;
-      }
-
-      const batchItems = parts.slice(1).map((p) => ({
-        domain: scope.domain,
-        category: scope.category,
-        subcategory: "",
-        ...(scope.projectId ? { projectId: scope.projectId } : {}),
-        item_type: item.itemType,
-        title: deriveEntryTitle(p.title, p.content),
-        content: p.content,
-      }));
-
-      const orderedForSplit = sortItemsByListOrder(items);
-      const splitIdx = orderedForSplit.findIndex((i) => i.id === id);
-      const insertBeforeItemId =
-        splitIdx >= 0 && splitIdx + 1 < orderedForSplit.length ? orderedForSplit[splitIdx + 1]!.id : null;
-
-      const batchRes = await fetch("/api/organized-items/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dumpId,
-          items: batchItems,
-          insertAfterItemId: id,
-          insertBeforeItemId,
-        }),
-      });
-      const batchJson = (await batchRes.json()) as {
-        created?: Array<{ id: string; title: string }>;
-        createdItems?: ViewItem[];
-      };
-      if (!batchRes.ok || !batchJson.createdItems?.length) {
-        await fetchItems();
-        return;
-      }
-      emitGamificationFromResponseBody(batchJson);
-      const newRows = batchJson.createdItems;
-      setItems((prev) => sortItemsByListOrder([...prev, ...newRows]));
-      const firstNew = newRows[0];
-      if (!firstNew) return;
-      if (showEntryTitles) {
-        const headline = (firstNew.title ?? "").trim() || secondPart.title;
-        return {
-          focusEntryId: firstNew.id,
-          focusField: "title",
-          focusValue: headline,
-        };
-      }
-      return {
-        focusEntryId: firstNew.id,
-        focusField: "content",
-        focusValue: secondPart.content,
-      };
-    },
-    [items, mode, projectId, category, showEntryTitles, fetchItems]
-  );
-
   const createEntry = useCallback(
     async (form: typeof addEntryForm) => {
       const title = form.title.trim();
@@ -1741,7 +1581,6 @@ export function ItemsViewArea({
   const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = useMemo(
     () => [
       { value: "list", label: t("items.viewList"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
-      { value: "text", label: t("items.viewText"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><line x1="8" y1="7" x2="16" y2="7" /><line x1="8" y1="11" x2="16" y2="11" /><line x1="8" y1="15" x2="12" y2="15" /></svg> },
       { value: "kanban", label: t("items.viewKanban"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1" /><rect x="9.5" y="3" width="5" height="18" rx="1" /><rect x="16" y="3" width="5" height="18" rx="1" /></svg> },
       { value: "postits", label: t("items.viewPostits"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M9 9h6" /><path d="M9 13h6" /><path d="M9 17h4" /></svg> },
       { value: "calendar", label: t("items.viewCalendar"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg> },
@@ -2090,19 +1929,6 @@ export function ItemsViewArea({
               onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
               onEdit={(it) => setEditingEntry(toEditEntry(it))}
               onUpdate={updateEntryContent}
-              reorderEnabled={canReorderEntries}
-              onReorder={reorderEntriesPersist}
-            />
-          ) : viewType === "text" ? (
-            <TextView
-              showEntryTitles={showEntryTitles}
-              items={filteredItems}
-              isMobile={isMobile}
-              onUpdate={updateEntryContent}
-              onCommitTextContent={commitTextViewContent}
-              onDelete={deleteItem}
-              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-              onEdit={(it) => setEditingEntry(toEditEntry(it))}
               reorderEnabled={canReorderEntries}
               onReorder={reorderEntriesPersist}
             />
@@ -5403,449 +5229,6 @@ function ListView({
     </div>
   );
 }
-
-function TextView({
-  items,
-  showEntryTitles = true,
-  isMobile = false,
-  onUpdate,
-  onCommitTextContent,
-  onDelete,
-  onItemContextMenu,
-  onEdit,
-  reorderEnabled = false,
-  onReorder,
-}: {
-  items: ViewItem[];
-  showEntryTitles?: boolean;
-  isMobile?: boolean;
-  onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
-  /** Text view: blur commits full textarea; double line breaks split into new entries (also on input). */
-  onCommitTextContent?: (id: string, raw: string) => void | Promise<TextViewCommitFocus | void>;
-  onDelete: (id: string, skipConfirm?: boolean) => void;
-  onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
-  onEdit?: (item: ViewItem) => void;
-  reorderEnabled?: boolean;
-  onReorder?: (orderedIds: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
-  const [editing, setEditing] = useState<{ id: string; field: "title" | "content"; value: string } | null>(null);
-  const [reorderPreview, setReorderPreview] = useState<ReorderDragPreview | null>(null);
-  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const textSplitCommitLockRef = useRef(false);
-
-  const textItemsOrdered = useMemo(
-    () => (reorderEnabled && reorderPreview ? applyReorderPreview(items, reorderPreview) : items),
-    [items, reorderEnabled, reorderPreview]
-  );
-
-  useEffect(() => {
-    if (!editing) return;
-    if (editing.field === "title") inputRef.current?.focus();
-    else textareaRef.current?.focus();
-  }, [editing]);
-
-  useEffect(() => {
-    if (!showEntryTitles && editing?.field === "title") setEditing(null);
-  }, [showEntryTitles, editing?.field]);
-
-  const handleBlur = (id: string, field: "title" | "content", value: string, current: string) => {
-    const trimmed = value.trim();
-    if (trimmed !== current) {
-      if (field === "title") onUpdate(id, { title: trimmed || current });
-      else onUpdate(id, { content: trimmed });
-    }
-    setEditing(null);
-  };
-
-  const scheduleSplitFocus = useCallback((focus: TextViewCommitFocus) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setEditing({
-          id: focus.focusEntryId,
-          field: focus.focusField,
-          value: focus.focusValue,
-        });
-        window.setTimeout(() => {
-          if (focus.focusField === "title") {
-            const el = inputRef.current;
-            el?.focus();
-            if (el) {
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
-            }
-          } else {
-            const el = textareaRef.current;
-            el?.focus();
-            if (el) {
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
-            }
-          }
-        }, 0);
-      });
-    });
-  }, []);
-
-  const handleContentBlur = (id: string, value: string, current: string) => {
-    if (onCommitTextContent) {
-      if (textSplitCommitLockRef.current) return;
-      void Promise.resolve(onCommitTextContent(id, value)).then((focus) => {
-        if (focus?.focusEntryId) {
-          scheduleSplitFocus(focus);
-        } else {
-          setEditing(null);
-        }
-      });
-      return;
-    }
-    handleBlur(id, "content", value, current);
-  };
-
-  /** When titles are on, description editor includes headline (first line) + body for split/commit. */
-  const mergeTitleAndContent = (it: ViewItem) => {
-    const title = (it.title ?? "").trim();
-    const body = (it.content ?? "").trim();
-    if (!title) return body;
-    if (!body) return title;
-    return `${title}\n${body}`;
-  };
-
-  const commitTextReorderDrop = (e: DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!onReorder) return;
-    const fromId = e.dataTransfer.getData("text/plain");
-    if (!fromId) return;
-    const el = e.currentTarget as HTMLElement;
-    const place = mergeDragPlace(e, el);
-    const ordered = applyReorderPreview(items, { draggedId: fromId, overId: targetId, place });
-    onReorder(ordered.map((i) => i.id));
-    setReorderPreview(null);
-  };
-
-  return (
-    <div
-      className="bd-text-view"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.65rem",
-        overflow: "auto",
-        paddingBottom: "0.5rem",
-        maxWidth: 720,
-        width: "100%",
-        minWidth: 0,
-        boxSizing: "border-box",
-      }}
-    >
-      {textItemsOrdered.map((it, i) => {
-        const ep = enterStaggerProps(i);
-        const isEditingTitle = editing?.id === it.id && editing?.field === "title";
-        const isEditingContent = editing?.id === it.id && editing?.field === "content";
-        const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
-        const isNew = isNewEntry(it);
-        const isDraggingRow = reorderPreview?.draggedId === it.id;
-        const dropHint =
-          reorderPreview &&
-          reorderPreview.draggedId !== it.id &&
-          reorderPreview.overId === it.id &&
-          (reorderPreview.place === "before"
-            ? { boxShadow: "inset 0 3px 0 0 var(--accent)" }
-            : { boxShadow: "inset 0 -3px 0 0 var(--accent)" });
-        return (
-          <SwipeDeleteRow
-            key={it.id}
-            entryId={it.id}
-            swipeOpenId={swipeOpenId}
-            setSwipeOpenId={setSwipeOpenId}
-            onDelete={() => onDelete(it.id, true)}
-            disabled={isEditingTitle || isEditingContent}
-            slideSurface="canvas"
-          >
-          <div
-            className={ep.className}
-            data-bd-entry-id={it.id}
-            data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
-            style={{
-              ...ep.style,
-              display: "flex",
-              flexDirection: "row",
-              background: "transparent",
-              gap: "0.45rem",
-              alignItems: "stretch",
-              opacity: isDraggingRow ? 0.38 : 1,
-              ...dropHint,
-            }}
-            onDragOver={
-              reorderEnabled && onReorder
-                ? (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    setReorderPreview((prev) => {
-                      if (!prev) return prev;
-                      if (prev.draggedId === it.id) return prev;
-                      const place = mergeDragPlace(e, e.currentTarget as HTMLElement);
-                      if (prev.overId === it.id && prev.place === place) return prev;
-                      return { ...prev, overId: it.id, place };
-                    });
-                  }
-                : undefined
-            }
-            onDrop={reorderEnabled && onReorder ? (e) => commitTextReorderDrop(e, it.id) : undefined}
-          >
-            {reorderEnabled && onReorder ? (
-              <span
-                className="bd-entry-drag-handle bd-entry-drag-handle--text"
-                data-bd-no-swipe
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("text/plain", it.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  setReorderPreview({ draggedId: it.id, overId: it.id, place: "before" });
-                  attachRowDragImage(e, e.currentTarget as HTMLElement);
-                }}
-                onDragEnd={() => setReorderPreview(null)}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                title={t("items.dragToReorder")}
-                aria-label={t("items.dragToReorder")}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <circle cx="9" cy="5" r="1" fill="currentColor" stroke="none" />
-                  <circle cx="15" cy="5" r="1" fill="currentColor" stroke="none" />
-                  <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
-                  <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
-                  <circle cx="9" cy="19" r="1" fill="currentColor" stroke="none" />
-                  <circle cx="15" cy="19" r="1" fill="currentColor" stroke="none" />
-                </svg>
-              </span>
-            ) : null}
-            <div style={{ width: 4, borderRadius: 999, background: barColor, flexShrink: 0 }} />
-            <article
-              onContextMenu={
-                onItemContextMenu && !isMobile
-                  ? (e) => {
-                      e.preventDefault();
-                      onItemContextMenu(e, it.id, it.domain, it.itemType);
-                    }
-                  : undefined
-              }
-              style={{
-                flex: 1,
-                minWidth: 0,
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.3rem",
-                padding: "0.35rem 0",
-                background: "transparent",
-                borderRadius: 0,
-                boxShadow: "none",
-                border: "none",
-                position: "relative",
-              }}
-            >
-            {isNew && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "var(--text-primary)",
-                  boxShadow: "0 0 6px rgba(255,255,255,0.25)",
-                }}
-                aria-hidden
-              />
-            )}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.1rem" }}>
-              <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", color: "var(--text-tertiary)", lineHeight: 1.2 }}>
-                {entryTypeMetaLine(it, t)}
-              </span>
-              {showEntryTitles &&
-                (isEditingTitle ? (
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    data-bd-no-swipe
-                    value={editing?.value ?? it.title}
-                    onChange={(e) => setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))}
-                    onBlur={() => editing && handleBlur(it.id, "title", editing.value, it.title)}
-                    {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    }}
-                    style={{
-                      flex: 1,
-                      margin: 0,
-                      fontSize: "1.125rem",
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                      padding: "0.1rem 0",
-                      lineHeight: 1.28,
-                      minHeight: "1.45rem",
-                      background: "transparent",
-                      border: "none",
-                      outline: "none",
-                    }}
-                  />
-                ) : (
-                  <h2
-                    onClick={!isMobile ? () => setEditing({ id: it.id, field: "title", value: it.title }) : undefined}
-                    {...(isMobile
-                      ? bindMobileField(it, () => setEditing({ id: it.id, field: "title", value: it.title }), () => onEdit?.(it))
-                      : {})}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      onEdit?.(it);
-                    }}
-                    style={{
-                      flex: 1,
-                      margin: 0,
-                      fontSize: "1.125rem",
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                      cursor: "text",
-                      padding: "0.1rem 0",
-                      lineHeight: 1.28,
-                      minHeight: "1.45rem",
-                    }}
-                  >
-                    {it.title || "Untitled"}
-                  </h2>
-                ))}
-            </div>
-            {isEditingContent ? (
-              <textarea
-                ref={textareaRef}
-                data-bd-no-swipe
-                value={
-                  editing?.id === it.id
-                    ? (editing.value ?? "")
-                    : showEntryTitles
-                      ? mergeTitleAndContent(it)
-                      : (it.content ?? "")
-                }
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setEditing((prev) => (prev ? { ...prev, value: next } : null));
-                  if (!onCommitTextContent) return;
-                  if (splitTextViewBlocks(next).length < 2) return;
-                  textSplitCommitLockRef.current = true;
-                  void Promise.resolve(onCommitTextContent(it.id, next))
-                    .then((focus) => {
-                      if (focus?.focusEntryId) {
-                        scheduleSplitFocus(focus);
-                      } else {
-                        setEditing({ id: it.id, field: "content", value: next });
-                      }
-                    })
-                    .finally(() => {
-                      textSplitCommitLockRef.current = false;
-                    });
-                }}
-                onBlur={(e) =>
-                  handleContentBlur(
-                    it.id,
-                    e.currentTarget.value,
-                    showEntryTitles ? mergeTitleAndContent(it) : it.content ?? ""
-                  )
-                }
-                {...(isMobile && onItemContextMenu ? bindMobileField(it) : {})}
-                rows={4}
-                style={{
-                  width: "100%",
-                  margin: 0,
-                  resize: "vertical",
-                  fontSize: "0.875rem",
-                  lineHeight: 1.4,
-                  color: "var(--text-secondary)",
-                  padding: "0.12rem 0",
-                  minHeight: 72,
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                }}
-              />
-            ) : (
-              <p
-                onClick={
-                  !isMobile
-                    ? () =>
-                        setEditing({
-                          id: it.id,
-                          field: "content",
-                          value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
-                        })
-                    : undefined
-                }
-                {...(isMobile
-                  ? bindMobileField(
-                      it,
-                      () =>
-                        setEditing({
-                          id: it.id,
-                          field: "content",
-                          value: showEntryTitles ? mergeTitleAndContent(it) : it.content ?? "",
-                        }),
-                      () => onEdit?.(it)
-                    )
-                  : {})}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onEdit?.(it);
-                }}
-                style={{
-                  margin: 0,
-                  fontSize: "0.875rem",
-                  lineHeight: 1.38,
-                  color: "var(--text-secondary)",
-                  cursor: "text",
-                  padding: "0.08rem 0 0",
-                  minHeight: "1.25em",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {(() => {
-                  const body = (it.content ?? "").trim();
-                  if (!body) return t("items.clickToAddDescription");
-                  if (
-                    showEntryTitles &&
-                    isContentRedundantWithTitle(it.title, it.content) &&
-                    body
-                  ) {
-                    return t("items.textViewTapMoreDetails");
-                  }
-                  return body;
-                })()}
-              </p>
-            )}
-          </article>
-          </div>
-          </SwipeDeleteRow>
-        );
-      })}
-      <p
-        style={{
-          fontSize: "0.72rem",
-          color: "var(--text-tertiary)",
-          margin: "0.35rem 0 0",
-          paddingLeft: "0.55rem",
-          lineHeight: 1.4,
-          maxWidth: 720,
-        }}
-      >
-        {t("items.textViewSplitHint")}
-      </p>
-    </div>
-  );
-}
-
 function KanbanView({
   items,
   showEntryTitles = true,
@@ -6063,7 +5446,7 @@ function KanbanView({
                   overflow: "hidden",
                 }}
               >
-                {it.content?.trim() || "—"}
+                {it.content?.trim() || "ÔÇö"}
               </div>
               )}
               <div
@@ -6452,7 +5835,7 @@ function PostitsView({
                   )}
                   {!hideRedundantBody && (
                   <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                    {it.content?.trim() || "—"}
+                    {it.content?.trim() || "ÔÇö"}
                   </div>
                   )}
                 </div>

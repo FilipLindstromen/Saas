@@ -33,6 +33,19 @@ export function scheduledAtToDateKey(scheduledAt: string | null | undefined): st
   return toYyyyMmDd(new Date(t));
 }
 
+export function filterItemsByDateKey<T extends { scheduledAt?: string | null }>(
+  items: T[],
+  dateKey: string
+): T[] {
+  return items.filter((it) => scheduledAtToDateKey(it.scheduledAt) === dateKey);
+}
+
+export function dateKeyOffset(fromToday: number): string {
+  const d = startOfLocalDay(new Date());
+  d.setDate(d.getDate() + fromToday);
+  return toYyyyMmDd(d);
+}
+
 export function filterItemsByDueDatePreset<T extends { scheduledAt?: string | null }>(
   items: T[],
   preset: DueDateFilterPreset

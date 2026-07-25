@@ -9,9 +9,9 @@ import type { ItemsViewType } from "@/components/ItemsViewArea";
 function bottomBarTarget(
   viewType: ItemsViewType,
   todayViewActive: boolean
-): "today" | "text" | "calendar" | null {
+): "today" | "list" | "calendar" | null {
   if (todayViewActive) return "today";
-  if (viewType === "text") return "text";
+  if (viewType === "list") return "list";
   if (viewType === "calendar") return "calendar";
   return null;
 }
@@ -21,10 +21,10 @@ export type MobileBottomBarPillProps = {
   todayViewActive: boolean;
   dumpRecordingActive: boolean;
   centerPanelRef: RefObject<BrainDumpCenterHandle | null>;
-  /** List/text view empty — show hint above the dump mic. */
+  /** List view empty — show hint above the dump mic. */
   showDumpEmptyHint?: boolean;
   onTodayClick: () => void;
-  onSelectText: () => void;
+  onSelectList: () => void;
   onSelectCalendar: () => void;
 };
 
@@ -45,13 +45,13 @@ export function MobileBottomBarPill({
   centerPanelRef,
   showDumpEmptyHint = false,
   onTodayClick,
-  onSelectText,
+  onSelectList,
   onSelectCalendar,
 }: MobileBottomBarPillProps) {
   const { t } = useI18n();
   const pillRef = useRef<HTMLElement>(null);
   const todayRef = useRef<HTMLButtonElement>(null);
-  const textRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLButtonElement>(null);
   const calendarRef = useRef<HTMLButtonElement>(null);
   const [highlight, setHighlight] = useState<HighlightMetrics>(HIGHLIGHT_INITIAL);
 
@@ -61,8 +61,8 @@ export function MobileBottomBarPill({
     const btn =
       target === "today"
         ? todayRef.current
-        : target === "text"
-          ? textRef.current
+        : target === "list"
+          ? listRef.current
           : target === "calendar"
             ? calendarRef.current
             : null;
@@ -136,27 +136,17 @@ export function MobileBottomBarPill({
         </svg>
       </button>
       <button
-        ref={textRef}
+        ref={listRef}
         type="button"
-        className={`bd-bottom-bar-pill-item${viewType === "text" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectText}
-        title={t("items.viewText")}
-        aria-label={t("items.viewText")}
-        aria-current={viewType === "text" && !todayViewActive ? "page" : undefined}
+        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onSelectList}
+        title={t("items.viewList")}
+        aria-label={t("items.viewList")}
+        aria-current={viewType === "list" && !todayViewActive ? "page" : undefined}
       >
-        <svg
-          className="bd-bottom-bar-pill-icon"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <path d="M4 6h16M4 12h16M4 18h11" />
+        <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
+          <path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       <div className="bd-bottom-bar-pill-mic-wrap">
