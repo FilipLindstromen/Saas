@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { ArrowDown, Square, Mic, List, Camera, X, HelpCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState, saveDebugSnapshot } from "@/lib/form-storage";
 import { fetchWithTimeout, postJsonWithTimeout } from "@/lib/safe-fetch-json";
@@ -76,10 +77,7 @@ export function DumpEmptyHintCallout({ className = "" }: { className?: string })
     <div className={`bd-dump-empty-hint ${className}`.trim()} aria-live="polite">
       <p className="bd-dump-empty-hint-text">{t("center.dumpEmptyHint")}</p>
       <div className="bd-dump-empty-hint-arrow">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <line x1="12" y1="5" x2="12" y2="17" />
-          <polyline points="8 13 12 17 16 13" />
-        </svg>
+        <ArrowDown size={26} strokeWidth={2.2} aria-hidden="true" />
       </div>
     </div>
   );
@@ -1120,9 +1118,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                     title={t("center.stopOrganize")}
                     aria-label={t("center.stopOrganize")}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
-                    </svg>
+                    <Square size={16} fill="currentColor" stroke="none" aria-hidden="true" />
                     {t("center.stopOrganize")}
                   </button>
                 </div>
@@ -1190,15 +1186,9 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               aria-label={recordState === "recording" ? t("center.stopOrganize") : t("center.recordNewDump")}
             >
               {recordState === "recording" ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
+                <Square size={24} fill="currentColor" stroke="none" aria-hidden="true" />
               ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="22" />
-                </svg>
+                <Mic size={24} strokeWidth={2} aria-hidden="true" />
               )}
             </button>
           </div>
@@ -1231,10 +1221,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   setShowTypedDumpSheet(true);
                 }}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="3" y="5" width="18" height="14" rx="2" />
-                  <path d="M7 9h4M7 13h8" />
-                </svg>
+                <List size={15} strokeWidth={2} aria-hidden="true" />
                 {t("center.typeDump")}
               </button>
               <button
@@ -1246,10 +1233,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
                 }}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
+                <Camera size={15} strokeWidth={2} aria-hidden="true" />
                 {t("bottom.photoFromCamera")}
               </button>
             </div>
@@ -1267,10 +1251,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   aria-label={t("center.cancelDump")}
                   title={t("center.cancelDump")}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <X size={16} strokeWidth={2.2} aria-hidden="true" />
                 </button>
                 <h2 id="bd-voice-dump-title" className="bd-dump-sheet-title">
                   {t("center.newDump")}
@@ -1282,11 +1263,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   aria-label={t("center.help")}
                   title={t("center.help")}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
+                  <HelpCircle size={18} strokeWidth={2} aria-hidden="true" />
                 </button>
               </header>
 
@@ -1319,10 +1296,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   onClick={closeTypedDumpSheet}
                   aria-label={t("center.cancelDump")}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <X size={16} strokeWidth={2.2} aria-hidden="true" />
                 </button>
               </div>
               <textarea

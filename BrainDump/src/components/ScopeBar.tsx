@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Calendar, Check, ChevronDown, Funnel, Plus, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
 import { scheduleClientPreferencesUpload } from "@/lib/client-preferences-sync";
@@ -288,12 +289,7 @@ function DueDateFilterMenuButton({
             : {}),
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
+        <Calendar size={18} aria-hidden />
         {!isMobile && selected ? (
           <span style={{ maxWidth: "5.5rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {t(DUE_DATE_LABEL_KEY[value])}
@@ -470,20 +466,12 @@ function ScopeDropdown({
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: "12rem" }}>
           {selectedLabel}
         </span>
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <ChevronDown
+          size={13}
+          strokeWidth={2.5}
           aria-hidden
           style={{ flexShrink: 0, opacity: 0.7, transform: open ? "rotate(180deg)" : undefined, transition: "transform 0.18s ease" }}
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+        />
       </button>
       {dropdown}
     </>
@@ -537,9 +525,7 @@ function ScopeDropdownOption({
         {label}
       </span>
       {selected ? (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
+        <Check size={14} strokeWidth={2.5} aria-hidden style={{ flexShrink: 0 }} />
       ) : (
         <span style={{ width: 14, flexShrink: 0 }} aria-hidden />
       )}
@@ -996,20 +982,7 @@ export function ScopeBar({
                     >
                       {selectedProjectLabel}
                     </span>
-                    <svg
-                      width="22"
-                      height="22"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                      style={{ flexShrink: 0, opacity: 0.85 }}
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
+                    <ChevronDown size={22} aria-hidden style={{ flexShrink: 0, opacity: 0.85 }} />
                   </button>
                   {onSearchFilterChange && (
                     <button
@@ -1037,9 +1010,7 @@ export function ScopeBar({
                             }),
                       }}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                      </svg>
+                      <Funnel size={20} aria-hidden />
                     </button>
                   )}
                 </div>
@@ -1104,9 +1075,7 @@ export function ScopeBar({
                             (e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)";
                           }}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M12 5v14M5 12h14" />
-                          </svg>
+                          <Plus size={14} strokeWidth={2.5} aria-hidden />
                           {t("scope.addProject")}
                         </button>
                       </>
@@ -1192,9 +1161,7 @@ export function ScopeBar({
                   aria-label={t("scope.cancel")}
                   style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <X size={18} aria-hidden />
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -1221,9 +1188,7 @@ export function ScopeBar({
                 >
                   {t("scope.all")}
                   {!selectedProjectId ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <Check size={18} strokeWidth={2.5} aria-hidden />
                   ) : (
                     <span style={{ width: 18 }} aria-hidden />
                   )}
@@ -1258,9 +1223,7 @@ export function ScopeBar({
                           {p.name}
                         </span>
                         {sel ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
+                          <Check size={18} strokeWidth={2.5} aria-hidden />
                         ) : (
                           <span style={{ width: 18 }} aria-hidden />
                         )}
@@ -1646,20 +1609,7 @@ export function ScopeBar({
                     >
                       {selectedCategory ? formatCategoryLabel(selectedCategory) : t("scope.all")}
                     </span>
-                    <svg
-                      width="22"
-                      height="22"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                      style={{ flexShrink: 0, opacity: 0.85 }}
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
+                    <ChevronDown size={22} aria-hidden style={{ flexShrink: 0, opacity: 0.85 }} />
                   </button>
                   {onSearchFilterChange && (
                     <button
@@ -1687,9 +1637,7 @@ export function ScopeBar({
                             }),
                       }}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                      </svg>
+                      <Funnel size={20} aria-hidden />
                     </button>
                   )}
                 </div>
@@ -1825,9 +1773,7 @@ export function ScopeBar({
                             (e.currentTarget as HTMLElement).style.color = "var(--text-tertiary)";
                           }}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M12 5v14M5 12h14" />
-                          </svg>
+                          <Plus size={14} strokeWidth={2.5} aria-hidden />
                           {t("scope.addArea")}
                         </button>
                       </>
@@ -1912,9 +1858,7 @@ export function ScopeBar({
                   aria-label={t("scope.cancel")}
                   style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <X size={18} aria-hidden />
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -1941,9 +1885,7 @@ export function ScopeBar({
                 >
                   {t("scope.all")}
                   {!selectedCategory ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <Check size={18} strokeWidth={2.5} aria-hidden />
                   ) : (
                     <span style={{ width: 18 }} aria-hidden />
                   )}
@@ -1978,9 +1920,7 @@ export function ScopeBar({
                           {formatCategoryLabel(value)}
                         </span>
                         {sel ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
+                          <Check size={18} strokeWidth={2.5} aria-hidden />
                         ) : (
                           <span style={{ width: 18 }} aria-hidden />
                         )}

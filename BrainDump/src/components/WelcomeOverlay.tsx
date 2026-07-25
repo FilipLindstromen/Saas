@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check, Mic } from "lucide-react";
 import { useI18n, type Locale } from "@/lib/i18n";
 
 const WELCOME_DONE_KEY = "braindump-welcome-done";
@@ -106,11 +107,7 @@ export function WelcomeOverlay() {
 
         <div style={{ textAlign: "center" }}>
           <div className="bd-welcome-logo" aria-hidden>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent-text, #fff)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
+            <Mic size={26} color="var(--accent-text, #fff)" strokeWidth={2} />
           </div>
           <h1 id="bd-welcome-title" className="bd-welcome-title">
             {step === "language" && t("welcome.titleLanguage")}
@@ -136,9 +133,7 @@ export function WelcomeOverlay() {
               >
                 <span>{lang.native}</span>
                 {selected === lang.value && (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+                  <Check size={18} color="var(--accent)" strokeWidth={2.5} aria-hidden />
                 )}
               </button>
             ))}

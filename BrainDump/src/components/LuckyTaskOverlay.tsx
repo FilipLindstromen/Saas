@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Dice5, X, Play } from "lucide-react";
 import type { ViewItem } from "./ItemsViewArea";
 
 interface LuckyTaskOverlayProps {
@@ -225,14 +226,7 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
               }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="2" y="2" width="20" height="20" rx="5" />
-                  <circle cx="8" cy="8" r="1.2" fill="#fff" stroke="none" />
-                  <circle cx="16" cy="8" r="1.2" fill="#fff" stroke="none" />
-                  <circle cx="8" cy="16" r="1.2" fill="#fff" stroke="none" />
-                  <circle cx="16" cy="16" r="1.2" fill="#fff" stroke="none" />
-                  <circle cx="12" cy="12" r="1.2" fill="#fff" stroke="none" />
-                </svg>
+                <Dice5 size={22} color="#fff" strokeWidth={2} aria-hidden="true" />
               </div>
               <div>
                 <p style={{ margin: 0, fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.75)" }}>
@@ -261,9 +255,7 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
                 transition: "background 0.15s ease",
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
+              <X size={16} strokeWidth={2.5} strokeLinecap="round" aria-hidden="true" />
             </button>
           </div>
 
@@ -366,9 +358,7 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
                 e.currentTarget.style.transform = "";
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
+              <Play size={15} strokeWidth={2.5} aria-hidden="true" />
               Start
             </button>
           </div>

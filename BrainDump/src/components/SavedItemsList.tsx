@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Trash2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { BRAINDUMP_NEW_BATCH_EVENT, getLastNewBatchIds } from "@/lib/newBatch";
@@ -805,13 +806,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                   alignSelf: isMobile ? "flex-start" : undefined,
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M3 6h18" />
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
+                <Trash2 size={20} aria-hidden />
               </button>
               <div
                 style={{
@@ -830,9 +825,7 @@ export function SavedItemsList({ mode, projectId, category, itemType, onItemMove
                   title={t("items.ariaCancelEdit")}
                   style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <X size={20} aria-hidden />
                 </button>
                 <button
                   type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
 export type PhotoCaptureTriggerHandle = {
@@ -142,10 +143,7 @@ export const PhotoCaptureTrigger = forwardRef<PhotoCaptureTriggerHandle, PhotoCa
             aria-expanded={menuOpen}
             aria-haspopup="menu"
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-              <circle cx="12" cy="13" r="3" />
-            </svg>
+            <Camera size={22} strokeWidth={2} aria-hidden />
           </button>
         )}
         {menuOpen && (

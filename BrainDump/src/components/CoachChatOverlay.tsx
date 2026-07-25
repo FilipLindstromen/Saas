@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { X, Square, Mic, Send } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { COACH_MODE_IDS, type CoachModeId } from "@/lib/coach-modes";
 
@@ -189,9 +190,7 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
             <p className="bd-coach-sub">{t("coach.subtitle")}</p>
           </div>
           <button type="button" className="bd-btn bd-coach-close" onClick={onClose} aria-label={t("coach.close")}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <X size={20} strokeWidth={2} aria-hidden="true" />
           </button>
         </header>
 
@@ -262,15 +261,9 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
             aria-pressed={recording}
           >
             {recording ? (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
+              <Square size={22} fill="currentColor" stroke="none" aria-hidden="true" />
             ) : (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
+              <Mic size={22} strokeWidth={2} aria-hidden="true" />
             )}
           </button>
           <textarea
@@ -295,10 +288,7 @@ export function CoachChatOverlay({ open, onClose }: CoachChatOverlayProps) {
             disabled={loading || !input.trim() || recording}
             aria-label={t("coach.send")}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" stroke="none" opacity="0.9" />
-            </svg>
+            <Send size={20} strokeWidth={2} strokeLinecap="round" aria-hidden="true" />
           </button>
         </div>
       </div>

@@ -8,6 +8,23 @@ import {
   type ReactNode,
 } from "react";
 import { useSession } from "next-auth/react";
+import {
+  Bell,
+  Briefcase,
+  Bug,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  Inbox as InboxIcon,
+  LayoutGrid,
+  Settings,
+  Trash2,
+  Trophy,
+  User,
+  X,
+  AlignLeft,
+} from "lucide-react";
 import { DeleteEntriesOverlay } from "./DeleteEntriesOverlay";
 import { BrainDumpHabitReminderModal } from "./BrainDumpHabitReminderModal";
 import { StreaksModal } from "./StreaksModal";
@@ -34,32 +51,10 @@ const MODE_KEY: Record<Mode, string> = {
 };
 
 const modeIcons: Record<Mode, () => ReactNode> = {
-  all: () => (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  ),
-  work: () => (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-    </svg>
-  ),
-  personal: () => (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  ),
-  inbox: () => (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-    </svg>
-  ),
+  all: () => <LayoutGrid size={20} aria-hidden />,
+  work: () => <Briefcase size={20} aria-hidden />,
+  personal: () => <User size={20} aria-hidden />,
+  inbox: () => <InboxIcon size={20} aria-hidden />,
 };
 
 type AppSidebarProps = {
@@ -213,9 +208,7 @@ export function AppSidebar({
           aria-label={expanded ? t("sidebar.collapse") : t("sidebar.expand")}
           aria-expanded={expanded}
         >
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            {expanded ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
-          </svg>
+          {expanded ? <ChevronLeft size={18} aria-hidden /> : <ChevronRight size={18} aria-hidden />}
         </button>
       )}
 
@@ -228,9 +221,7 @@ export function AppSidebar({
             onClick={() => onMobileOpenChange(false)}
             aria-label={t("sidebar.closeMenu")}
           >
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <X size={20} aria-hidden />
           </button>
         </div>
       )}
@@ -297,9 +288,7 @@ export function AppSidebar({
               aria-label={t("sidebar.captureText")}
             >
               <span className="bd-app-sidebar-nav-icon">
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M4 6h16M4 12h16M4 18h11" />
-                </svg>
+                <AlignLeft size={20} aria-hidden />
               </span>
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.captureText")}</span> : null}
             </button>
@@ -317,10 +306,7 @@ export function AppSidebar({
               aria-label={t("sidebar.capturePhoto")}
             >
               <span className="bd-app-sidebar-nav-icon">
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                  <circle cx="12" cy="13" r="3" />
-                </svg>
+                <Camera size={20} aria-hidden />
               </span>
               {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.capturePhoto")}</span> : null}
             </button>
@@ -343,9 +329,7 @@ export function AppSidebar({
           aria-label={`${t("topBar.streaks")}. ${t("streaks.levelShort", { n: streakLevelFromTotal(streakState.totalOrganizedDumps) })}`}
         >
           <span className="bd-app-sidebar-nav-icon">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3.5a2.5 2.5 0 0 0 2.5 2.5z" />
-            </svg>
+            <Flame size={20} aria-hidden />
             <span className="bd-app-sidebar-streak-badge">{streakState.currentStreak}</span>
           </span>
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("topBar.streaks")}</span> : null}
@@ -364,11 +348,7 @@ export function AppSidebar({
             aria-label={t("gamification.title")}
           >
             <span className="bd-app-sidebar-nav-icon">
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 15c-3.866 0-7-1.567-7-3.5V6.5C5 4.567 8.134 3 12 3s7 1.567 7 3.5V11.5c0 1.933-3.134 3.5-7 3.5z" />
-                <path d="M5 10v4c0 2 3 4 7 4s7-2 7-4v-4" />
-                <path d="M12 11v6" />
-              </svg>
+              <Trophy size={20} aria-hidden />
             </span>
             {showLabels ? <span className="bd-app-sidebar-nav-label">{t("gamification.shortLabel")}</span> : null}
           </button>
@@ -386,10 +366,7 @@ export function AppSidebar({
           aria-label={t("sidebar.habitReminders")}
         >
           <span className="bd-app-sidebar-nav-icon">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
+            <Bell size={20} aria-hidden />
           </span>
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.habitReminders")}</span> : null}
         </button>
@@ -408,12 +385,7 @@ export function AppSidebar({
           aria-label={t("sidebar.trash")}
         >
           <span className="bd-app-sidebar-nav-icon">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
+            <Trash2 size={20} aria-hidden />
           </span>
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("sidebar.trash")}</span> : null}
         </button>
@@ -430,12 +402,7 @@ export function AppSidebar({
           aria-label={t("settings.deleteEntriesOpen")}
         >
           <span className="bd-app-sidebar-nav-icon">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
+            <Trash2 size={20} aria-hidden />
           </span>
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("settings.deleteEntriesOpen")}</span> : null}
         </button>
@@ -453,10 +420,7 @@ export function AppSidebar({
             aria-label="Debug — last organize"
           >
             <span className="bd-app-sidebar-nav-icon">
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M12 22c1.1 0 2-.9 2-2H10c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-                <circle cx="18" cy="8" r="4" fill="var(--accent)" stroke="none" />
-              </svg>
+              <Bug size={20} aria-hidden />
             </span>
             {showLabels ? <span className="bd-app-sidebar-nav-label">Debug</span> : null}
           </button>
@@ -471,10 +435,7 @@ export function AppSidebar({
           aria-label={t("topBar.settings")}
         >
           <span className="bd-app-sidebar-nav-icon">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
+            <Settings size={20} aria-hidden />
           </span>
           {showLabels ? <span className="bd-app-sidebar-nav-label">{t("topBar.settings")}</span> : null}
         </button>

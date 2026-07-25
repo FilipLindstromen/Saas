@@ -16,6 +16,25 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  AlarmClock,
+  Calendar,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  CircleCheckBig,
+  EllipsisVertical,
+  FileText,
+  GripVertical,
+  Heart,
+  Info,
+  Lightbulb,
+  RefreshCw,
+  ShoppingCart,
+  SquareCheckBig,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
   BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT,
   scheduleClientPreferencesUpload,
 } from "@/lib/client-preferences-sync";
@@ -249,63 +268,22 @@ export function EntryTypeIcon({ type, size = 16 }: { type: string; size?: number
   const iconProps = { width: size, height: size, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (t) {
     case "task":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M9 11l3 3L22 4" />
-          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-        </svg>
-      );
+      return <SquareCheckBig {...iconProps} />;
     case "task_completed":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-          <path d="M22 4L12 14.01l-3-3" />
-        </svg>
-      );
+      return <CircleCheckBig {...iconProps} />;
     case "shopping":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <circle cx="9" cy="21" r="1" />
-          <circle cx="20" cy="21" r="1" />
-          <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
-        </svg>
-      );
+      return <ShoppingCart {...iconProps} />;
     case "idea":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5S10 14.09 11 14.25" />
-        </svg>
-      );
+      return <Lightbulb {...iconProps} />;
     case "emotion":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-        </svg>
-      );
+      return <Heart {...iconProps} />;
     case "reflection":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4M12 8h.01" />
-        </svg>
-      );
+      return <Info {...iconProps} />;
     case "calendar":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-      );
+      return <Calendar {...iconProps} />;
     case "note":
     default:
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...iconProps}>
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-        </svg>
-      );
+      return <FileText {...iconProps} />;
   }
 }
 
@@ -1383,9 +1361,7 @@ export function ItemsViewArea({
           }}
         >
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{selectedTypeLabel}</span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.95 }} aria-hidden>
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          <ChevronDown size={18} style={{ flexShrink: 0, opacity: 0.95 }} aria-hidden />
         </button>
       )}
     </>
@@ -1501,9 +1477,7 @@ export function ItemsViewArea({
                   aria-label={t("scope.cancel")}
                   style={{ minWidth: 44, minHeight: 44, padding: "0.45rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <X size={18} aria-hidden />
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -1542,9 +1516,7 @@ export function ItemsViewArea({
                         {opt.label}
                       </span>
                       {sel ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
+                        <Check size={18} strokeWidth={2.5} aria-hidden />
                       ) : (
                         <span style={{ width: 18 }} aria-hidden />
                       )}
@@ -1855,9 +1827,7 @@ export function ItemsViewArea({
               }}
               aria-label={t("items.editCloseSave")}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
+              <ChevronLeft size={22} aria-hidden />
             </button>
             <div className="bd-edit-entry-mobile-top-actions">
               <button
@@ -1866,11 +1836,7 @@ export function ItemsViewArea({
                 aria-label={t("items.editMore")}
                 onClick={() => setEditEntryMoreOpen(true)}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <circle cx="12" cy="6" r="1.5" />
-                  <circle cx="12" cy="12" r="1.5" />
-                  <circle cx="12" cy="18" r="1.5" />
-                </svg>
+                <EllipsisVertical size={20} fill="currentColor" stroke="none" aria-hidden />
               </button>
               <button
                 type="button"
@@ -1950,20 +1916,11 @@ export function ItemsViewArea({
                         <span className="bd-edit-entry-schedule-accent-inner">
                           {scheduleLine || t("items.editTapToSchedule")}
                           {scheduleLine ? (
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
+                            <AlarmClock
+                              size={16}
                               aria-hidden
                               className="bd-edit-entry-schedule-alarm"
-                            >
-                              <circle cx="12" cy="13" r="7" />
-                              <path d="M12 9v4l2 2M5 3 2 3M22 3h-3M2 3h3" />
-                            </svg>
+                            />
                           ) : null}
                         </span>
                       </button>
@@ -2653,13 +2610,7 @@ export function ItemsViewArea({
                   alignSelf: isMobile ? "flex-start" : undefined,
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M3 6h18" />
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
+                <Trash2 size={20} aria-hidden />
               </button>
               <div
                 style={{
@@ -2678,9 +2629,7 @@ export function ItemsViewArea({
                   title={t("items.ariaCancelEdit")}
                   style={{ minWidth: 44, minHeight: 44, padding: "0.55rem", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <X size={20} aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -3795,13 +3744,7 @@ export function SwipeDeleteRow({
             setOffset(0);
           }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M3 6h18" />
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            <line x1="10" y1="11" x2="10" y2="17" />
-            <line x1="14" y1="11" x2="14" y2="17" />
-          </svg>
+          <Trash2 size={22} aria-hidden />
         </button>
       </div>
       <div
@@ -4078,14 +4021,7 @@ function ListView({
               title={t("items.dragToReorder")}
               aria-label={t("items.dragToReorder")}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                <circle cx="9" cy="5" r="1" fill="currentColor" stroke="none" />
-                <circle cx="15" cy="5" r="1" fill="currentColor" stroke="none" />
-                <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
-                <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
-                <circle cx="9" cy="19" r="1" fill="currentColor" stroke="none" />
-                <circle cx="15" cy="19" r="1" fill="currentColor" stroke="none" />
-              </svg>
+              <GripVertical size={14} aria-hidden />
             </span>
           ) : null}
           {isTask ? (
@@ -4305,12 +4241,7 @@ function ListView({
           )}
           {isTask && taskRec.isRecurring && (
             <div className="bd-task-recur-badge">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                <path d="M8 16H3v5" />
-              </svg>
+              <RefreshCw size={11} strokeWidth={2.5} aria-hidden />
               {taskRec.pattern === "daily"
                 ? t("items.taskRepeatEveryDay")
                 : taskRec.days.length > 0

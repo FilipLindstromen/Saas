@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { Sun, Calendar, Square, Mic, CheckSquare, Inbox } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { type BrainDumpCenterHandle } from "@/components/CenterPanel";
 import { DumpCaptureActions } from "@/components/DumpCaptureActions";
@@ -136,21 +137,12 @@ export function MobileBottomBarPill({
         aria-label={t("bottom.todayNav")}
         aria-pressed={todayViewActive}
       >
-        <svg
+        <Sun
           className="bd-bottom-bar-pill-icon"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-        </svg>
+          size={24}
+          strokeWidth={2}
+          aria-hidden="true"
+        />
       </button>
       <button
         ref={calendarRef}
@@ -161,21 +153,29 @@ export function MobileBottomBarPill({
         aria-label={t("items.viewCalendar")}
         aria-current={viewType === "calendar" && !todayViewActive && !inboxActive ? "page" : undefined}
       >
-        <svg className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-          <rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-          <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <text
-            x="12"
-            y="17.5"
-            textAnchor="middle"
-            fontSize="9"
-            fontWeight="600"
-            fill="currentColor"
+        <span
+          className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar"
+          style={{ position: "relative", display: "inline-flex" }}
+          aria-hidden="true"
+        >
+          <Calendar size={24} strokeWidth={2} />
+          <span
             className="bd-bottom-bar-cal-day"
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "66%",
+              transform: "translate(-50%, -50%)",
+              fontSize: "9px",
+              fontWeight: 600,
+              lineHeight: 1,
+              color: "currentColor",
+              pointerEvents: "none",
+            }}
           >
             {new Date().getDate()}
-          </text>
-        </svg>
+          </span>
+        </span>
       </button>
       <div className="bd-bottom-bar-pill-mic-wrap">
         {showDumpEmptyHint ? (
@@ -198,25 +198,9 @@ export function MobileBottomBarPill({
           aria-label={dumpRecordingActive ? t("center.stopOrganize") : t("center.recordNewDump")}
         >
           {dumpRecordingActive ? (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
+            <Square size={28} fill="currentColor" stroke="none" aria-hidden="true" />
           ) : (
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
+            <Mic size={28} strokeWidth={2} aria-hidden="true" />
           )}
         </button>
       </div>
@@ -229,10 +213,7 @@ export function MobileBottomBarPill({
         aria-label={t("items.viewList")}
         aria-current={viewType === "list" && !todayViewActive && !inboxActive ? "page" : undefined}
       >
-        <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
-          <path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <CheckSquare className="bd-bottom-bar-pill-icon" size={24} strokeWidth={2} aria-hidden="true" />
       </button>
       <button
         ref={inboxRef}
@@ -244,10 +225,7 @@ export function MobileBottomBarPill({
         aria-current={inboxActive ? "page" : undefined}
       >
         <span className="bd-bottom-bar-pill-icon-wrap">
-          <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-            <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-          </svg>
+          <Inbox className="bd-bottom-bar-pill-icon" size={24} strokeWidth={2} aria-hidden="true" />
           {newInboxCount > 0 ? (
             <span className="bd-bottom-bar-inbox-badge" aria-hidden>
               {newInboxCount > 9 ? "9+" : newInboxCount}
