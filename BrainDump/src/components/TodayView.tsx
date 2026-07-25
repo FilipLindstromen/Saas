@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { filterItemsByDueDatePreset } from "@/lib/due-date-filter";
+import { scheduledAtToDateKey } from "@/lib/due-date-filter";
 import { formatAreaLabel } from "@/lib/personal-areas";
 import {
   SwipeDeleteRow,
@@ -11,15 +11,17 @@ import {
   type ViewItem,
 } from "@/components/ItemsViewArea";
 import {
-  buildTaskRecurrenceString,
   clearTaskRecurrenceCompleted,
-  isRecurringTaskActiveToday,
-  isRecurringTaskDoneToday,
+  isRecurringTaskActiveOnDate,
+  isRecurringTaskDoneOnDate,
   markTaskRecurrenceCompleted,
   parseTaskRecurrence,
 } from "@/lib/task-recurrence";
 
 const FETCH_TIMEOUT_MS = 15000;
+const INITIAL_DAY_RADIUS = 21;
+const DAY_CHUNK = 14;
+const SCROLL_EDGE_THRESHOLD = 280;
 
 export type TodayItemRow = {
   id: string;
@@ -39,10 +41,23 @@ export type TodayItemRow = {
 
 function todayDateKey(): string {
   const n = new Date();
-  const y = n.getFullYear();
-  const m = String(n.getMonth() + 1).padStart(2, "0");
-  const d = String(n.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
+function addDaysToKey(dateKey: string, delta: number): string {
+  const d = new Date(`${dateKey}T12:00:00`);
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function buildDateKeys(startKey: string, endKey: string): string[] {
+  const keys: string[] = [];
+  let current = startKey;
+  while (current <= endKey) {
+    keys.push(current);
+    current = addDaysToKey(current, 1);
+  }
+  return keys;
 }
 
 function isTask(it: Pick<TodayItemRow, "itemType">): boolean {
@@ -55,12 +70,37 @@ function isTaskCompleted(it: Pick<TodayItemRow, "itemType" | "progress" | "kanba
   return false;
 }
 
-function sortTodayRows(a: TodayItemRow, b: TodayItemRow): number {
+function sortTimelineRows(a: TodayItemRow, b: TodayItemRow): number {
   const ta = (a.scheduledTime ?? "").trim() || "99:99";
   const tb = (b.scheduledTime ?? "").trim() || "99:99";
   const c = ta.localeCompare(tb);
   if (c !== 0) return c;
   return (a.title ?? "").localeCompare(b.title ?? "");
+}
+
+function itemsForDate(allItems: TodayItemRow[], dateKey: string): TodayItemRow[] {
+  const bySchedule = allItems.filter((it) => scheduledAtToDateKey(it.scheduledAt) === dateKey);
+  const scheduledIds = new Set(bySchedule.map((it) => it.id));
+  const recurring = allItems.filter(
+    (it) =>
+      !scheduledIds.has(it.id) &&
+      isTask(it) &&
+      isRecurringTaskActiveOnDate(it.recurrence, dateKey)
+  );
+  return [...bySchedule, ...recurring].sort(sortTimelineRows);
+}
+
+function formatTimelineTime(raw: string | null | undefined, locale: string): string {
+  const t = (raw ?? "").trim();
+  if (!t) return "";
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (!m) return t;
+  const d = new Date();
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  return d.toLocaleTimeString(locale === "sv" ? "sv-SE" : undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 type TodayViewProps = {
@@ -73,25 +113,25 @@ type TodayViewProps = {
 
 export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps) {
   const { t, locale } = useI18n();
-  const [items, setItems] = useState<TodayItemRow[]>([]);
+  const [allItems, setAllItems] = useState<TodayItemRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const bindMobileField = useMobileEntryFieldGestures(isMobile, undefined);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const todayAnchorRef = useRef<HTMLDivElement | null>(null);
+  const prependAdjustRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const didScrollToTodayRef = useRef(false);
+  const expandingRef = useRef(false);
 
   const todayStr = useMemo(() => todayDateKey(), []);
-  const dateHeadline = useMemo(
-    () =>
-      new Date(`${todayStr}T12:00:00`).toLocaleDateString(locale === "sv" ? "sv-SE" : undefined, {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }),
-    [todayStr, locale]
-  );
+  const [rangeStart, setRangeStart] = useState(() => addDaysToKey(todayStr, -INITIAL_DAY_RADIUS));
+  const [rangeEnd, setRangeEnd] = useState(() => addDaysToKey(todayStr, INITIAL_DAY_RADIUS));
+
+  const dateKeys = useMemo(() => buildDateKeys(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+
+  const bindMobileField = useMobileEntryFieldGestures(isMobile, undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,30 +145,16 @@ export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps)
       ]);
       if (!rw.ok || !rp.ok) {
         setError(t("today.loadError"));
-        setItems([]);
+        setAllItems([]);
         return;
       }
       const dw = (await rw.json()) as { items?: TodayItemRow[] };
       const dp = (await rp.json()) as { items?: TodayItemRow[] };
-      const merged = [...(dw.items ?? []), ...(dp.items ?? [])];
-      const bySchedule = filterItemsByDueDatePreset(merged, "today") as TodayItemRow[];
-      const scheduledIds = new Set(bySchedule.map((it) => it.id));
-      // Also include recurring tasks that are active today (even without scheduledAt)
-      const recurringToday = merged.filter(
-        (it) =>
-          !scheduledIds.has(it.id) &&
-          isTask(it) &&
-          isRecurringTaskActiveToday(it.recurrence)
-      );
-      const combined = [...bySchedule, ...recurringToday];
-      combined.sort(sortTodayRows);
-      setItems(combined);
+      setAllItems([...(dw.items ?? []), ...(dp.items ?? [])]);
     } catch (e) {
-      if ((e as Error).name === "AbortError") {
-        setItems([]);
-      } else {
+      if ((e as Error).name !== "AbortError") {
         setError(t("today.loadError"));
-        setItems([]);
+        setAllItems([]);
       }
     } finally {
       window.clearTimeout(to);
@@ -151,8 +177,45 @@ export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps)
     inputRef.current?.focus();
   }, [editing]);
 
-  const handleTaskComplete = useCallback((id: string, completed: boolean) => {
-    setItems((prev) => {
+  useLayoutEffect(() => {
+    if (loading || didScrollToTodayRef.current) return;
+    const anchor = todayAnchorRef.current;
+    const scroller = scrollRef.current;
+    if (!anchor || !scroller) return;
+    didScrollToTodayRef.current = true;
+    anchor.scrollIntoView({ block: "start" });
+  }, [loading, dateKeys]);
+
+  useLayoutEffect(() => {
+    const adjust = prependAdjustRef.current;
+    const scroller = scrollRef.current;
+    if (!adjust || !scroller) return;
+    const delta = scroller.scrollHeight - adjust.scrollHeight;
+    scroller.scrollTop = adjust.scrollTop + delta;
+    prependAdjustRef.current = null;
+  }, [rangeStart]);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || expandingRef.current || !didScrollToTodayRef.current) return;
+    if (el.scrollTop < SCROLL_EDGE_THRESHOLD) {
+      expandingRef.current = true;
+      prependAdjustRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop };
+      setRangeStart((s) => addDaysToKey(s, -DAY_CHUNK));
+      window.requestAnimationFrame(() => {
+        expandingRef.current = false;
+      });
+    } else if (el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_EDGE_THRESHOLD) {
+      expandingRef.current = true;
+      setRangeEnd((e) => addDaysToKey(e, DAY_CHUNK));
+      window.requestAnimationFrame(() => {
+        expandingRef.current = false;
+      });
+    }
+  }, []);
+
+  const handleTaskComplete = useCallback((id: string, completed: boolean, dateKey: string) => {
+    setAllItems((prev) => {
       const currentItem = prev.find((it) => it.id === id);
       const taskRec = parseTaskRecurrence(currentItem?.recurrence);
       const isRecurring = taskRec.isRecurring;
@@ -164,7 +227,7 @@ export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps)
       let newRecurrence: string | undefined;
       if (isRecurring && taskRec.pattern && currentItem?.recurrence) {
         newRecurrence = completed
-          ? markTaskRecurrenceCompleted(currentItem.recurrence)
+          ? markTaskRecurrenceCompleted(currentItem.recurrence, dateKey)
           : clearTaskRecurrenceCompleted(currentItem.recurrence);
       }
 
@@ -186,7 +249,7 @@ export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps)
   }, []);
 
   const handleDelete = useCallback((id: string) => {
-    setItems((prev) => prev.filter((it) => it.id !== id));
+    setAllItems((prev) => prev.filter((it) => it.id !== id));
     fetch(`/api/organized-items/${id}`, { method: "DELETE" }).catch(() => {
       void load();
     });
@@ -194,16 +257,16 @@ export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps)
 
   const commitEdit = useCallback((id: string, value: string) => {
     const trimmed = value.trim();
-    const it = items.find((i) => i.id === id);
+    const it = allItems.find((i) => i.id === id);
     setEditing(null);
     if (!it || trimmed === (it.title ?? "").trim()) return;
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, title: trimmed } : i)));
+    setAllItems((prev) => prev.map((i) => (i.id === id ? { ...i, title: trimmed } : i)));
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: trimmed }),
     }).catch(() => {});
-  }, [items]);
+  }, [allItems]);
 
   const goToWorkspace = useCallback((it: TodayItemRow) => {
     const domainOk = it.domain === "work" || it.domain === "personal";
@@ -220,199 +283,186 @@ export function TodayView({ onGoToWorkspace, isMobile = false }: TodayViewProps)
     return domain;
   };
 
-  return (
-    <div className="bd-today-view bd-panel">
-      <header className="bd-today-head">
-        <h1 className="bd-today-title">{t("today.title")}</h1>
-        <p className="bd-today-sub">{dateHeadline}</p>
-        <p className="bd-today-hint">{t("today.hint")}</p>
-      </header>
+  const formatDayHeadline = (dateKey: string) => {
+    const d = new Date(`${dateKey}T12:00:00`);
+    const isToday = dateKey === todayStr;
+    const formatted = d.toLocaleDateString(locale === "sv" ? "sv-SE" : undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+    return isToday ? `${t("today.title")} · ${formatted}` : formatted;
+  };
 
+  return (
+    <div className="bd-timeline-view">
       {loading ? (
-        <p className="bd-today-loading">{t("today.loading")}</p>
+        <p className="bd-timeline-status">{t("today.loading")}</p>
       ) : error ? (
-        <p className="bd-today-error" role="alert">
+        <p className="bd-timeline-status bd-timeline-status--error" role="alert">
           {error}
         </p>
-      ) : items.length === 0 ? (
-        <p className="bd-today-empty">{t("today.empty")}</p>
       ) : (
-        <div className="bd-todo-list-card">
-          {items.map((it) => {
-            const taskRec = parseTaskRecurrence(it.recurrence);
-            const done = isTask(it) && taskRec.isRecurring
-              ? isRecurringTaskDoneToday(it.recurrence)
-              : isTaskCompleted(it);
-            const isTaskItem = isTask(it);
-            const isEditing = editing?.id === it.id;
+        <div ref={scrollRef} className="bd-timeline-scroll" onScroll={handleScroll}>
+          {dateKeys.map((dateKey) => {
+            const dayItems = itemsForDate(allItems, dateKey);
+            const isToday = dateKey === todayStr;
 
             return (
-              <SwipeDeleteRow
-                key={it.id}
-                entryId={it.id}
-                swipeOpenId={swipeOpenId}
-                setSwipeOpenId={setSwipeOpenId}
-                onDelete={() => handleDelete(it.id)}
-                disabled={isEditing}
-                slideSurface="elevated"
+              <section
+                key={dateKey}
+                id={`timeline-day-${dateKey}`}
+                ref={isToday ? todayAnchorRef : undefined}
+                className="bd-timeline-day"
+                aria-label={formatDayHeadline(dateKey)}
               >
-                <div
-                  className={`bd-todo-row bd-todo-row--single-line`}
-                  data-bd-mobile-entry={isMobile ? "1" : undefined}
-                  onDoubleClick={() => goToWorkspace(it)}
-                  onContextMenu={
-                    !isMobile
-                      ? (e) => {
-                          e.preventDefault();
-                          if (!isEditing) setEditing({ id: it.id, value: it.title ?? "" });
-                        }
-                      : undefined
-                  }
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="bd-todo-row-lead">
-                    {isTaskItem ? (
-                      <label
-                        className="bd-todo-checkbox-wrap"
-                        data-bd-no-swipe
-                        onClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          className="bd-todo-checkbox"
-                          data-bd-no-swipe
-                          checked={done}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleTaskComplete(it.id, e.target.checked);
-                          }}
-                          aria-label={done ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
-                        />
-                      </label>
-                    ) : (
-                      <span className="bd-todo-row-type-lead">
-                        <EntryTypeIcon type={it.itemType || "note"} size={20} />
-                      </span>
-                    )}
-                  </div>
+                <h2 className="bd-timeline-day-head">{formatDayHeadline(dateKey)}</h2>
 
-                  <div className="bd-todo-row-body">
-                    {isEditing ? (
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        data-bd-no-swipe
-                        value={editing!.value}
-                        onChange={(e) =>
-                          setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))
-                        }
-                        onBlur={() => commitEdit(it.id, editing!.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") setEditing(null);
-                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                        }}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                        aria-label={t("menu.edit")}
-                        style={{
-                          fontWeight: 600,
-                          fontSize: "1rem",
-                          color: "var(--text-primary)",
-                          width: "100%",
-                          margin: 0,
-                          padding: "0.15rem 0.35rem",
-                          border: "none",
-                          borderRadius: 6,
-                          background: "var(--bg-secondary)",
-                          outline: "1px solid var(--bd-chrome-selected-border)",
-                        }}
-                      />
-                    ) : (
-                      <div
-                        onClick={
-                          !isMobile
-                            ? () => setEditing({ id: it.id, value: it.title ?? "" })
-                            : undefined
-                        }
-                        {...(isMobile
-                          ? bindMobileField(
-                              it as unknown as ViewItem,
-                              () => setEditing({ id: it.id, value: it.title ?? "" }),
-                              () => goToWorkspace(it)
-                            )
-                          : {})}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          goToWorkspace(it);
-                        }}
-                        style={{
-                          fontWeight: 600,
-                          fontSize: "1rem",
-                          color: "var(--text-primary)",
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere",
-                          textDecoration: done ? "line-through" : undefined,
-                          opacity: done ? 0.52 : 1,
-                        }}
-                      >
-                        {it.scheduledTime ? (
-                          <span
-                            style={{
-                              marginRight: "0.4rem",
-                              fontSize: "0.8rem",
-                              fontWeight: 500,
-                              opacity: 0.72,
-                            }}
+                {dayItems.length === 0 ? (
+                  <p className="bd-timeline-day-empty">{t("today.dayEmpty")}</p>
+                ) : (
+                  <div className="bd-timeline-events">
+                    {dayItems.map((it, idx) => {
+                      const taskRec = parseTaskRecurrence(it.recurrence);
+                      const done =
+                        isTask(it) && taskRec.isRecurring
+                          ? isRecurringTaskDoneOnDate(it.recurrence, dateKey)
+                          : isTaskCompleted(it);
+                      const isTaskItem = isTask(it);
+                      const isEditing = editing?.id === it.id;
+                      const isLast = idx === dayItems.length - 1;
+                      const timeLabel = formatTimelineTime(it.scheduledTime, locale);
+
+                      return (
+                        <SwipeDeleteRow
+                          key={`${dateKey}-${it.id}`}
+                          entryId={it.id}
+                          swipeOpenId={swipeOpenId}
+                          setSwipeOpenId={setSwipeOpenId}
+                          onDelete={() => handleDelete(it.id)}
+                          disabled={isEditing}
+                          slideSurface="elevated"
+                        >
+                          <div
+                            className={`bd-timeline-event${done ? " bd-timeline-event--done" : ""}`}
+                            data-bd-mobile-entry={isMobile ? "1" : undefined}
+                            onDoubleClick={() => goToWorkspace(it)}
+                            onContextMenu={
+                              !isMobile
+                                ? (e) => {
+                                    e.preventDefault();
+                                    if (!isEditing) setEditing({ id: it.id, value: it.title ?? "" });
+                                  }
+                                : undefined
+                            }
                           >
-                            {it.scheduledTime}
-                          </span>
-                        ) : null}
-                        {it.title?.trim() || "—"}
-                      </div>
-                    )}
+                            <div className="bd-timeline-time" aria-hidden={!timeLabel}>
+                              {timeLabel || "\u00a0"}
+                            </div>
+                            <div className="bd-timeline-rail" aria-hidden>
+                              <span className="bd-timeline-dot" />
+                              {!isLast ? <span className="bd-timeline-line" /> : null}
+                            </div>
+                            <div className="bd-timeline-body">
+                              <div className="bd-timeline-title-row">
+                                {isTaskItem ? (
+                                  <label
+                                    className="bd-timeline-check"
+                                    data-bd-no-swipe
+                                    onClick={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="bd-todo-checkbox"
+                                      data-bd-no-swipe
+                                      checked={done}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleTaskComplete(it.id, e.target.checked, dateKey);
+                                      }}
+                                      aria-label={done ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                                    />
+                                  </label>
+                                ) : (
+                                  <span className="bd-timeline-type-icon">
+                                    <EntryTypeIcon type={it.itemType || "note"} size={18} />
+                                  </span>
+                                )}
 
-                    {isTaskItem && taskRec.isRecurring && (
-                      <div className="bd-task-recur-badge">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                          <path d="M21 3v5h-5" />
-                          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                          <path d="M8 16H3v5" />
-                        </svg>
-                        {taskRec.pattern === "daily"
-                          ? t("items.taskRepeatEveryDay")
-                          : taskRec.days.length > 0
-                            ? taskRec.days.map((d) => t(`habitReminder.dayShort.${["", "mon","tue","wed","thu","fri","sat","sun"][d]}`)).join(" · ")
-                            : t("items.taskRepeatBadge")}
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "var(--text-tertiary)",
-                        display: "flex",
-                        gap: "0.3rem",
-                        flexWrap: "wrap",
-                        marginTop: "0.1rem",
-                      }}
-                    >
-                      <span>{domainLabel(it.domain)}</span>
-                      {it.project?.name ? (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span>{it.project.name}</span>
-                        </>
-                      ) : null}
-                      {it.category ? (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span>{formatAreaLabel(it.category)}</span>
-                        </>
-                      ) : null}
-                    </div>
+                                {isEditing ? (
+                                  <input
+                                    ref={inputRef}
+                                    type="text"
+                                    data-bd-no-swipe
+                                    className="bd-timeline-edit-input"
+                                    value={editing!.value}
+                                    onChange={(e) =>
+                                      setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))
+                                    }
+                                    onBlur={() => commitEdit(it.id, editing!.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") setEditing(null);
+                                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                    }}
+                                    onDoubleClick={(e) => e.stopPropagation()}
+                                    aria-label={t("menu.edit")}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="bd-timeline-title"
+                                    onClick={() =>
+                                      isMobile
+                                        ? goToWorkspace(it)
+                                        : setEditing({ id: it.id, value: it.title ?? "" })
+                                    }
+                                    {...(isMobile
+                                      ? bindMobileField(
+                                          it as unknown as ViewItem,
+                                          () => setEditing({ id: it.id, value: it.title ?? "" }),
+                                          () => goToWorkspace(it)
+                                        )
+                                      : {})}
+                                  >
+                                    {it.title?.trim() || "—"}
+                                  </button>
+                                )}
+                              </div>
+
+                              {it.content?.trim() ? (
+                                <p className="bd-timeline-desc">{it.content.trim()}</p>
+                              ) : null}
+
+                              <div className="bd-timeline-meta">
+                                <span>{domainLabel(it.domain)}</span>
+                                {it.project?.name ? (
+                                  <>
+                                    <span aria-hidden>·</span>
+                                    <span>{it.project.name}</span>
+                                  </>
+                                ) : null}
+                                {it.category ? (
+                                  <>
+                                    <span aria-hidden>·</span>
+                                    <span>{formatAreaLabel(it.category)}</span>
+                                  </>
+                                ) : null}
+                                {isTaskItem && taskRec.isRecurring ? (
+                                  <>
+                                    <span aria-hidden>·</span>
+                                    <span>{t("items.taskRepeatBadge")}</span>
+                                  </>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        </SwipeDeleteRow>
+                      );
+                    })}
                   </div>
-                </div>
-              </SwipeDeleteRow>
+                )}
+              </section>
             );
           })}
         </div>

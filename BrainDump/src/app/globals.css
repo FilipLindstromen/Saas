@@ -3762,7 +3762,209 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   padding-top: env(safe-area-inset-top);
 }
 
-/* Today — lightweight combined list (work + personal) */
+/* Today timeline — scrollable vertical schedule (work + personal) */
+.bd-timeline-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bd-timeline-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.bd-timeline-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem 1rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bd-timeline-status {
+  margin: 1.25rem 1rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.bd-timeline-status--error {
+  color: var(--bd-danger-text);
+}
+
+.bd-timeline-day {
+  max-width: 640px;
+  margin: 0 auto 2.25rem;
+}
+
+.bd-timeline-day-head {
+  margin: 0 0 1rem;
+  padding: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.bd-timeline-day-empty {
+  margin: 0 0 0 4.75rem;
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.bd-timeline-events {
+  display: flex;
+  flex-direction: column;
+}
+
+.bd-timeline-event {
+  display: grid;
+  grid-template-columns: 3.75rem 1.25rem 1fr;
+  gap: 0 0.85rem;
+  align-items: start;
+  padding: 0.35rem 0 1.1rem;
+  min-height: 2.75rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  text-align: left;
+}
+
+.bd-timeline-event--done .bd-timeline-title {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.bd-timeline-time {
+  padding-top: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.bd-timeline-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+  padding-top: 0.35rem;
+}
+
+.bd-timeline-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  border: 2px solid var(--bd-accent, #5eb8ff);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.bd-timeline-line {
+  position: absolute;
+  top: 0.85rem;
+  bottom: -1.1rem;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--bd-accent, #5eb8ff);
+  opacity: 0.55;
+}
+
+.bd-timeline-body {
+  min-width: 0;
+  padding-top: 0;
+}
+
+.bd-timeline-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.bd-timeline-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 0.1rem;
+}
+
+.bd-timeline-type-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 0.05rem;
+  opacity: 0.85;
+}
+
+.bd-timeline-title {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.bd-timeline-title:hover {
+  color: var(--text-secondary);
+}
+
+.bd-timeline-edit-input {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0.1rem 0.3rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  outline: 1px solid var(--bd-chrome-selected-border);
+}
+
+.bd-timeline-desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.bd-timeline-meta {
+  margin-top: 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* Legacy today card styles (kept for any remaining references) */
 .bd-today-view {
   max-width: 560px;
   margin: 0 auto;

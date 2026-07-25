@@ -303,7 +303,7 @@ export default function BrainDumpPage() {
     const sync = () => {
       let next = loadViewPreference();
       if (typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches) {
-        if (next === "kanban" || next === "postits") next = "list";
+        if (next === "kanban" || next === "postits" || next === "list") next = "text";
       }
       setViewType(next);
       const ws = loadWorkspaceScope();
@@ -326,7 +326,7 @@ export default function BrainDumpPage() {
 
   useEffect(() => {
     if (!isMobileLayout) return;
-    setViewType((v) => (v === "kanban" || v === "postits" ? "list" : v));
+    setViewType((v) => (v === "kanban" || v === "postits" || v === "list" ? "text" : v));
   }, [isMobileLayout]);
 
   const refreshWorkProjectNames = useCallback(() => {
@@ -664,7 +664,7 @@ export default function BrainDumpPage() {
             />
           </div>
           {todayViewActive ? (
-            <div className="bd-page-content-padding bd-main-scroll" style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+            <div className="bd-timeline-host">
               <TodayView onGoToWorkspace={goToTodayItemWorkspace} isMobile={isMobileLayout} />
             </div>
           ) : null}
@@ -694,10 +694,6 @@ export default function BrainDumpPage() {
             centerPanelRef={centerPanelRef}
             showDumpEmptyHint={dumpEmptyHintActive}
             onTodayClick={() => setTodayViewActive((v) => !v)}
-            onSelectList={() => {
-              setTodayViewActive(false);
-              setViewType("list");
-            }}
             onSelectText={() => {
               setTodayViewActive(false);
               setViewType("text");

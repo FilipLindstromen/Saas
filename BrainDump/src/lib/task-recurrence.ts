@@ -62,15 +62,34 @@ export function isRecurringTaskDoneToday(recurrence: string | null | undefined):
 
 /** True if the task should appear and be reset today (based on its pattern). */
 export function isRecurringTaskActiveToday(recurrence: string | null | undefined): boolean {
+  return isRecurringTaskActiveOnDate(recurrence, todayISODateKey());
+}
+
+/** True if the task should appear on a given local calendar day (YYYY-MM-DD). */
+export function isRecurringTaskActiveOnDate(
+  recurrence: string | null | undefined,
+  dateKey: string
+): boolean {
   const { isRecurring, pattern, days } = parseTaskRecurrence(recurrence);
   if (!isRecurring) return false;
   if (pattern === "daily") return true;
   if (pattern === "days" && days.length > 0) {
-    const dow = new Date().getDay(); // 0 = Sun
-    const isoWeekday = dow === 0 ? 7 : dow; // 1=Mon … 7=Sun
+    const d = new Date(`${dateKey}T12:00:00`);
+    const dow = d.getDay();
+    const isoWeekday = dow === 0 ? 7 : dow;
     return days.includes(isoWeekday);
   }
   return false;
+}
+
+/** True if the task was marked done on a given local calendar day. */
+export function isRecurringTaskDoneOnDate(
+  recurrence: string | null | undefined,
+  dateKey: string
+): boolean {
+  const { isRecurring, completedDate } = parseTaskRecurrence(recurrence);
+  if (!isRecurring || !completedDate) return false;
+  return completedDate === dateKey;
 }
 
 /** Build the recurrence string (without completion date). */
@@ -80,12 +99,12 @@ export function buildTaskRecurrenceString(pattern: TaskRecurrencePattern, days: 
   return `task:days:${sorted.join(",")}`;
 }
 
-/** Append today's date to mark completion (keeps existing pattern). */
-export function markTaskRecurrenceCompleted(recurrence: string): string {
+/** Append a completion date to mark done (keeps existing pattern). Defaults to today. */
+export function markTaskRecurrenceCompleted(recurrence: string, dateKey?: string): string {
   const parsed = parseTaskRecurrence(recurrence);
   if (!parsed.isRecurring || !parsed.pattern) return recurrence;
   const base = buildTaskRecurrenceString(parsed.pattern, parsed.days);
-  return `${base}|${todayISODateKey()}`;
+  return `${base}|${dateKey ?? todayISODateKey()}`;
 }
 
 /** Remove completion date (keeps pattern only). */
