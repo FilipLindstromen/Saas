@@ -33,6 +33,26 @@ export function getLastNewBatchIds(): Set<string> {
   }
 }
 
+/** Drop batch ids that no longer exist (deleted/trashed); returns remaining count. */
+export function pruneLastNewBatchIds(validIds: Set<string>): number {
+  const stored = getLastNewBatchIds();
+  if (stored.size === 0) return 0;
+  const kept = [...stored].filter((id) => validIds.has(id));
+  if (kept.length === stored.size) return kept.length;
+  saveLastNewBatchIds(kept);
+  return kept.length;
+}
+
+export function countNewBatchItems(items: { id: string }[]): number {
+  const ids = getLastNewBatchIds();
+  if (ids.size === 0) return 0;
+  let n = 0;
+  for (const it of items) {
+    if (ids.has(it.id)) n += 1;
+  }
+  return n;
+}
+
 /** Subscribe to changes in the last batch id set (save or clear). */
 export function subscribeNewBatch(listener: () => void): () => void {
   if (typeof window === "undefined") return () => {};

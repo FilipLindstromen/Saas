@@ -122,6 +122,8 @@ interface CenterPanelProps {
   onDumpEmptyHintChange?: (show: boolean) => void;
   /** Hide empty-state dump hint (e.g. while Today view is active). */
   dumpHintSuppressed?: boolean;
+  /** Inbox tab: show latest dump batch only, hide type filters. */
+  inboxViewActive?: boolean;
 }
 
 function getDefaultDomainFromMode(mode: string): "work" | "personal" | undefined {
@@ -168,6 +170,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     onItemMovedToTrash,
     onDumpEmptyHintChange,
     dumpHintSuppressed = false,
+    inboxViewActive = false,
   },
   ref
 ) {
@@ -1439,6 +1442,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           onItemMovedToTrash={onItemMovedToTrash}
           onDumpEmptyListTextHintChange={setDumpEmptyListHint}
           dumpEmptyHintSuppressed={dumpHintSuppressed}
+          inboxViewActive={inboxViewActive}
         />
       )}
       {unclearItems && (

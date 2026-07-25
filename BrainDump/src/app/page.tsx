@@ -14,7 +14,6 @@ import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { TodayView } from "@/components/TodayView";
 import { MobileBottomBarPill } from "@/components/MobileBottomBarPill";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { DumpSuccessBar } from "@/components/DumpSuccessBar";
 import { WelcomeOverlay, WELCOME_COMPLETE_EVENT } from "@/components/WelcomeOverlay";
 import { loadViewPreference, type ItemsViewType } from "@/components/ItemsViewArea";
 import type { DueDateFilterPreset } from "@/lib/due-date-filter";
@@ -77,7 +76,6 @@ export default function BrainDumpPage() {
   const [topBarEnd, setTopBarEnd] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
-  const [dumpSuccess, setDumpSuccess] = useState<{ count: number } | null>(null);
   const [authProviders, setAuthProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
 
   useEffect(() => {
@@ -184,9 +182,11 @@ export default function BrainDumpPage() {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
+  const inboxViewActive = selectedItemType === "new" && !todayViewActive;
+
   const scopeBarSlot = useMemo(
     () =>
-      !todayViewActive && (mode === "work" || mode === "personal" || mode === "all") ? (
+      !todayViewActive && !inboxViewActive && (mode === "work" || mode === "personal" || mode === "all") ? (
         <ScopeBar
           key="bd-scope-main"
           mode={mode}
@@ -203,6 +203,7 @@ export default function BrainDumpPage() {
       ) : null,
     [
       todayViewActive,
+      inboxViewActive,
       mode,
       selectedProjectId,
       selectedCategory,
@@ -302,9 +303,6 @@ export default function BrainDumpPage() {
   useEffect(() => {
     const sync = () => {
       let next = loadViewPreference();
-      if (typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches) {
-        if (next === "kanban" || next === "postits") next = "list";
-      }
       setViewType(next);
       const ws = loadWorkspaceScope();
       const mobile = window.matchMedia("(max-width: 768px)").matches;
@@ -323,11 +321,6 @@ export default function BrainDumpPage() {
     window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
     return () => window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, sync);
   }, []);
-
-  useEffect(() => {
-    if (!isMobileLayout) return;
-    setViewType((v) => (v === "kanban" || v === "postits" ? "list" : v));
-  }, [isMobileLayout]);
 
   const refreshWorkProjectNames = useCallback(() => {
     fetch("/api/projects?domain=work")
@@ -481,33 +474,36 @@ export default function BrainDumpPage() {
     [mode]
   );
 
-  const handleDumpFinished = useCallback(() => {
+  const activateInboxView = useCallback(() => {
+    setTodayViewActive(false);
     setMode("all");
     setSelectedProjectId(null);
     setSelectedCategory(null);
     setSelectedItemType("new");
     setSearchFilter("");
+    setDueDateFilter("all");
+    setViewType("list");
   }, []);
 
-  const handleDumpSaved = useCallback((count: number) => {
-    if (count > 0) setDumpSuccess({ count });
-  }, []);
+  const handleDumpFinished = useCallback(() => {
+    activateInboxView();
+  }, [activateInboxView]);
 
-  const handleViewNewDumpItems = useCallback(() => {
-    setDumpSuccess(null);
-    handleDumpFinished();
-  }, [handleDumpFinished]);
+  const handleDumpSaved = useCallback((_count: number) => {
+    activateInboxView();
+  }, [activateInboxView]);
 
   const handleSaveComplete = useCallback((createdIds?: string[]) => {
     setOrganizedItems([]);
     setOrganizedTranscript("");
     if (createdIds && createdIds.length > 0) {
       saveLastNewBatchIds(createdIds);
+      activateInboxView();
     }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("braindump-reload-items"));
     }
-  }, []);
+  }, [activateInboxView]);
 
   if (status === "loading") {
     return (
@@ -661,6 +657,7 @@ export default function BrainDumpPage() {
               onDumpRecordingChange={setDumpRecordingActive}
               onDumpEmptyHintChange={setDumpEmptyHintActive}
               dumpHintSuppressed={todayViewActive}
+              inboxViewActive={inboxViewActive}
             />
           </div>
           {todayViewActive ? (
@@ -690,7 +687,7 @@ export default function BrainDumpPage() {
           <MobileBottomBarPill
             viewType={viewType}
             todayViewActive={todayViewActive}
-            inboxActive={selectedItemType === "new" && !todayViewActive}
+            inboxActive={inboxViewActive}
             dumpRecordingActive={dumpRecordingActive}
             centerPanelRef={centerPanelRef}
             showDumpEmptyHint={dumpEmptyHintActive}
@@ -705,26 +702,10 @@ export default function BrainDumpPage() {
               setSelectedItemType(null);
               setViewType("list");
             }}
-            onSelectInbox={() => {
-              setTodayViewActive(false);
-              setMode("all");
-              setSelectedProjectId(null);
-              setSelectedCategory(null);
-              setSelectedItemType("new");
-              setSearchFilter("");
-              setViewType("list");
-            }}
+            onSelectInbox={activateInboxView}
           />
         </div>
       </div>
-
-      {dumpSuccess ? (
-        <DumpSuccessBar
-          count={dumpSuccess.count}
-          onViewNewItems={handleViewNewDumpItems}
-          onDismiss={() => setDumpSuccess(null)}
-        />
-      ) : null}
 
       {trashUndo ? (
         <div className="bd-trash-undo-bar" role="status" aria-live="polite">

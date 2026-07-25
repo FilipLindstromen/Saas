@@ -67,7 +67,7 @@ export type ClientPreferencesPayloadV1 = {
   workspaceScope?: WorkspaceScopePersisted | null;
 };
 
-const VIEW_TYPES = new Set(["kanban", "list", "postits", "calendar", "flowchart"]);
+const VIEW_TYPES = new Set(["list", "calendar"]);
 
 function parseJson<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;

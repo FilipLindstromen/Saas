@@ -22,7 +22,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { emitGamificationFromResponseBody } from "@/lib/gamification-client";
-import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
+import { getLastNewBatchIds, pruneLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 import {
   BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT,
   type SuggestedItemTypeDetail,
@@ -72,16 +72,9 @@ function toolbarChipProps(i: number): { className: string; style: CSSProperties 
   };
 }
 
-function viewChipProps(i: number): { className: string; style: CSSProperties } {
-  return {
-    className: "bd-btn bd-view-chip",
-    style: { ["--bd-i" as string]: Math.min(Math.max(i, 0), 8) },
-  };
-}
-
 const VIEW_STORAGE_KEY = "braindump-items-view";
 
-export type ItemsViewType = "kanban" | "list" | "postits" | "calendar" | "flowchart";
+export type ItemsViewType = "list" | "calendar";
 
 export type ItemContextSubmenu = "workPrivate" | "areaProject" | "type";
 
@@ -139,6 +132,8 @@ interface ItemsViewAreaProps {
   onDumpEmptyListTextHintChange?: (show: boolean) => void;
   /** When true, never reports the empty hint (e.g. Today view hides the items panel). */
   dumpEmptyHintSuppressed?: boolean;
+  /** Inbox tab: show latest dump batch only, hide type filters. */
+  inboxViewActive?: boolean;
 }
 
 function isTaskRow(it: Pick<ViewItem, "itemType">): boolean {
@@ -326,8 +321,8 @@ export function loadViewPreference(): ItemsViewType {
   if (typeof window === "undefined") return "list";
   try {
     const v = localStorage.getItem(VIEW_STORAGE_KEY);
-    if (v === "text") return "list";
-    if (v === "kanban" || v === "list" || v === "postits" || v === "calendar" || v === "flowchart") return v as ItemsViewType;
+    if (v === "text" || v === "kanban" || v === "postits" || v === "flowchart") return "list";
+    if (v === "list" || v === "calendar") return v as ItemsViewType;
   } catch {}
   return "list";
 }
@@ -513,6 +508,7 @@ export function ItemsViewArea({
   onItemMovedToTrash,
   onDumpEmptyListTextHintChange,
   dumpEmptyHintSuppressed = false,
+  inboxViewActive = false,
 }: ItemsViewAreaProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ViewItem[]>([]);
@@ -521,6 +517,11 @@ export function ItemsViewArea({
   const [loading, setLoading] = useState(true);
   const [newBatchTick, setNewBatchTick] = useState(0);
   useEffect(() => subscribeNewBatch(() => setNewBatchTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    pruneLastNewBatchIds(new Set(items.map((it) => it.id)));
+  }, [items]);
   const [showEntryTitles, setShowEntryTitles] = useState(() => (typeof window !== "undefined" ? loadShowEntryTitles() : true));
   useEffect(() => {
     const sync = () => setShowEntryTitles(loadShowEntryTitles());
@@ -531,16 +532,19 @@ export function ItemsViewArea({
       window.removeEventListener("storage", sync);
     };
   }, []);
-  const filteredItems = useMemo(
-    () =>
-      sortItemsByListOrder(
-        filterItemsBySearch(
-          filterItemsByDueDatePreset(filterItemsByType(items, itemType), dueDateFilter),
-          searchFilter
-        )
-      ),
-    [items, itemType, searchFilter, dueDateFilter, newBatchTick]
-  );
+  const filteredItems = useMemo(() => {
+    if (inboxViewActive) {
+      const ids = getLastNewBatchIds();
+      if (ids.size === 0) return [];
+      return sortItemsByListOrder(items.filter((it) => ids.has(it.id)));
+    }
+    return sortItemsByListOrder(
+      filterItemsBySearch(
+        filterItemsByDueDatePreset(filterItemsByType(items, itemType), dueDateFilter),
+        searchFilter
+      )
+    );
+  }, [items, itemType, searchFilter, dueDateFilter, newBatchTick, inboxViewActive]);
 
   const canReorderEntries = !searchFilter.trim() && dueDateFilter === "all";
 
@@ -562,7 +566,6 @@ export function ItemsViewArea({
       cb(false);
     };
   }, [loading, viewType, items.length, dumpEmptyHintSuppressed, onDumpEmptyListTextHintChange]);
-  const [postitPositions, setPostitPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [itemContextMenu, setItemContextMenu] = useState<{ id: string; x: number; y: number; domain: string; currentType: string } | null>(null);
   const [itemContextSubmenu, setItemContextSubmenu] = useState<ItemContextSubmenu | null>(null);
   const [projectsList, setProjectsList] = useState<{ id: string; name: string }[]>([]);
@@ -617,8 +620,6 @@ export function ItemsViewArea({
     reminderMinutesBefore: normalizeReminderMinutesBefore(it.reminderMinutesBefore ?? 30),
     priority: it.priority ?? null,
   }), []);
-  const [lineToolActive, setLineToolActive] = useState(false);
-  const [postitLinks, setPostitLinks] = useState<{ fromId: string; toId: string }[]>([]);
   const [luckyOpen, setLuckyOpen] = useState(false);
   const [luckyTask, setLuckyTask] = useState<ViewItem | null>(null);
   const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
@@ -1029,31 +1030,6 @@ export function ItemsViewArea({
   }, [viewType]);
 
   useEffect(() => {
-    const load = () => {
-      try {
-        const raw = localStorage.getItem("braindump_postit_links");
-        const parsed: Record<string, { fromId: string; toId: string }[]> = raw ? JSON.parse(raw) : {};
-        setPostitLinks(parsed[mode] ?? []);
-      } catch {}
-    };
-    load();
-    window.addEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, load);
-    return () => window.removeEventListener(BRAINDUMP_CLIENT_PREFS_APPLIED_EVENT, load);
-  }, [mode]);
-
-  useEffect(() => {
-    try {
-      const key = "braindump_postit_links";
-      const raw = localStorage.getItem(key);
-      const parsed: Record<string, { fromId: string; toId: string }[]> = raw ? JSON.parse(raw) : {};
-      parsed[mode] = postitLinks;
-      localStorage.setItem(key, JSON.stringify(parsed));
-      scheduleClientPreferencesUpload();
-    } catch {}
-  }, [mode, postitLinks]);
-
-
-  useEffect(() => {
     if (!itemContextMenu) return;
     setItemContextSubmenu(null);
   }, [itemContextMenu?.id]);
@@ -1120,19 +1096,6 @@ export function ItemsViewArea({
         if (completed) playTaskCompleteCheer();
       })
       .catch(() => {});
-  }, []);
-
-  const updatePosition = useCallback((id: string, x: number, y: number) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, positionX: x, positionY: y } : it))
-    );
-    fetch(`/api/organized-items/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ positionX: x, positionY: y }),
-    }).catch(() => {
-      // Keep optimistic update; position stays where user dropped it
-    });
   }, []);
 
   const deleteItem = useCallback(
@@ -1578,17 +1541,6 @@ export function ItemsViewArea({
     setLuckyOpen(true);
   }
 
-  const viewButtons: { value: ItemsViewType; label: string; icon: ReactNode }[] = useMemo(
-    () => [
-      { value: "list", label: t("items.viewList"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
-      { value: "kanban", label: t("items.viewKanban"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="5" height="18" rx="1" /><rect x="9.5" y="3" width="5" height="18" rx="1" /><rect x="16" y="3" width="5" height="18" rx="1" /></svg> },
-      { value: "postits", label: t("items.viewPostits"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M9 9h6" /><path d="M9 13h6" /><path d="M9 17h4" /></svg> },
-      { value: "calendar", label: t("items.viewCalendar"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg> },
-      { value: "flowchart", label: t("items.viewFlowchart"), icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="4" r="2.5" /><path d="M12 6.5v3" /><circle cx="6" cy="14" r="2.5" /><circle cx="12" cy="14" r="2.5" /><circle cx="18" cy="14" r="2.5" /><path d="M12 9.5c-2.5 0-4.5 1.2-6 3M12 9.5c2.5 0 4.5 1.2 6 3" /><path d="M12 16.5v3.5" /><circle cx="12" cy="22" r="1.5" fill="currentColor" stroke="none" /></svg> },
-    ],
-    [t]
-  );
-
   if (loading) {
     return (
       <div style={{ padding: "1.5rem" }}>
@@ -1602,7 +1554,7 @@ export function ItemsViewArea({
 
   const mobileToolbarCompactInner = (
     <>
-      {onItemTypeSelect && (
+      {onItemTypeSelect && !inboxViewActive && (
         <button
           type="button"
           className={isMobile ? "bd-btn bd-mobile-type-chip-pill" : "bd-btn"}
@@ -1638,36 +1590,11 @@ export function ItemsViewArea({
           </svg>
         </button>
       )}
-      {viewType === "postits" && (
-        <button
-          type="button"
-          className="bd-btn"
-          title={t("items.connectPostits")}
-          aria-label={t("items.connectPostits")}
-          style={{
-            padding: "0.4rem",
-            minWidth: 44,
-            minHeight: 44,
-            flexShrink: 0,
-            background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
-            color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
-            borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
-          }}
-          onClick={() => setLineToolActive((a) => !a)}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
-        </button>
-      )}
     </>
   );
 
   return (
     <div className="bd-items-view-root">
-      {isMobile && (mode === "work" || mode === "personal" || mode === "all") ? (
-        <p className="bd-items-mobile-simplified-note">{t("items.mobileSimplifiedNote")}</p>
-      ) : null}
       {showUnifiedMobileChrome && (
         <div className="bd-mobile-unified-chrome">
           <div className="bd-mobile-unified-chrome__scope">{scopeSlot}</div>
@@ -1697,7 +1624,7 @@ export function ItemsViewArea({
         ) : (
           <>
             <div className="bd-items-toolbar-left">
-              {onItemTypeSelect && (mode === "work" || mode === "personal" || mode === "all") && (
+              {onItemTypeSelect && !inboxViewActive && (mode === "work" || mode === "personal" || mode === "all") && (
                 <div
                   className={isMobile ? "bd-scope-strip bd-items-type-filters" : undefined}
                   style={{
@@ -1741,90 +1668,11 @@ export function ItemsViewArea({
                 </div>
               )}
             </div>
-            <div
-              className={
-                isMobile ? "bd-items-toolbar-right" : "bd-items-toolbar-right bd-items-toolbar-views"
-              }
-            >
-              {isMobile ? (
-                <>
-                  {viewType === "postits" && (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      title={t("items.connectPostits")}
-                      aria-label={t("items.connectPostits")}
-                      style={{
-                        padding: "0.4rem",
-                        minWidth: 44,
-                        minHeight: 44,
-                        flexShrink: 0,
-                        background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
-                        color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
-                        borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
-                      }}
-                      onClick={() => setLineToolActive((a) => !a)}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  {viewButtons.map(({ value, label, icon }, i) => {
-                    const vc = viewChipProps(i);
-                    return (
-                    <button
-                      key={value}
-                      type="button"
-                      className={vc.className}
-                      title={label}
-                      aria-label={label}
-                      style={{
-                        ...vc.style,
-                        padding: "0.4rem",
-                        flexShrink: 0,
-                        background: viewType === value ? "var(--bd-chrome-selected-bg)" : "transparent",
-                        borderColor: viewType === value ? "var(--bd-chrome-selected-border)" : "var(--border-default)",
-                        color: viewType === value ? "var(--bd-chrome-selected-text)" : "var(--text-primary)",
-                      }}
-                      onClick={() => setViewType(value)}
-                    >
-                      {icon}
-                    </button>
-                    );
-                  })}
-                  {viewType === "postits" && (
-                    <button
-                      type="button"
-                      className="bd-btn"
-                      title={t("items.connectPostits")}
-                      aria-label={t("items.connectPostits")}
-                      style={{
-                        marginLeft: "0.25rem",
-                        padding: "0.4rem",
-                        flexShrink: 0,
-                        background: lineToolActive ? "var(--bd-chrome-selected-bg)" : undefined,
-                        color: lineToolActive ? "var(--bd-chrome-selected-text)" : undefined,
-                        borderColor: lineToolActive ? "var(--bd-chrome-selected-border)" : "transparent",
-                      }}
-                      onClick={() => setLineToolActive((a) => !a)}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
           </>
         )}
       </div>
       )}
-        {isMobile && typePickerOpen && onItemTypeSelect && mobileModesToolbar && (
+        {isMobile && typePickerOpen && onItemTypeSelect && !inboxViewActive && mobileModesToolbar && (
           <div
             className="bd-items-sheet-backdrop"
             onClick={() => setTypePickerOpen(false)}
@@ -1919,7 +1767,18 @@ export function ItemsViewArea({
               {t("items.emptyFilters")}
             </p>
           ) : null}
-          {viewType === "list" ? (
+          {viewType === "calendar" ? (
+            <CalendarView
+              showEntryTitles={showEntryTitles}
+              items={filteredItems}
+              onSchedule={updateSchedule}
+              onEdit={(it) => setEditingEntry(toEditEntry(it))}
+              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
+              onSetTaskCompleted={setTaskCompleted}
+              onDelete={deleteItem}
+              isMobile={isMobile}
+            />
+          ) : (
             <ListView
               showEntryTitles={showEntryTitles}
               items={filteredItems}
@@ -1931,45 +1790,6 @@ export function ItemsViewArea({
               onUpdate={updateEntryContent}
               reorderEnabled={canReorderEntries}
               onReorder={reorderEntriesPersist}
-            />
-          ) : viewType === "kanban" ? (
-            <KanbanView showEntryTitles={showEntryTitles} items={filteredItems} onSetTaskCompleted={setTaskCompleted} onDelete={deleteItem} onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })} onEdit={(it) => setEditingEntry(toEditEntry(it))} isMobile={isMobile} />
-          ) : viewType === "calendar" ? (
-            <CalendarView
-              showEntryTitles={showEntryTitles}
-              items={filteredItems}
-              onSchedule={updateSchedule}
-              onEdit={(it) => setEditingEntry(toEditEntry(it))}
-              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-              onSetTaskCompleted={setTaskCompleted}
-              onDelete={deleteItem}
-              isMobile={isMobile}
-            />
-          ) : viewType === "flowchart" ? (
-            <MindmapView
-              showEntryTitles={showEntryTitles}
-              items={filteredItems}
-              onSetTaskCompleted={setTaskCompleted}
-              onEdit={(it) => setEditingEntry(toEditEntry(it))}
-              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-              isMobile={isMobile}
-            />
-          ) : (
-            <PostitsView
-              showEntryTitles={showEntryTitles}
-              items={filteredItems}
-              onSetTaskCompleted={setTaskCompleted}
-              onDelete={deleteItem}
-              onPosition={updatePosition}
-              postitPositions={postitPositions}
-              setPostitPositions={setPostitPositions}
-              onItemContextMenu={(e, id, domain, currentType) => setItemContextMenu({ id, x: e.clientX, y: e.clientY, domain, currentType })}
-              onEdit={(it) => setEditingEntry(toEditEntry(it))}
-              lineToolActive={lineToolActive}
-              links={postitLinks}
-              onAddLink={(fromId, toId) => setPostitLinks((prev) => (prev.some((l) => l.fromId === fromId && l.toId === toId) ? prev : [...prev, { fromId, toId }]))}
-              onRemoveLink={(fromId, toId) => setPostitLinks((prev) => prev.filter((l) => !(l.fromId === fromId && l.toId === toId)))}
-              isMobile={isMobile}
             />
           )}
         </>
@@ -3863,395 +3683,6 @@ function CalendarView({
   );
 }
 
-function flowSectionLabel(domain: string, sectionKey: string): string {
-  if (domain === "work") return sectionKey === "__none" ? "No project" : sectionKey;
-  return sectionKey
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
-
-const MINDMAP_BRANCH_PALETTE = ["#8b5cf6", "#22c55e", "#ef4444", "#f97316", "#171717", "#6366f1", "#ec4899", "#0ea5e9"];
-
-function mindmapBranchColor(key: string): string {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return MINDMAP_BRANCH_PALETTE[h % MINDMAP_BRANCH_PALETTE.length]!;
-}
-
-const MINDMAP_DOMAIN: Record<"work" | "personal", string> = {
-  work: "#2563eb",
-  personal: "#a855f7",
-};
-
-function MindmapFanDown({ n, colors }: { n: number; colors: string[] }) {
-  if (n <= 0) return null;
-  const w = 100;
-  const h = 38;
-  const cx = w / 2;
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="bd-mindmap-fan" aria-hidden>
-      {Array.from({ length: n }, (_, i) => {
-        const tx = n === 1 ? cx : ((i + 0.5) / n) * w;
-        const stroke = colors[i] ?? "var(--border-strong)";
-        const d =
-          n === 1
-            ? `M ${cx} 0 C ${cx} ${h * 0.55}, ${cx} ${h * 0.45}, ${tx} ${h}`
-            : `M ${cx} 0 C ${cx} ${h * 0.62}, ${tx} ${h * 0.38}, ${tx} ${h}`;
-        return <path key={i} d={d} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />;
-      })}
-    </svg>
-  );
-}
-
-function MindmapPill({
-  icon,
-  label,
-  count,
-  color,
-  onClick,
-  expanded,
-  variant = "branch",
-}: {
-  icon: ReactNode;
-  label: string;
-  count: number;
-  color: string;
-  onClick?: () => void;
-  expanded?: boolean;
-  variant?: "root" | "branch";
-}) {
-  const Cmp = onClick ? "button" : "div";
-  const props = onClick ? { type: "button" as const, onClick } : {};
-  return (
-    <Cmp {...props} className={`bd-mindmap-pill ${variant === "root" ? "bd-mindmap-pill--root" : ""}`}>
-      <span className="bd-mindmap-pill-icon" style={{ color }}>
-        {icon}
-      </span>
-      <span className="bd-mindmap-pill-dash" style={{ background: color }} />
-      <span className="bd-mindmap-pill-label">{label}</span>
-      <span className="bd-mindmap-pill-badge" style={{ background: color }}>
-        {count}
-      </span>
-      {onClick && expanded !== undefined && <span className="bd-mindmap-pill-chevron">{expanded ? "▼" : "▶"}</span>}
-    </Cmp>
-  );
-}
-
-function MindmapView({
-  items,
-  showEntryTitles = true,
-  onSetTaskCompleted,
-  onEdit,
-  onItemContextMenu,
-  isMobile = false,
-}: {
-  items: ViewItem[];
-  showEntryTitles?: boolean;
-  onSetTaskCompleted: (id: string, completed: boolean) => void;
-  onEdit: (item: ViewItem) => void;
-  onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
-  isMobile?: boolean;
-}) {
-  const { t } = useI18n();
-  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
-  const [collapsedDomains, setCollapsedDomains] = useState<Set<string>>(new Set());
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
-
-  const toggleDomain = (key: string) =>
-    setCollapsedDomains((s) => {
-      const n = new Set(s);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
-    });
-  const toggleSection = (key: string) =>
-    setCollapsedSections((s) => {
-      const n = new Set(s);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
-    });
-  const toggleType = (key: string) =>
-    setCollapsedTypes((s) => {
-      const n = new Set(s);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
-    });
-
-  const workItems = items.filter((it) => it.domain === "work");
-  const personalItems = items.filter((it) => it.domain === "personal");
-
-  const workSections = (() => {
-    const byProject = new Map<string, ViewItem[]>();
-    for (const it of workItems) {
-      const key = it.project?.id ?? "__none";
-      if (!byProject.has(key)) byProject.set(key, []);
-      byProject.get(key)!.push(it);
-    }
-    return Array.from(byProject.entries()).map(([id, list]) => ({
-      key: id,
-      label: id === "__none" ? t("items.flowchartNoProject") : (list[0]?.project?.name ?? id),
-      items: list,
-    }));
-  })();
-
-  const personalSections = (() => {
-    const byCategory = new Map<string, ViewItem[]>();
-    for (const it of personalItems) {
-      const key = it.category || "__none";
-      if (!byCategory.has(key)) byCategory.set(key, []);
-      byCategory.get(key)!.push(it);
-    }
-    return Array.from(byCategory.entries()).map(([key, list]) => ({
-      key,
-      label: flowSectionLabel("personal", key),
-      items: list,
-    }));
-  })();
-
-  const groupByType = (list: ViewItem[]) => {
-    const byType = new Map<string, ViewItem[]>();
-    for (const it of list) {
-      const ty = it.itemType || "note";
-      if (!byType.has(ty)) byType.set(ty, []);
-      byType.get(ty)!.push(it);
-    }
-    return Array.from(byType.entries()).map(([type, entries]) => ({ type, entries }));
-  };
-
-  const iconBriefcase = (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="2" y="7" width="20" height="14" rx="2" />
-      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-    </svg>
-  );
-  const iconUser = (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-  const iconRoot = (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-    </svg>
-  );
-
-  const renderEntry = (it: ViewItem, index: number) => {
-    const ep = enterStaggerProps(index);
-    const barColor = TYPE_BAR_COLORS[it.itemType] ?? TYPE_BAR_COLORS.default;
-    const isNew = isNewEntry(it);
-    return (
-      <div
-        key={it.id}
-        className={ep.className}
-        data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
-        style={{
-          ...ep.style,
-          display: "flex",
-          alignItems: "stretch",
-          gap: "0.35rem",
-          minWidth: 0,
-        }}
-      >
-        {isTaskRow(it) && (
-          <label
-            style={{
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              paddingLeft: "0.15rem",
-              cursor: "pointer",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <input
-              type="checkbox"
-              checked={isTaskCompleted(it)}
-              onChange={(e) => {
-                e.stopPropagation();
-                onSetTaskCompleted(it.id, e.target.checked);
-              }}
-              aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
-              style={{ width: 16, height: 16, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
-            />
-          </label>
-        )}
-        <button
-          type="button"
-          className="bd-mindmap-entry"
-          data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            borderLeft: `3px solid ${barColor}`,
-            position: "relative",
-          }}
-          onClick={!isMobile || !onItemContextMenu ? () => onEdit(it) : undefined}
-          {...(isMobile && onItemContextMenu ? bindMobileField(it, () => onEdit(it)) : {})}
-          onDoubleClick={() => onEdit(it)}
-          onContextMenu={
-            onItemContextMenu && !isMobile
-              ? (e) => {
-                  e.preventDefault();
-                  onItemContextMenu(e, it.id, it.domain, it.itemType);
-                }
-              : undefined
-          }
-        >
-          {isNew && (
-            <span
-              style={{
-                position: "absolute",
-                top: 6,
-                right: 8,
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: "var(--text-primary)",
-                boxShadow: "0 0 6px rgba(255,255,255,0.25)",
-              }}
-              aria-hidden
-            />
-          )}
-          <span className="bd-mindmap-entry-type">
-            <EntryTypeIcon type={it.itemType} size={14} />
-          </span>
-          <span className="bd-mindmap-entry-text">
-            {entryPrimaryLine(it, showEntryTitles)}
-            {showEntryTitles && it.content?.trim() && !isContentRedundantWithTitle(it.title, it.content) && (
-              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-tertiary)", marginTop: "0.15rem" }}>
-                {it.content.slice(0, 48)}
-                {it.content.length > 48 ? "…" : ""}
-              </span>
-            )}
-          </span>
-        </button>
-      </div>
-    );
-  };
-
-  const renderTypeBlock = (domain: string, sectionKey: string, type: string, entries: ViewItem[]) => {
-    const typeKey = `${domain}:${sectionKey}:${type}`;
-    const isCollapsed = collapsedTypes.has(typeKey);
-    const label = formatTypeLabel(type, t);
-    const typeColor = TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default;
-    return (
-      <div key={typeKey} className="bd-mindmap-type-col" style={{ ["--bd-mindmap-branch" as string]: typeColor }}>
-        <MindmapPill
-          icon={<EntryTypeIcon type={type} size={16} />}
-          label={label}
-          count={entries.length}
-          color={typeColor}
-          onClick={() => toggleType(typeKey)}
-          expanded={!isCollapsed}
-        />
-        {!isCollapsed && <div className="bd-mindmap-entries">{entries.map((it, idx) => renderEntry(it, idx))}</div>}
-      </div>
-    );
-  };
-
-  const renderSection = (domain: string, sectionKey: string, label: string, sectionItems: ViewItem[]) => {
-    const sectionId = `${domain}:${sectionKey}`;
-    const isCollapsed = collapsedSections.has(sectionId);
-    const byType = groupByType(sectionItems);
-    const branchColor = mindmapBranchColor(sectionId);
-    const typeColors = byType.map(({ type }) => TYPE_BAR_COLORS[type] ?? TYPE_BAR_COLORS.default);
-    return (
-      <div key={sectionId} className="bd-mindmap-section">
-        <MindmapPill
-          icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={branchColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-          }
-          label={label}
-          count={sectionItems.length}
-          color={branchColor}
-          onClick={() => toggleSection(sectionId)}
-          expanded={!isCollapsed}
-        />
-        {!isCollapsed && byType.length > 0 && (
-          <>
-            <MindmapFanDown n={byType.length} colors={typeColors} />
-            <div className="bd-mindmap-types-row">
-              {byType.map(({ type, entries }) => renderTypeBlock(domain, sectionKey, type, entries))}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  const renderDomainMindmap = (
-    domain: "work" | "personal",
-    label: string,
-    sections: { key: string; label: string; items: ViewItem[] }[],
-  ) => {
-    const color = MINDMAP_DOMAIN[domain];
-    const isCollapsed = collapsedDomains.has(domain);
-    const total = sections.reduce((s, sec) => s + sec.items.length, 0);
-    const filled = sections.filter((s) => s.items.length > 0);
-    const sectionColors = filled.map((s) => mindmapBranchColor(`${domain}:${s.key}`));
-    return (
-      <div className="bd-mindmap-domain" key={domain}>
-        <MindmapPill
-          icon={domain === "work" ? iconBriefcase : iconUser}
-          label={label}
-          count={total}
-          color={color}
-          onClick={() => toggleDomain(domain)}
-          expanded={!isCollapsed}
-        />
-        {!isCollapsed && filled.length > 0 && (
-          <>
-            <MindmapFanDown n={filled.length} colors={sectionColors} />
-            <div className="bd-mindmap-sections-row">{filled.map((sec) => renderSection(domain, sec.key, sec.label, sec.items))}</div>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  const hasWork = workSections.some((s) => s.items.length > 0);
-  const hasPersonal = personalSections.some((s) => s.items.length > 0);
-  const domainColorsList: string[] = [];
-  if (hasWork) domainColorsList.push(MINDMAP_DOMAIN.work);
-  if (hasPersonal) domainColorsList.push(MINDMAP_DOMAIN.personal);
-  const rootColor = "var(--accent)";
-
-  return (
-    <div
-      className="bd-mindmap"
-      style={{
-        padding: isMobile ? "0.65rem" : "1.25rem 1.5rem 0",
-        paddingBottom: isMobile
-          ? "calc(0.65rem + var(--bd-view-bottom-pad))"
-          : "calc(1.75rem + var(--bd-view-bottom-pad))",
-      }}
-    >
-      {items.length === 0 ? (
-        <p style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>{t("items.flowchartEmpty")}</p>
-      ) : (
-        <div className="bd-mindmap-chart">
-          <div className="bd-mindmap-level bd-mindmap-level--root">
-            <MindmapPill variant="root" icon={iconRoot} label={t("items.mindmapRoot")} count={items.length} color={rootColor} />
-          </div>
-          {domainColorsList.length > 0 && <MindmapFanDown n={domainColorsList.length} colors={domainColorsList} />}
-          <div className="bd-mindmap-domains-row">
-            {hasWork && renderDomainMindmap("work", t("items.flowchartWork"), workSections)}
-            {hasPersonal && renderDomainMindmap("personal", t("items.flowchartPersonal"), personalSections)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 type ReorderDragPreview = { draggedId: string; overId: string; place: "before" | "after" };
 
 function applyReorderPreview(items: ViewItem[], preview: ReorderDragPreview | null): ViewItem[] {
@@ -5226,624 +4657,6 @@ function ListView({
           );
         });
       })()}
-    </div>
-  );
-}
-function KanbanView({
-  items,
-  showEntryTitles = true,
-  onSetTaskCompleted,
-  onItemContextMenu,
-  onEdit,
-  isMobile = false,
-}: {
-  items: ViewItem[];
-  showEntryTitles?: boolean;
-  onSetTaskCompleted: (id: string, completed: boolean) => void;
-  onDelete: (id: string, skipConfirm?: boolean) => void;
-  onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
-  onEdit?: (item: ViewItem) => void;
-  isMobile?: boolean;
-}) {
-  const { t } = useI18n();
-  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
-  const draggedIdRef = useRef<string | null>(null);
-  const dragOverColumnRef = useRef<string | null>(null);
-  const kanbanContainerRef = useRef<HTMLDivElement | null>(null);
-  dragOverColumnRef.current = dragOverColumn;
-  const taskItems = items.filter(isTaskRow);
-  const byColumn = [
-    {
-      key: "todo",
-      label: t("items.kanbanTodo"),
-      items: taskItems.filter((it) => !isTaskCompleted(it)),
-    },
-    {
-      key: "completed",
-      label: t("items.kanbanCompleted"),
-      items: taskItems.filter(isTaskCompleted),
-    },
-  ];
-
-  const applyDrop = useCallback(
-    (id: string, columnKey: string) => {
-      const completed = columnKey === "completed";
-      onSetTaskCompleted(id, completed);
-      draggedIdRef.current = null;
-      setDraggedId(null);
-      setDragOverColumn(null);
-    },
-    [onSetTaskCompleted]
-  );
-
-  useEffect(() => {
-    const onWindowDrop = (e: globalThis.DragEvent) => {
-      const id = draggedIdRef.current;
-      const column = dragOverColumnRef.current;
-      if (!id || !column) return;
-      if (kanbanContainerRef.current && kanbanContainerRef.current.contains(e.target as Node)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      applyDrop(id, column);
-    };
-    const onWindowDragEnd = () => {
-      draggedIdRef.current = null;
-      setDraggedId(null);
-      setDragOverColumn(null);
-    };
-    window.addEventListener("drop", onWindowDrop, true);
-    window.addEventListener("dragend", onWindowDragEnd, true);
-    return () => {
-      window.removeEventListener("drop", onWindowDrop, true);
-      window.removeEventListener("dragend", onWindowDragEnd, true);
-    };
-  }, [applyDrop]);
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData("text/plain", id);
-    e.dataTransfer.effectAllowed = "move";
-    draggedIdRef.current = id;
-    setDraggedId(id);
-  };
-  const handleDragEnd = () => {
-    setDraggedId(null);
-    setDragOverColumn(null);
-  };
-  const handleDragOver = (e: React.DragEvent, columnKey: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
-    setDragOverColumn(columnKey);
-  };
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!(e.currentTarget as Node).contains((e.relatedTarget as Node))) setDragOverColumn(null);
-  };
-  const handleDrop = (e: React.DragEvent, columnKey: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const id = e.dataTransfer.getData("text/plain") || draggedIdRef.current;
-    if (id) {
-      applyDrop(id, columnKey);
-    } else {
-      setDragOverColumn(null);
-    }
-  };
-
-  return (
-    <div
-      ref={kanbanContainerRef}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--bd-space-3, 0.75rem)",
-        flex: 1,
-        minHeight: 200,
-        width: "100%",
-      }}
-    >
-      {taskItems.length === 0 && items.length > 0 && (
-        <p style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", margin: 0 }}>
-          {t("items.kanbanNote")}
-        </p>
-      )}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: isMobile ? "column" : "row",
-          alignItems: "stretch",
-          gap: isMobile ? "var(--bd-space-3, 0.75rem)" : "var(--bd-space-4, 1rem)",
-          overflow: isMobile ? "visible" : "auto",
-          flex: 1,
-          width: "100%",
-          maxWidth: "100%",
-          minWidth: 0,
-          boxSizing: "border-box",
-          ...(isMobile ? {} : { paddingBottom: "var(--bd-view-bottom-pad)" }),
-        }}
-      >
-      {byColumn.map((col) => (
-        <div
-          key={col.key}
-          onDragOver={(e) => handleDragOver(e, col.key)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, col.key)}
-          style={{
-            flex: isMobile ? "0 0 auto" : "1 1 0",
-            minWidth: isMobile ? 0 : 0,
-            width: isMobile ? "100%" : undefined,
-            maxWidth: "100%",
-            minHeight: 120,
-            background: dragOverColumn === col.key ? "var(--bg-hover)" : "var(--bg-secondary)",
-            borderRadius: 0,
-            padding: "var(--bd-space-4, 1rem)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--bd-space-3, 0.75rem)",
-            border: dragOverColumn === col.key ? "2px dashed var(--bd-chrome-selected-border)" : "2px solid transparent",
-            transition:
-              "background var(--bd-duration-fast) var(--bd-ease-soft), border-color var(--bd-duration-fast) var(--bd-ease-soft)",
-          }}
-        >
-          <h4
-            style={{
-              fontSize: "0.8125rem",
-              fontWeight: 600,
-              color: "var(--text-secondary)",
-              margin: 0,
-              paddingBottom: "var(--bd-space-1, 0.25rem)",
-              lineHeight: 1.3,
-            }}
-          >
-            {col.label}
-          </h4>
-          {col.items.map((it, idx) => {
-            const ep = enterStaggerProps(idx);
-            const hideRedundantBody =
-              showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
-            return (
-            <div
-              key={it.id}
-              className={ep.className}
-              draggable
-              data-bd-mobile-entry={isMobile && onItemContextMenu ? "1" : undefined}
-              onDragStart={(e) => handleDragStart(e, it.id)}
-              onDragEnd={handleDragEnd}
-              onDragOver={(e) => handleDragOver(e, col.key)}
-              onDrop={(e) => handleDrop(e, col.key)}
-              onDoubleClick={() => onEdit?.(it)}
-              onContextMenu={
-                onItemContextMenu && !isMobile
-                  ? (e) => {
-                      e.preventDefault();
-                      onItemContextMenu(e, it.id, it.domain, it.itemType);
-                    }
-                  : undefined
-              }
-              {...(isMobile ? bindMobileField(it, undefined, () => onEdit?.(it)) : {})}
-              style={{
-                ...ep.style,
-                padding: "0.65rem 0.85rem",
-                background: "var(--bg-tertiary)",
-                border: "1px solid var(--border-default)",
-                borderRadius: "12px",
-                cursor: "grab",
-                opacity: draggedId === it.id ? 0.6 : 1,
-              }}
-            >
-              {showEntryTitles && <div style={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1.35 }}>{it.title}</div>}
-              {!hideRedundantBody && (
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "var(--text-secondary)",
-                  marginTop: showEntryTitles ? "0.35rem" : 0,
-                  lineHeight: 1.45,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {it.content?.trim() || "ÔÇö"}
-              </div>
-              )}
-              <div
-                style={{
-                  fontSize: "0.65rem",
-                  color: "var(--text-tertiary)",
-                  marginTop: "0.4rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                }}
-              >
-                <EntryTypeIcon type={it.itemType} size={12} />
-                {entryTypeMetaLine(it, t)}
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      ))}
-      </div>
-    </div>
-  );
-}
-
-const CARD_WIDTH = 180;
-const CARD_HEIGHT = 160;
-const PAD = 16;
-
-const POSTIT_COLORS: Record<string, string> = {
-  task: "#f59e0b",
-  task_completed: "#22c55e",
-  shopping: "#f43f5e",
-  note: "#3b82f6",
-  idea: "#8b5cf6",
-  emotion: "#ec4899",
-  reflection: "#06b6d4",
-  reminder: "#10b981",
-  default: "#6b7280",
-};
-
-function PostitsView({
-  items,
-  showEntryTitles = true,
-  onSetTaskCompleted,
-  onDelete,
-  onPosition,
-  postitPositions,
-  setPostitPositions,
-  onItemContextMenu,
-  onEdit,
-  lineToolActive,
-  links,
-  onAddLink,
-  onRemoveLink,
-  isMobile = false,
-}: {
-  items: ViewItem[];
-  showEntryTitles?: boolean;
-  onSetTaskCompleted: (id: string, completed: boolean) => void;
-  onDelete: (id: string, skipConfirm?: boolean) => void;
-  onPosition: (id: string, x: number, y: number) => void;
-  postitPositions: Record<string, { x: number; y: number }>;
-  setPostitPositions: React.Dispatch<React.SetStateAction<Record<string, { x: number; y: number }>>>;
-  onItemContextMenu?: (e: React.MouseEvent, id: string, domain: string, currentType: string) => void;
-  onEdit?: (item: ViewItem) => void;
-  lineToolActive: boolean;
-  links: { fromId: string; toId: string }[];
-  onAddLink: (fromId: string, toId: string) => void;
-  onRemoveLink: (fromId: string, toId: string) => void;
-  isMobile?: boolean;
-}) {
-  const { t } = useI18n();
-  const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [dragState, setDragState] = useState<{ id: string; startX: number; startY: number; itemX: number; itemY: number } | null>(null);
-  const [linkFrom, setLinkFrom] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [linkPreview, setLinkPreview] = useState<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      if (el) {
-        const { width, height } = el.getBoundingClientRect();
-        setContainerSize({ width, height });
-      }
-    };
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    update();
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    setPostitPositions((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const it of items) {
-        const p = next[it.id];
-        if (p != null && it.positionX === p.x && it.positionY === p.y) {
-          delete next[it.id];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [items, setPostitPositions]);
-
-  const getPosition = (it: ViewItem) => {
-    const def = { x: 0, y: 0 };
-    if (it.positionX != null && it.positionY != null) return { x: it.positionX, y: it.positionY };
-    const i = items.indexOf(it);
-    const row = Math.floor(i / 4);
-    const col = i % 4;
-    return { x: col * (CARD_WIDTH + PAD), y: row * (CARD_HEIGHT + PAD) };
-  };
-
-  const getCenter = (it: ViewItem) => {
-    const { x, y } = getPosition(it);
-    const drag = postitPositions[it.id];
-    const px = drag ? drag.x : x;
-    const py = drag ? drag.y : y;
-    return { x: px + CARD_WIDTH / 2, y: py + CARD_HEIGHT / 2 };
-  };
-
-  const clientToBoard = (clientX: number, clientY: number) => {
-    if (!containerRef.current) return { x: 0, y: 0 };
-    const rect = containerRef.current.getBoundingClientRect();
-    return {
-      x: clientX - rect.left + containerRef.current.scrollLeft,
-      y: clientY - rect.top + containerRef.current.scrollTop,
-    };
-  };
-
-  const handleMouseDown = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    if (lineToolActive) {
-      const pos = items.find((it) => it.id === id);
-      if (!pos) return;
-      const c = getCenter(pos);
-      setLinkFrom({ id, x: c.x, y: c.y });
-      setLinkPreview(c);
-      return;
-    }
-    const pos = items.find((it) => it.id === id);
-    if (!pos) return;
-    const { x, y } = getPosition(pos);
-    setDragState({ id, startX: e.clientX, startY: e.clientY, itemX: x, itemY: y });
-  };
-
-  useEffect(() => {
-    if (!dragState) return;
-    const handleMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
-      setPostitPositions((prev) => ({
-        ...prev,
-        [dragState.id]: { x: Math.max(0, dragState.itemX + dx), y: Math.max(0, dragState.itemY + dy) },
-      }));
-    };
-    const handleUp = (e: MouseEvent) => {
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
-      const newX = Math.max(0, dragState.itemX + dx);
-      const newY = Math.max(0, dragState.itemY + dy);
-      setPostitPositions((prev) => ({ ...prev, [dragState.id]: { x: newX, y: newY } }));
-      onPosition(dragState.id, newX, newY);
-      setDragState(null);
-    };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [dragState, onPosition]);
-
-  useEffect(() => {
-    if (!linkFrom) return;
-    const handleMove = (e: MouseEvent) => setLinkPreview(clientToBoard(e.clientX, e.clientY));
-    const handleUp = (e: MouseEvent) => {
-      const target = document.elementFromPoint(e.clientX, e.clientY);
-      const card = target?.closest("[data-postit-id]");
-      const toId = card?.getAttribute("data-postit-id");
-      if (toId && toId !== linkFrom.id) onAddLink(linkFrom.id, toId);
-      setLinkFrom(null);
-      setLinkPreview(null);
-    };
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [linkFrom, onAddLink]);
-
-  const minBoardWidth = CARD_WIDTH + PAD * 2;
-  const minBoardHeightFromCards = CARD_HEIGHT + PAD * 2;
-  const boardWidthFromCards = Math.max(
-    minBoardWidth,
-    ...items.map((it) => {
-      const { x } = getPosition(it);
-      const d = postitPositions[it.id];
-      return (d ? d.x : x) + CARD_WIDTH + PAD;
-    })
-  );
-  const boardHeightFromCards = Math.max(
-    minBoardHeightFromCards,
-    ...items.map((it) => {
-      const { y } = getPosition(it);
-      const d = postitPositions[it.id];
-      return (d ? d.y : y) + CARD_HEIGHT + PAD;
-    })
-  );
-  const boardWidth = Math.max(boardWidthFromCards, containerSize.width || 400);
-  const boardHeight = Math.max(boardHeightFromCards, containerSize.height || 400);
-
-  const idToCenter = (id: string) => {
-    const it = items.find((i) => i.id === id);
-    if (!it) return null;
-    return getCenter(it);
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        position: "relative",
-        minHeight: 0,
-        flex: 1,
-        overflow: "auto",
-        background: "var(--bg-primary)",
-        borderRadius: 0,
-        paddingBottom: "var(--bd-view-bottom-pad)",
-      }}
-      onMouseLeave={() => {
-        if (dragState) setDragState(null);
-        if (linkFrom) {
-          setLinkFrom(null);
-          setLinkPreview(null);
-        }
-      }}
-    >
-      <div style={{ position: "relative", width: boardWidth, height: boardHeight, minHeight: boardHeight }}>
-        <svg
-          style={{ position: "absolute", left: 0, top: 0, width: boardWidth, height: boardHeight, pointerEvents: "none", zIndex: 0 }}
-          viewBox={`0 0 ${boardWidth} ${boardHeight}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="var(--text-tertiary)" />
-            </marker>
-          </defs>
-          {links.map(({ fromId, toId }) => {
-            const from = idToCenter(fromId);
-            const to = idToCenter(toId);
-            if (!from || !to) return null;
-            const dx = to.x - from.x;
-            const dy = to.y - from.y;
-            const len = Math.hypot(dx, dy) || 1;
-            const shorten = Math.min(20, len / 2);
-            const endX = to.x - (dx / len) * shorten;
-            const endY = to.y - (dy / len) * shorten;
-            const startX = from.x + (dx / len) * (CARD_WIDTH / 2 + 4);
-            const startY = from.y + (dy / len) * (CARD_HEIGHT / 2 + 4);
-            return (
-              <line
-                key={`${fromId}-${toId}`}
-                x1={startX}
-                y1={startY}
-                x2={endX}
-                y2={endY}
-                stroke="var(--text-tertiary)"
-                strokeWidth="2"
-                markerEnd="url(#arrowhead)"
-              />
-            );
-          })}
-          {linkFrom && linkPreview && (
-            <line
-              x1={linkFrom.x}
-              y1={linkFrom.y}
-              x2={linkPreview.x}
-              y2={linkPreview.y}
-              stroke="var(--text-tertiary)"
-              strokeWidth="2"
-              strokeDasharray="6 4"
-              markerEnd="url(#arrowhead)"
-            />
-          )}
-        </svg>
-        {items.map((it, i) => {
-          const ep = enterStaggerProps(i);
-          const base = getPosition(it);
-          const drag = postitPositions[it.id];
-          const x = drag ? drag.x : base.x;
-          const y = drag ? drag.y : base.y;
-          const barColor = POSTIT_COLORS[it.itemType] ?? POSTIT_COLORS.default;
-          const hideRedundantBody =
-            showEntryTitles && !!(it.content ?? "").trim() && isContentRedundantWithTitle(it.title, it.content);
-          return (
-            <div
-              key={it.id}
-              data-postit-id={it.id}
-              className={ep.className}
-              onMouseDown={(e) => handleMouseDown(e, it.id)}
-              onDoubleClick={() => onEdit?.(it)}
-              onContextMenu={
-                onItemContextMenu && !isMobile
-                  ? (e) => {
-                      e.preventDefault();
-                      onItemContextMenu(e, it.id, it.domain, it.itemType);
-                    }
-                  : undefined
-              }
-              {...(isMobile ? bindMobileField(it, undefined, () => onEdit?.(it)) : {})}
-              style={{
-                ...ep.style,
-                position: "absolute",
-                left: x,
-                top: y,
-                width: CARD_WIDTH,
-                minHeight: CARD_HEIGHT,
-                zIndex: 1,
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-default)",
-                borderRadius: 6,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)",
-                cursor: lineToolActive ? "crosshair" : dragState?.id === it.id ? "grabbing" : "grab",
-                userSelect: "none",
-                WebkitTouchCallout: "none",
-                display: "flex",
-                flexDirection: "row",
-                overflow: "hidden",
-                transition:
-                  dragState?.id === it.id
-                    ? "box-shadow var(--bd-duration-normal) var(--bd-ease-soft)"
-                    : "none",
-                ...(dragState?.id === it.id ? { boxShadow: "0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)" } : {}),
-              }}
-            >
-              <div style={{ width: 4, flexShrink: 0, background: barColor }} />
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.5rem 0.75rem 0.25rem", gap: "0.5rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0, flex: 1 }}>
-                    {isTaskRow(it) && (
-                      <input
-                        type="checkbox"
-                        checked={isTaskCompleted(it)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          onSetTaskCompleted(it.id, e.target.checked);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={isTaskCompleted(it) ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
-                        style={{ width: 16, height: 16, flexShrink: 0, accentColor: "var(--accent, #ea580c)", cursor: "pointer" }}
-                      />
-                    )}
-                    <span style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-tertiary)", minWidth: 0 }}>
-                      {entryTypeMetaLine(it, t)}
-                    </span>
-                  </div>
-                  {onItemContextMenu && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onItemContextMenu(e, it.id, it.domain, it.itemType); }}
-                      style={{ padding: "0.2rem", border: "none", background: "none", color: "var(--text-tertiary)", cursor: "pointer", borderRadius: 4 }}
-                      aria-label="More actions"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="12" cy="6" r="1.5" />
-                        <circle cx="12" cy="12" r="1.5" />
-                        <circle cx="12" cy="18" r="1.5" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <div style={{ flex: 1, padding: "0 0.75rem 0.5rem", minHeight: 0 }}>
-                  {showEntryTitles && (
-                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--text-primary)", marginBottom: "0.25rem", lineHeight: 1.3 }}>
-                      {it.title}
-                    </div>
-                  )}
-                  {!hideRedundantBody && (
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                    {it.content?.trim() || "ÔÇö"}
-                  </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
