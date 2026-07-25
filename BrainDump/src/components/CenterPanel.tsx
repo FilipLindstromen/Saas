@@ -107,12 +107,6 @@ interface CenterPanelProps {
   dueDateFilter?: import("@/lib/due-date-filter").DueDateFilterPreset;
   /** Mobile: ScopeBar rendered in one row with items toolbar (from page). */
   scopeSlot?: ReactNode;
-  /** Mobile: items view registers controls left of the top-bar menu (see TopBar.beforeMenuSlot). */
-  onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
-  /** Desktop: items view registers controls left of the scope filter field (see ScopeBar.beforeFilterSlot). */
-  onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
-  /** Top bar end slot: lucky button (both mobile and desktop). */
-  onTopBarEndSlot?: (slot: ReactNode | null) => void;
   /** After organizing creates new work projects — refetch project list for ScopeBar / prompts. */
   onWorkProjectsChanged?: () => void;
   /** Mic capture active (for global chrome: stop icon, pulse, z-index). */
@@ -162,9 +156,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     searchFilter = "",
     dueDateFilter = "all",
     scopeSlot = null,
-    onMobileTopBarBeforeMenuSlot,
-    onDesktopScopeBeforeFilterSlot,
-    onTopBarEndSlot,
     onWorkProjectsChanged,
     onDumpRecordingChange,
     onItemMovedToTrash,
@@ -1436,9 +1427,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           dueDateFilter={dueDateFilter}
           reloadKey={itemsReloadKey}
           scopeSlot={scopeSlot}
-          onMobileTopBarBeforeMenuSlot={onMobileTopBarBeforeMenuSlot}
-          onDesktopScopeBeforeFilterSlot={onDesktopScopeBeforeFilterSlot}
-          onTopBarEndSlot={onTopBarEndSlot}
           onItemMovedToTrash={onItemMovedToTrash}
           onDumpEmptyListTextHintChange={setDumpEmptyListHint}
           dumpEmptyHintSuppressed={dumpHintSuppressed}

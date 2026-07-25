@@ -10,6 +10,7 @@
   "topBar.streaks": "Streaks",
   "topBar.title": "BrainDump",
   "topBar.workspace": "Workspace",
+  "topBar.workspaceSwipe": "Swipe left or right to switch All, Personal, or Work",
   "sidebar.expand": "Expand sidebar",
   "sidebar.collapse": "Collapse sidebar",
   "sidebar.navAria": "Main navigation",

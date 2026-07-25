@@ -3768,8 +3768,78 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   padding-top: 0.35rem;
   padding-bottom: 0.5rem;
+}
+
+.bd-workspace-column--today {
+  flex: 1;
+  min-height: 0;
+}
+
+.bd-today-timeline-shell--mobile {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  padding-bottom: var(--bd-bottom-bar-clearance);
+  overflow: hidden;
+}
+
+.bd-today-timeline-shell--mobile .bd-timeline-view {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-width: 100%;
+  padding-left: max(0.65rem, env(safe-area-inset-left));
+  padding-right: max(0.65rem, env(safe-area-inset-right));
+  padding-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+
+.bd-topbar-workspace-swipe {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0.2rem 0.35rem;
+  margin-left: 0.25rem;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  max-width: min(52vw, 11rem);
+}
+
+.bd-topbar-workspace-swipe:active {
+  cursor: grabbing;
+}
+
+.bd-topbar-workspace-swipe__label {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-align: center;
+  transition: transform 0.12s ease-out;
+}
+
+.bd-topbar-workspace-swipe__peek {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-quaternary);
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bd-topbar-workspace-swipe__peek--prev {
+  text-align: right;
+}
+
+.bd-topbar-workspace-swipe__peek--next {
+  text-align: left;
 }
 
 .bd-timeline-view {
@@ -3796,7 +3866,25 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 }
 
 .bd-timeline-day {
-  padding: 1.25rem 0 0.5rem;
+  position: relative;
+  padding: 2.35rem 0 2rem;
+}
+
+.bd-timeline-day::before {
+  content: "";
+  position: absolute;
+  left: 0.58rem;
+  top: 0.65rem;
+  bottom: -0.35rem;
+  width: 2px;
+  background: var(--bd-accent, #3b82f6);
+  border-radius: 1px;
+  opacity: 0.82;
+  pointer-events: none;
+}
+
+.bd-timeline-day:last-child::before {
+  bottom: 1.25rem;
 }
 
 .bd-timeline-day--today .bd-timeline-day-label {
@@ -3804,7 +3892,7 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 }
 
 .bd-timeline-day-label {
-  margin: 0 0 0.85rem;
+  margin: 0;
   padding: 0;
   font-size: 0.95rem;
   font-weight: 600;
@@ -3812,37 +3900,58 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   color: var(--text-secondary);
 }
 
+.bd-timeline-row {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr);
+  gap: 0 0.85rem;
+  align-items: start;
+}
+
+.bd-timeline-row--label {
+  margin-bottom: 0.55rem;
+}
+
+.bd-timeline-row--event {
+  padding: 0.45rem 0;
+}
+
+.bd-timeline-spine {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.28rem;
+  position: relative;
+  z-index: 1;
+}
+
+.bd-timeline-node {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--bd-accent, #3b82f6);
+  background: var(--bg-primary);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.bd-timeline-node--day {
+  width: 11px;
+  height: 11px;
+}
+
+.bd-timeline-node--today {
+  background: var(--bd-accent, #3b82f6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bd-accent, #3b82f6) 22%, transparent);
+}
+
 .bd-timeline-day-empty {
-  margin: 0 0 0.25rem 4.75rem;
+  margin: 0;
   font-size: 0.8125rem;
   color: var(--text-tertiary);
 }
 
-.bd-timeline-day-events {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.bd-timeline-day-events::before {
-  content: "";
-  position: absolute;
-  left: 4.35rem;
-  top: 0.35rem;
-  bottom: 0.35rem;
-  width: 2px;
-  background: var(--bd-accent, #3b82f6);
-  border-radius: 1px;
-  opacity: 0.85;
-}
-
-.bd-timeline-event {
-  display: grid;
-  grid-template-columns: 3.5rem 1.1rem minmax(0, 1fr);
-  gap: 0 0.65rem;
-  align-items: start;
-  padding: 0.55rem 0;
+.bd-timeline-event-content {
+  min-width: 0;
+  padding-bottom: 0.1rem;
 }
 
 .bd-timeline-event-time {
@@ -3850,38 +3959,58 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--text-tertiary);
-  text-align: right;
   line-height: 1.35;
-  padding-top: 0.15rem;
-}
-
-.bd-timeline-event-rail {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  padding-top: 0.28rem;
-}
-
-.bd-timeline-event-node {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--bd-accent, #3b82f6);
-  background: var(--bg-primary);
-  box-sizing: border-box;
-  position: relative;
-  z-index: 1;
-}
-
-.bd-timeline-event-body {
-  min-width: 0;
-  padding-bottom: 0.15rem;
+  margin-bottom: 0.15rem;
 }
 
 .bd-timeline-event-head {
   display: flex;
   align-items: flex-start;
   gap: 0.45rem;
+}
+
+.bd-timeline-day--tick .bd-timeline-node--day,
+.bd-timeline-day--tick .bd-timeline-node--today {
+  animation: bd-timeline-tick-shake 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.bd-timeline-day--tick .bd-timeline-day-label {
+  animation: bd-timeline-tick-nudge 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes bd-timeline-tick-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  18% {
+    transform: translateX(-2px) rotate(-4deg);
+  }
+  36% {
+    transform: translateX(2px) rotate(4deg);
+  }
+  54% {
+    transform: translateX(-1px) rotate(-2deg);
+  }
+  72% {
+    transform: translateX(1px) rotate(2deg);
+  }
+}
+
+@keyframes bd-timeline-tick-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-1px);
+  }
+  50% {
+    transform: translateX(1px);
+  }
+  75% {
+    transform: translateX(-0.5px);
+  }
 }
 
 .bd-timeline-event-check {
@@ -3942,11 +4071,11 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   flex-wrap: wrap;
 }
 
-.bd-timeline-day-events .bd-swipe-delete-wrap {
+.bd-timeline-day .bd-swipe-delete-wrap {
   background: transparent;
 }
 
-.bd-timeline-day-events .bd-swipe-delete-slide {
+.bd-timeline-day .bd-swipe-delete-slide {
   background: transparent;
 }
 

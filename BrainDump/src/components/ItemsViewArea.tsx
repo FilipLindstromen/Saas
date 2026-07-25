@@ -30,7 +30,6 @@ import {
 import { ENTRY_DISPLAY_CHANGED, entryPrimaryLine, loadShowEntryTitles } from "@/lib/entry-display-settings";
 import {
   dateOnlyToStartOfDay,
-  isPastScheduledForAiSuggestions,
   localDateTimeToDate,
   normalizeReminderMinutesBefore,
 } from "@/lib/calendar-schedule";
@@ -55,9 +54,8 @@ import {
   parseTaskRecurrence,
   type TaskRecurrencePattern,
 } from "@/lib/task-recurrence";
-import { LuckyTaskOverlay } from "./LuckyTaskOverlay";
 
-/** Staggered fade-in for list cards, kanban, post-its (set --bd-i 0…24). */
+/** Staggered fade-in for list cards (set --bd-i 0…24). */
 function enterStaggerProps(i: number, quick = false): { className: string; style: CSSProperties } {
   return {
     className: quick ? "bd-enter bd-enter--quick" : "bd-enter",
@@ -120,12 +118,6 @@ interface ItemsViewAreaProps {
   reloadKey?: number;
   /** Mobile: render ScopeBar in one row with type / view / filter (passed from page when scope is shown). */
   scopeSlot?: ReactNode;
-  /** Mobile: register content immediately left of the top-bar menu (e.g. AI next-actions). */
-  onMobileTopBarBeforeMenuSlot?: (slot: ReactNode | null) => void;
-  /** Desktop: register content immediately left of the scope search filter (e.g. AI next-actions). */
-  onDesktopScopeBeforeFilterSlot?: (slot: ReactNode | null) => void;
-  /** Top bar end slot: orange lucky button (both mobile and desktop). */
-  onTopBarEndSlot?: (slot: ReactNode | null) => void;
   /** After a successful soft-delete (trash); parent may show undo. */
   onItemMovedToTrash?: (id: string, title: string) => void;
   /** List or text view has no items (workspace empty); parent may show dump FAB hint. */
@@ -502,9 +494,6 @@ export function ItemsViewArea({
   dueDateFilter = "all",
   reloadKey = 0,
   scopeSlot,
-  onMobileTopBarBeforeMenuSlot,
-  onDesktopScopeBeforeFilterSlot,
-  onTopBarEndSlot,
   onItemMovedToTrash,
   onDumpEmptyListTextHintChange,
   dumpEmptyHintSuppressed = false,
@@ -620,52 +609,6 @@ export function ItemsViewArea({
     reminderMinutesBefore: normalizeReminderMinutesBefore(it.reminderMinutesBefore ?? 30),
     priority: it.priority ?? null,
   }), []);
-  const [luckyOpen, setLuckyOpen] = useState(false);
-  const [luckyTask, setLuckyTask] = useState<ViewItem | null>(null);
-  const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
-  const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
-  const [aiSuggestError, setAiSuggestError] = useState<string | null>(null);
-  const [aiSuggestList, setAiSuggestList] = useState<{ title: string; reason: string }[]>([]);
-
-  const runAiSuggest = useCallback(async () => {
-    if (items.length === 0) return;
-    const payloadItems = items
-      .filter((it) => !isPastScheduledForAiSuggestions(it))
-      .slice(0, 45)
-      .map((it) => ({
-        title: it.title,
-        content: it.content,
-        itemType: it.itemType,
-        progress: it.progress,
-        scheduledAt: it.scheduledAt ?? undefined,
-        scheduledTime: it.scheduledTime ?? undefined,
-        recurrence: it.recurrence ?? undefined,
-        project: it.project,
-      }));
-    setAiSuggestLoading(true);
-    setAiSuggestError(null);
-    setAiSuggestList([]);
-    setAiSuggestOpen(true);
-    try {
-      const res = await fetch("/api/suggest-next-actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          locale,
-          items: payloadItems,
-        }),
-      });
-      const data = (await res.json()) as { suggestions?: { title: string; reason: string }[]; error?: string };
-      if (!res.ok) {
-        throw new Error(data.error || t("items.suggestError"));
-      }
-      setAiSuggestList(Array.isArray(data.suggestions) ? data.suggestions : []);
-    } catch (e) {
-      setAiSuggestError(e instanceof Error ? e.message : t("items.suggestError"));
-    } finally {
-      setAiSuggestLoading(false);
-    }
-  }, [items, locale, t]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -678,141 +621,6 @@ export function ItemsViewArea({
   useEffect(() => {
     setEditEntryPortalEl(typeof document !== "undefined" ? document.body : null);
   }, []);
-
-  const showMobileAiInTopBar =
-    isMobile && (mode === "work" || mode === "personal" || mode === "all");
-
-  useEffect(() => {
-    if (!onMobileTopBarBeforeMenuSlot) return;
-    if (!showMobileAiInTopBar) {
-      onMobileTopBarBeforeMenuSlot(null);
-      return;
-    }
-    onMobileTopBarBeforeMenuSlot(
-      <button
-        key="bd-topbar-ai-next"
-        type="button"
-        className="bd-btn bd-topbar-ai-suggest-btn"
-        disabled={items.length === 0 || aiSuggestLoading || loading}
-        onClick={() => void runAiSuggest()}
-        title={t("items.aiNextThree")}
-        aria-label={t("items.aiNextThree")}
-        style={{ opacity: items.length === 0 ? 0.45 : 1 }}
-      >
-        {aiSuggestLoading ? (
-          <span style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>{t("items.aiNextThreeBusy")}</span>
-        ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-            <path d="M12 3v4M12 17v4M5 12h4M15 12h4" />
-            <path d="M19 4v3.5M17.25 5.75h3.5" strokeWidth="1.65" />
-          </svg>
-        )}
-      </button>
-    );
-    return () => onMobileTopBarBeforeMenuSlot(null);
-  }, [
-    onMobileTopBarBeforeMenuSlot,
-    showMobileAiInTopBar,
-    items.length,
-    aiSuggestLoading,
-    loading,
-    runAiSuggest,
-    t,
-  ]);
-
-  useEffect(() => {
-    if (!onDesktopScopeBeforeFilterSlot) return;
-    const showDesktopAi =
-      !isMobile && (mode === "work" || mode === "personal" || mode === "all");
-    if (!showDesktopAi) {
-      onDesktopScopeBeforeFilterSlot(null);
-      return;
-    }
-    onDesktopScopeBeforeFilterSlot(
-      <button
-        type="button"
-        className="bd-btn bd-toolbar-chip"
-        disabled={items.length === 0 || aiSuggestLoading || loading}
-        onClick={() => void runAiSuggest()}
-        title={t("items.aiNextThree")}
-        aria-label={t("items.aiNextThree")}
-        style={{
-          padding: "0.4rem 0.7rem",
-          fontSize: "0.8125rem",
-          flexShrink: 0,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.4rem",
-        }}
-      >
-        {aiSuggestLoading ? (
-          <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem" }}>{t("items.aiNextThreeBusy")}</span>
-        ) : (
-          <>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-              <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
-            </svg>
-            <span className="bd-mobile-hide">{t("items.aiNextThree")}</span>
-          </>
-        )}
-      </button>
-    );
-    return () => onDesktopScopeBeforeFilterSlot(null);
-  }, [
-    onDesktopScopeBeforeFilterSlot,
-    isMobile,
-    mode,
-    items.length,
-    aiSuggestLoading,
-    loading,
-    runAiSuggest,
-    t,
-  ]);
-
-  useEffect(() => {
-    if (!onTopBarEndSlot) return;
-    const hasActiveTasks = items.some((it) => isTaskRow(it) && !isTaskCompleted(it));
-    if (!hasActiveTasks) {
-      onTopBarEndSlot(null);
-      return;
-    }
-    onTopBarEndSlot(
-      <button
-        key="bd-topbar-lucky"
-        type="button"
-        className="bd-btn"
-        title="I'm Feeling Lucky"
-        aria-label="I'm Feeling Lucky"
-        style={{
-          width: 44,
-          height: 44,
-          minWidth: 44,
-          minHeight: 44,
-          padding: 0,
-          flexShrink: 0,
-          borderRadius: "50%",
-          background: "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%)",
-          border: "none",
-          color: "#fff",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onClick={handleLucky}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="2" width="20" height="20" rx="3" ry="3" />
-          <circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" />
-          <circle cx="16" cy="8" r="1.3" fill="currentColor" stroke="none" />
-          <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-          <circle cx="8" cy="16" r="1.3" fill="currentColor" stroke="none" />
-          <circle cx="16" cy="16" r="1.3" fill="currentColor" stroke="none" />
-        </svg>
-      </button>,
-    );
-    return () => onTopBarEndSlot(null);
-  }, [onTopBarEndSlot, items, handleLucky]);
 
   useEffect(() => {
     if (!isMobile) setTypePickerOpen(false);
@@ -1530,16 +1338,6 @@ export function ItemsViewArea({
     document.addEventListener("pointerdown", onChromePointerDown, true);
     return () => document.removeEventListener("pointerdown", onChromePointerDown, true);
   }, [editingEntry, flushEditingEntry]);
-
-  function handleLucky() {
-    const activeTasks = items.filter(
-      (it) => isTaskRow(it) && !isTaskCompleted(it),
-    );
-    if (activeTasks.length === 0) return;
-    const pick = activeTasks[Math.floor(Math.random() * activeTasks.length)];
-    setLuckyTask(pick);
-    setLuckyOpen(true);
-  }
 
   if (loading) {
     return (
@@ -3199,70 +2997,6 @@ export function ItemsViewArea({
         </div>
       )}
 
-      {aiSuggestOpen && (
-        <div
-          className="bd-modal-backdrop"
-          onClick={() => !aiSuggestLoading && setAiSuggestOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bd-ai-suggest-title"
-        >
-          <div
-            className="bd-panel bd-modal-panel"
-            style={{ padding: "1.25rem", maxWidth: 440, width: "100%", maxHeight: "min(85dvh, 560px)", overflow: "auto" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem", marginBottom: "0.85rem" }}>
-              <h2 id="bd-ai-suggest-title" style={{ margin: 0, fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
-                {t("items.aiNextThreeTitle")}
-              </h2>
-              <button
-                type="button"
-                className="bd-btn"
-                disabled={aiSuggestLoading}
-                onClick={() => setAiSuggestOpen(false)}
-                aria-label={t("items.aiNextThreeClose")}
-                style={{ flexShrink: 0, minWidth: 40, minHeight: 40, padding: "0.35rem" }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {aiSuggestLoading && (
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-secondary)" }}>{t("items.aiNextThreeBusy")}</p>
-            )}
-            {aiSuggestError && (
-              <p className="bd-banner-error bd-banner-error--solo" style={{ margin: "0 0 0.75rem" }}>
-                {aiSuggestError}
-              </p>
-            )}
-            {!aiSuggestLoading && !aiSuggestError && aiSuggestList.length === 0 && (
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text-tertiary)" }}>{t("items.aiNextThreeEmpty")}</p>
-            )}
-            {!aiSuggestLoading && aiSuggestList.length > 0 && (
-              <ol style={{ margin: 0, paddingLeft: "1.1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {aiSuggestList.map((s, i) => (
-                  <li key={i} style={{ fontSize: "0.9rem", color: "var(--text-primary)", lineHeight: 1.45 }}>
-                    <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{s.title}</div>
-                    {s.reason ? <div style={{ fontWeight: 400, color: "var(--text-secondary)", fontSize: "0.84rem" }}>{s.reason}</div> : null}
-                  </li>
-                ))}
-              </ol>
-            )}
-            <div style={{ marginTop: "1.1rem", display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" className="bd-btn bd-btn-primary" disabled={aiSuggestLoading} onClick={() => setAiSuggestOpen(false)}>
-                {t("items.aiNextThreeClose")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <LuckyTaskOverlay
-        isOpen={luckyOpen}
-        task={luckyTask}
-        onClose={() => setLuckyOpen(false)}
-      />
     </div>
   );
 }

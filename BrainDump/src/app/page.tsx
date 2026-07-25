@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getProviders, signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -8,10 +8,9 @@ import { TopBar } from "@/components/TopBar";
 import { ScopeBar } from "@/components/ScopeBar";
 import { CenterPanel, type BrainDumpCenterHandle, type OrganizedItemPreview } from "@/components/CenterPanel";
 import { RightPanel } from "@/components/RightPanel";
-import { CoachChatOverlay } from "@/components/CoachChatOverlay";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
-import { TodayView } from "@/components/TodayView";
+import { TodayView, type TodayViewHandle } from "@/components/TodayView";
 import { MobileBottomBarPill } from "@/components/MobileBottomBarPill";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WelcomeOverlay, WELCOME_COMPLETE_EVENT } from "@/components/WelcomeOverlay";
@@ -65,15 +64,11 @@ export default function BrainDumpPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [coachChatOpen, setCoachChatOpen] = useState(false);
   const [todayViewActive, setTodayViewActive] = useState(false);
   const [workspaceScopeHydrated, setWorkspaceScopeHydrated] = useState(false);
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
-  const [mobileTopBarBeforeMenu, setMobileTopBarBeforeMenu] = useState<ReactNode>(null);
-  const [desktopScopeBeforeFilter, setDesktopScopeBeforeFilter] = useState<ReactNode>(null);
-  const [topBarEnd, setTopBarEnd] = useState<ReactNode>(null);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
   const [authProviders, setAuthProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
@@ -101,6 +96,7 @@ export default function BrainDumpPage() {
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
   const centerPanelRef = useRef<BrainDumpCenterHandle>(null);
+  const todayViewRef = useRef<TodayViewHandle>(null);
   /** Desktop: new browser tab shows no date filter until you pick one; then we remember the tab choice in sessionStorage. */
   const dueDateFilterFromUserRef = useRef(false);
   const trashUndoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,7 +182,10 @@ export default function BrainDumpPage() {
 
   const scopeBarSlot = useMemo(
     () =>
-      !todayViewActive && !inboxViewActive && (mode === "work" || mode === "personal" || mode === "all") ? (
+      !todayViewActive &&
+      !inboxViewActive &&
+      viewType !== "calendar" &&
+      (mode === "work" || mode === "personal" || mode === "all") ? (
         <ScopeBar
           key="bd-scope-main"
           mode={mode}
@@ -198,18 +197,17 @@ export default function BrainDumpPage() {
           onSearchFilterChange={setSearchFilter}
           dueDateFilter={dueDateFilter}
           onDueDateFilterChange={onDueDateFilterChangeFromUser}
-          beforeFilterSlot={desktopScopeBeforeFilter}
         />
       ) : null,
     [
       todayViewActive,
       inboxViewActive,
+      viewType,
       mode,
       selectedProjectId,
       selectedCategory,
       searchFilter,
       dueDateFilter,
-      desktopScopeBeforeFilter,
       onDueDateFilterChangeFromUser,
     ]
   );
@@ -597,8 +595,6 @@ export default function BrainDumpPage() {
           }}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
-          beforeMenuSlot={mobileTopBarBeforeMenu}
-          endSlot={topBarEnd}
           scopeSlot={isMobileLayout || todayViewActive ? null : scopeBarSlot}
         />
 
@@ -624,9 +620,8 @@ export default function BrainDumpPage() {
           onMobileOpenChange={setMobileNavOpen}
           onCapturePhoto={onSidebarCapturePhoto}
           onCaptureText={onSidebarCaptureText}
-          onOpenCoach={() => setCoachChatOpen(true)}
         />
-        <div className="bd-workspace-column" style={{ gap: "0" }}>
+        <div className={`bd-workspace-column${todayViewActive ? " bd-workspace-column--today" : ""}`} style={{ gap: "0" }}>
           <div className="bd-page-content-padding" style={{ display: todayViewActive ? "none" : undefined }}>
             <CenterPanel
               ref={centerPanelRef}
@@ -651,9 +646,6 @@ export default function BrainDumpPage() {
               searchFilter={searchFilter}
               dueDateFilter={dueDateFilter}
               scopeSlot={isMobileLayout ? scopeBarSlot : null}
-              onMobileTopBarBeforeMenuSlot={setMobileTopBarBeforeMenu}
-              onDesktopScopeBeforeFilterSlot={setDesktopScopeBeforeFilter}
-              onTopBarEndSlot={setTopBarEnd}
               onDumpRecordingChange={setDumpRecordingActive}
               onDumpEmptyHintChange={setDumpEmptyHintActive}
               dumpHintSuppressed={todayViewActive}
@@ -661,8 +653,12 @@ export default function BrainDumpPage() {
             />
           </div>
           {todayViewActive ? (
-            <div className="bd-page-content-padding bd-today-timeline-shell">
-              <TodayView onGoToWorkspace={goToTodayItemWorkspace} isMobile={isMobileLayout} />
+            <div className={`bd-today-timeline-shell${isMobileLayout ? " bd-today-timeline-shell--mobile" : ""}`}>
+              <TodayView
+                ref={todayViewRef}
+                onGoToWorkspace={goToTodayItemWorkspace}
+                isMobile={isMobileLayout}
+              />
             </div>
           ) : null}
           {mode === "inbox" && !todayViewActive && (
@@ -691,7 +687,13 @@ export default function BrainDumpPage() {
             dumpRecordingActive={dumpRecordingActive}
             centerPanelRef={centerPanelRef}
             showDumpEmptyHint={dumpEmptyHintActive}
-            onTodayClick={() => setTodayViewActive((v) => !v)}
+            onTodayClick={() => {
+              if (todayViewActive) {
+                todayViewRef.current?.scrollToToday();
+                return;
+              }
+              setTodayViewActive(true);
+            }}
             onSelectCalendar={() => {
               setTodayViewActive(false);
               setSelectedItemType(null);
@@ -715,8 +717,6 @@ export default function BrainDumpPage() {
           </button>
         </div>
       ) : null}
-
-      <CoachChatOverlay open={coachChatOpen} onClose={() => setCoachChatOpen(false)} />
 
       <ProfileOverlay
         isOpen={showProfile}
