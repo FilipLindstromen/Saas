@@ -246,7 +246,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const [photoOrganizeFlow, setPhotoOrganizeFlow] = useState(false);
   const [showTypedDumpSheet, setShowTypedDumpSheet] = useState(false);
   const [typedDumpText, setTypedDumpText] = useState("");
-  const organizeRef = useRef<(override?: string) => Promise<void>>(async () => {});
   const photoAnchorRef = useRef<PhotoCaptureTriggerHandle | null>(null);
   const isDumpProcessing = transcribeLoading || organizeLoading || saveLoading;
   const processingStep: "transcribe" | "organize" | "save" = saveLoading
@@ -427,6 +426,10 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
 
   const saved = loadFormState();
   useEffect(() => {
+    // Drop stale in-flight organize flags from a previous session — processing UI is session-only.
+    if (saved.organizeInProgress) {
+      saveFormState({ organizeInProgress: false, organizeTranscriptSnapshot: undefined });
+    }
     setTranscript(saved.transcriptEdited || saved.transcriptRaw || "");
   }, []);
   useEffect(() => {
@@ -823,6 +826,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Organization failed";
       setError(msg.toLowerCase().includes("timed out") ? t("center.organizeNetworkError") : msg);
+      saveFormState({ organizeInProgress: false, organizeTranscriptSnapshot: undefined });
     } finally {
       setOrganizeLoading(false);
     }
@@ -923,27 +927,6 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     setShowTypedDumpSheet(false);
     setTypedDumpText("");
   }, []);
-
-  useEffect(() => {
-    organizeRef.current = organize;
-  }, [organize]);
-
-  useEffect(() => {
-    const st = loadFormState();
-    if (!st.organizeInProgress || !st.organizeTranscriptSnapshot?.trim()) return;
-    try {
-      const last = Number(sessionStorage.getItem("braindump-resume-attempt") || "0");
-      if (Date.now() - last < 4000) return;
-      sessionStorage.setItem("braindump-resume-attempt", String(Date.now()));
-    } catch {
-      /* ignore */
-    }
-    setOrganizeSuccess(t("center.resumingOrganize"));
-    const snap = st.organizeTranscriptSnapshot.trim();
-    queueMicrotask(() => {
-      void organizeRef.current(snap);
-    });
-  }, [t]);
 
   const handleStopAndProcess = useCallback(async () => {
     stopRecording();

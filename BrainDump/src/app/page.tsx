@@ -690,17 +690,29 @@ export default function BrainDumpPage() {
           <MobileBottomBarPill
             viewType={viewType}
             todayViewActive={todayViewActive}
+            inboxActive={selectedItemType === "new" && !todayViewActive}
             dumpRecordingActive={dumpRecordingActive}
             centerPanelRef={centerPanelRef}
             showDumpEmptyHint={dumpEmptyHintActive}
             onTodayClick={() => setTodayViewActive((v) => !v)}
-            onSelectList={() => {
-              setTodayViewActive(false);
-              setViewType("list");
-            }}
             onSelectCalendar={() => {
               setTodayViewActive(false);
+              setSelectedItemType(null);
               setViewType("calendar");
+            }}
+            onSelectList={() => {
+              setTodayViewActive(false);
+              setSelectedItemType(null);
+              setViewType("list");
+            }}
+            onSelectInbox={() => {
+              setTodayViewActive(false);
+              setMode("all");
+              setSelectedProjectId(null);
+              setSelectedCategory(null);
+              setSelectedItemType("new");
+              setSearchFilter("");
+              setViewType("list");
             }}
           />
         </div>

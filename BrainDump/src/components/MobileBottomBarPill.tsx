@@ -1,31 +1,36 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useI18n } from "@/lib/i18n";
 import { type BrainDumpCenterHandle } from "@/components/CenterPanel";
 import { DumpCaptureActions } from "@/components/DumpCaptureActions";
 import type { ItemsViewType } from "@/components/ItemsViewArea";
+import { getLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
 
 function bottomBarTarget(
   viewType: ItemsViewType,
-  todayViewActive: boolean
-): "today" | "list" | "calendar" | null {
+  todayViewActive: boolean,
+  inboxActive: boolean
+): "today" | "calendar" | "list" | "inbox" | null {
   if (todayViewActive) return "today";
-  if (viewType === "list") return "list";
+  if (inboxActive) return "inbox";
   if (viewType === "calendar") return "calendar";
+  if (viewType === "list") return "list";
   return null;
 }
 
 export type MobileBottomBarPillProps = {
   viewType: ItemsViewType;
   todayViewActive: boolean;
+  inboxActive: boolean;
   dumpRecordingActive: boolean;
   centerPanelRef: RefObject<BrainDumpCenterHandle | null>;
   /** List view empty — show hint above the dump mic. */
   showDumpEmptyHint?: boolean;
   onTodayClick: () => void;
-  onSelectList: () => void;
   onSelectCalendar: () => void;
+  onSelectList: () => void;
+  onSelectInbox: () => void;
 };
 
 type HighlightMetrics = {
@@ -41,31 +46,43 @@ const HIGHLIGHT_INITIAL: HighlightMetrics = { left: 0, top: 0, width: 0, height:
 export function MobileBottomBarPill({
   viewType,
   todayViewActive,
+  inboxActive,
   dumpRecordingActive,
   centerPanelRef,
   showDumpEmptyHint = false,
   onTodayClick,
-  onSelectList,
   onSelectCalendar,
+  onSelectList,
+  onSelectInbox,
 }: MobileBottomBarPillProps) {
   const { t } = useI18n();
   const pillRef = useRef<HTMLElement>(null);
   const todayRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLButtonElement>(null);
   const calendarRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLButtonElement>(null);
+  const inboxRef = useRef<HTMLButtonElement>(null);
   const [highlight, setHighlight] = useState<HighlightMetrics>(HIGHLIGHT_INITIAL);
+  const [newInboxCount, setNewInboxCount] = useState(0);
+
+  useEffect(() => {
+    const sync = () => setNewInboxCount(getLastNewBatchIds().size);
+    sync();
+    return subscribeNewBatch(sync);
+  }, []);
 
   const measureHighlight = useCallback(() => {
     const nav = pillRef.current;
-    const target = bottomBarTarget(viewType, todayViewActive);
+    const target = bottomBarTarget(viewType, todayViewActive, inboxActive);
     const btn =
       target === "today"
         ? todayRef.current
-        : target === "list"
-          ? listRef.current
-          : target === "calendar"
-            ? calendarRef.current
-            : null;
+        : target === "calendar"
+          ? calendarRef.current
+          : target === "list"
+            ? listRef.current
+            : target === "inbox"
+              ? inboxRef.current
+              : null;
     if (!nav || !btn) {
       setHighlight(HIGHLIGHT_INITIAL);
       return;
@@ -79,7 +96,7 @@ export function MobileBottomBarPill({
       height: btnRect.height,
       visible: true,
     });
-  }, [todayViewActive, viewType]);
+  }, [inboxActive, todayViewActive, viewType]);
 
   useLayoutEffect(() => {
     measureHighlight();
@@ -136,17 +153,28 @@ export function MobileBottomBarPill({
         </svg>
       </button>
       <button
-        ref={listRef}
+        ref={calendarRef}
         type="button"
-        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectList}
-        title={t("items.viewList")}
-        aria-label={t("items.viewList")}
-        aria-current={viewType === "list" && !todayViewActive ? "page" : undefined}
+        className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive && !inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onSelectCalendar}
+        title={t("items.viewCalendar")}
+        aria-label={t("items.viewCalendar")}
+        aria-current={viewType === "calendar" && !todayViewActive && !inboxActive ? "page" : undefined}
       >
-        <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
-          <path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <svg className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+          <rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <text
+            x="12"
+            y="17.5"
+            textAnchor="middle"
+            fontSize="9"
+            fontWeight="600"
+            fill="currentColor"
+            className="bd-bottom-bar-cal-day"
+          >
+            {new Date().getDate()}
+          </text>
         </svg>
       </button>
       <div className="bd-bottom-bar-pill-mic-wrap">
@@ -193,29 +221,39 @@ export function MobileBottomBarPill({
         </button>
       </div>
       <button
-        ref={calendarRef}
+        ref={listRef}
         type="button"
-        className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectCalendar}
-        title={t("items.viewCalendar")}
-        aria-label={t("items.viewCalendar")}
-        aria-current={viewType === "calendar" ? "page" : undefined}
+        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive && !inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onSelectList}
+        title={t("items.viewList")}
+        aria-label={t("items.viewList")}
+        aria-current={viewType === "list" && !todayViewActive && !inboxActive ? "page" : undefined}
       >
-        <svg className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar" width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-          <rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-          <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <text
-            x="12"
-            y="17.5"
-            textAnchor="middle"
-            fontSize="9"
-            fontWeight="600"
-            fill="currentColor"
-            className="bd-bottom-bar-cal-day"
-          >
-            {new Date().getDate()}
-          </text>
+        <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" strokeWidth="2" />
+          <path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+      </button>
+      <button
+        ref={inboxRef}
+        type="button"
+        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--inbox${inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+        onClick={onSelectInbox}
+        title={t("bottom.inboxNav")}
+        aria-label={t("bottom.inboxNav")}
+        aria-current={inboxActive ? "page" : undefined}
+      >
+        <span className="bd-bottom-bar-pill-icon-wrap">
+          <svg className="bd-bottom-bar-pill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+            <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+          </svg>
+          {newInboxCount > 0 ? (
+            <span className="bd-bottom-bar-inbox-badge" aria-hidden>
+              {newInboxCount > 9 ? "9+" : newInboxCount}
+            </span>
+          ) : null}
+        </span>
       </button>
     </nav>
   );

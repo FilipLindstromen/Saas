@@ -4762,6 +4762,31 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   opacity: 0.95;
 }
 
+.bd-bottom-bar-pill-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bd-bottom-bar-inbox-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--bd-accent, #e85d2d);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
 .bd-bottom-bar-pill-icon--calendar .bd-bottom-bar-cal-day {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   dominant-baseline: middle;
