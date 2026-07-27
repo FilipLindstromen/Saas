@@ -2,11 +2,9 @@ import React from 'react';
 import { Composition } from 'remotion';
 import { MainComposition, computeTotalDurationInFrames } from './Composition';
 import { createEmptyProject, type Project } from '@/types/project';
+import { COMPOSITION_ID, FPS, HEIGHT, WIDTH } from './constants';
 
-export const FPS = 30;
-export const WIDTH = 1080;
-export const HEIGHT = 1080;
-export const COMPOSITION_ID = 'Main';
+export { FPS, WIDTH, HEIGHT, COMPOSITION_ID };
 
 export const RemotionRoot: React.FC = () => {
   return (

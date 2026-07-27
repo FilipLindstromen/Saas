@@ -4002,7 +4002,9 @@ function ListView({
               <button
                 type="button"
                 className="bd-inbox-triage-discard"
-                onClick={() => onDelete(it.id)}
+                data-bd-no-swipe
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onDelete(it.id); }}
                 aria-label={t("items.inboxDiscard")}
                 title={t("items.inboxDiscard")}
               >
@@ -4015,8 +4017,10 @@ function ListView({
                   key={d}
                   type="button"
                   className={`bd-inbox-triage-chip bd-inbox-triage-chip--domain${domain === d ? ` bd-inbox-triage-chip--domain-${d}-active` : ""}`}
+                  data-bd-no-swipe
+                  onPointerDown={(e) => e.stopPropagation()}
                   aria-pressed={domain === d}
-                  onClick={() => onSetItemDomain(it.id, d)}
+                  onClick={(e) => { e.stopPropagation(); onSetItemDomain(it.id, d); }}
                 >
                   {t(MODE_LABEL_KEY[d])}
                 </button>
@@ -4028,14 +4032,22 @@ function ListView({
                   key={ty}
                   type="button"
                   className={`bd-inbox-triage-chip${(it.itemType || "note") === ty ? " bd-inbox-triage-chip--active" : ""}`}
+                  data-bd-no-swipe
+                  onPointerDown={(e) => e.stopPropagation()}
                   aria-pressed={(it.itemType || "note") === ty}
-                  onClick={() => onSetItemType(it.id, ty)}
+                  onClick={(e) => { e.stopPropagation(); onSetItemType(it.id, ty); }}
                 >
                   {formatTypeLabel(ty, t)}
                 </button>
               ))}
             </div>
-            <button type="button" className="bd-inbox-triage-file-btn" onClick={() => onFileItem(it.id)}>
+            <button
+              type="button"
+              className="bd-inbox-triage-file-btn"
+              data-bd-no-swipe
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onFileItem(it.id); }}
+            >
               {t("items.inboxFile")}
             </button>
           </div>

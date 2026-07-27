@@ -1076,6 +1076,10 @@ select.bd-input::-ms-expand {
   align-items: stretch;
 }
 
+.bd-dump-sheet-handle {
+  display: none;
+}
+
 .bd-dump-sheet-header {
   display: flex;
   align-items: center;
@@ -1316,14 +1320,33 @@ select.bd-input::-ms-expand {
 }
 
 .bd-dump-success-item-title {
+  flex: 1;
+  min-width: 0;
   font-size: 0.90625rem;
   font-weight: 600;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-dump-success-item-domain {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.bd-dump-success-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.125rem;
 }
 
 .bd-dump-success-done-btn {
   width: 100%;
-  margin-top: 1.125rem;
   border: none;
   border-radius: 12px;
   padding: 0.75rem 0;
@@ -1331,6 +1354,17 @@ select.bd-input::-ms-expand {
   font-weight: 700;
   background: var(--bd-brand-accent);
   color: #ffffff;
+}
+
+.bd-dump-success-review-btn {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .bd-dump-overlay-body {
@@ -5163,6 +5197,42 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   box-shadow: var(--shadow-sm);
 }
 
+/* Collapsing large-title header (Today / Calendar / List / Inbox, mobile only) */
+.bd-large-title {
+  margin: 0.2rem 0 0.6rem;
+  padding: 0;
+  font-size: 33px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.bd-large-title-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity var(--bd-duration-fast) var(--bd-ease-soft), transform var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-large-title-sticky--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Inbox triage cards */
 .bd-inbox-triage-card {
   background: var(--bg-elevated);
@@ -5677,12 +5747,22 @@ button.bd-shopping-toggle[aria-pressed="true"] {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: var(--bd-space-4) var(--bd-space-4) max(var(--bd-space-5), env(safe-area-inset-bottom)) !important;
+    padding: 0 var(--bd-space-4) max(var(--bd-space-5), env(safe-area-inset-bottom)) !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     border-radius: 22px 22px 0 0 !important;
     animation: bd-sheet-enter var(--bd-duration-emphasis) var(--bd-ease-soft) both !important;
     transform-origin: 50% 100% !important;
+  }
+
+  .bd-dump-sheet-handle {
+    display: block;
+    flex-shrink: 0;
+    width: 36px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--border-strong, var(--border-default));
+    margin: 0.6rem auto 0.4rem;
   }
 
   .bd-dump-sheet-content {

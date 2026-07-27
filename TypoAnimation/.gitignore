@@ -24,6 +24,7 @@
 /data/
 /out/
 /public/uploads/
+/public/renders/
 
 # misc
 .DS_Store

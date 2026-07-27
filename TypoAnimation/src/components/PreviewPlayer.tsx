@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Player } from '@remotion/player';
 import { MainComposition, computeTotalDurationInFrames } from '@/remotion/Composition';
-import { FPS, WIDTH, HEIGHT } from '@/remotion/Root';
+import { FPS, WIDTH, HEIGHT } from '@/remotion/constants';
 import type { Project } from '@/types/project';
 
 export function PreviewPlayer({ project }: { project: Project }) {

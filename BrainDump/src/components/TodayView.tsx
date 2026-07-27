@@ -143,6 +143,7 @@ export const TodayView = forwardRef<TodayViewHandle, TodayViewProps>(function To
   const visibleDayRef = useRef(todayDateKey());
   const [tickDayKey, setTickDayKey] = useState<string | null>(null);
   const tickTimerRef = useRef<number | null>(null);
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
 
   const bindMobileField = useMobileEntryFieldGestures(isMobile, undefined);
   const todayKey = useMemo(() => todayDateKey(), []);
@@ -312,6 +313,8 @@ export const TodayView = forwardRef<TodayViewHandle, TodayViewProps>(function To
     const el = scrollRef.current;
     if (!el) return;
 
+    setHeaderCollapsed(el.scrollTop > 28);
+
     if (el.scrollTop < SCROLL_LOAD_THRESHOLD && !loadingPastRef.current) {
       loadingPastRef.current = true;
       pendingScrollAdjustRef.current = el.scrollHeight;
@@ -421,6 +424,14 @@ export const TodayView = forwardRef<TodayViewHandle, TodayViewProps>(function To
       role="region"
       aria-label={t("today.navAria")}
     >
+      {isMobile && (
+        <>
+          <div className={`bd-large-title-sticky${headerCollapsed ? " bd-large-title-sticky--visible" : ""}`}>
+            {t("today.title")}
+          </div>
+          <h1 className="bd-large-title">{t("today.title")}</h1>
+        </>
+      )}
       {loading ? (
         <p className="bd-timeline-status">{t("today.loading")}</p>
       ) : error ? (

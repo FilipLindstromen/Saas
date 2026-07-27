@@ -754,13 +754,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     [onAutoSave, onOrganized, onDumpFinished, onDumpSaved, mode, t, isMobile]
   );
 
-  const finishCaptureSuccess = useCallback(() => {
-    setCaptureSuccessItems(null);
-    showDumpOverlayRef.current = false;
-    setShowDumpOverlay(false);
-    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
-    onDumpFinished?.();
-  }, [mode, onDumpFinished]);
+  const finishCaptureSuccess = useCallback(
+    (reviewInbox: boolean) => {
+      setCaptureSuccessItems(null);
+      showDumpOverlayRef.current = false;
+      setShowDumpOverlay(false);
+      if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+      if (reviewInbox) onDumpFinished?.();
+    },
+    [mode, onDumpFinished]
+  );
 
   const organize = useCallback(async (transcriptOverride?: string) => {
     const text = (transcriptOverride ?? transcript).trim();
@@ -1225,7 +1228,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           role="dialog"
           aria-modal="true"
           aria-labelledby="bd-voice-dump-title"
-          onClick={captureSuccessItems ? finishCaptureSuccess : closeDumpOverlay}
+          onClick={captureSuccessItems ? () => finishCaptureSuccess(false) : closeDumpOverlay}
         >
           <div className="bd-dump-overlay-wrapper">
             {/* Switch buttons float above the panel, stacked vertically */}
@@ -1263,11 +1266,12 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               className="bd-panel bd-modal-panel bd-dump-sheet-inner"
               onClick={(e) => e.stopPropagation()}
             >
+              <div className="bd-dump-sheet-handle" aria-hidden />
               <header className="bd-dump-sheet-header">
                 <button
                   type="button"
                   className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-close-btn"
-                  onClick={captureSuccessItems ? finishCaptureSuccess : closeDumpOverlay}
+                  onClick={captureSuccessItems ? () => finishCaptureSuccess(false) : closeDumpOverlay}
                   disabled={isDumpProcessing}
                   aria-label={t("center.cancelDump")}
                   title={t("center.cancelDump")}
@@ -1293,7 +1297,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                   <div className="bd-dump-success">
                     <CircleCheckBig size={44} strokeWidth={1.6} className="bd-dump-success-icon" aria-hidden />
                     <p className="bd-dump-success-title">
-                      {t("center.organizedReview", { n: captureSuccessItems.length })}
+                      {t("center.captureSuccessTitle", { n: captureSuccessItems.length })}
                     </p>
                     <div className="bd-dump-success-list">
                       {captureSuccessItems.map((it, i) => (
@@ -1304,12 +1308,28 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                             aria-hidden
                           />
                           <span className="bd-dump-success-item-title">{it.title}</span>
+                          <span className="bd-dump-success-item-domain">
+                            {it.domain === "work" ? t("mode.work") : t("mode.personal")}
+                          </span>
                         </div>
                       ))}
                     </div>
-                    <button type="button" className="bd-dump-success-done-btn" onClick={finishCaptureSuccess}>
-                      {t("settings.done")}
-                    </button>
+                    <div className="bd-dump-success-actions">
+                      <button
+                        type="button"
+                        className="bd-dump-success-review-btn"
+                        onClick={() => finishCaptureSuccess(true)}
+                      >
+                        {t("center.reviewInbox")}
+                      </button>
+                      <button
+                        type="button"
+                        className="bd-dump-success-done-btn"
+                        onClick={() => finishCaptureSuccess(false)}
+                      >
+                        {t("settings.done")}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <>

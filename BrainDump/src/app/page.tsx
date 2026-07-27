@@ -181,6 +181,23 @@ export default function BrainDumpPage() {
 
   const inboxViewActive = selectedItemType === "new" && !todayViewActive;
 
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const [contentHeaderCollapsed, setContentHeaderCollapsed] = useState(false);
+  useEffect(() => {
+    const el = contentScrollRef.current;
+    if (!el) return;
+    const onScroll = () => setContentHeaderCollapsed(el.scrollTop > 28);
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const contentLargeTitle = inboxViewActive
+    ? t("items.inboxTitle")
+    : viewType === "calendar"
+      ? t("items.viewCalendar")
+      : t("items.viewList");
+
   const scopeBarSlot = useMemo(
     () =>
       !todayViewActive &&
@@ -640,7 +657,19 @@ export default function BrainDumpPage() {
           onCaptureText={onSidebarCaptureText}
         />
         <div className={`bd-workspace-column${todayViewActive ? " bd-workspace-column--today" : ""}`} style={{ gap: "0" }}>
-          <div className="bd-page-content-padding" style={{ display: todayViewActive ? "none" : undefined }}>
+          <div
+            ref={contentScrollRef}
+            className="bd-page-content-padding"
+            style={{ display: todayViewActive ? "none" : undefined }}
+          >
+            {isMobileLayout && !todayViewActive && (
+              <>
+                <div className={`bd-large-title-sticky${contentHeaderCollapsed ? " bd-large-title-sticky--visible" : ""}`}>
+                  {contentLargeTitle}
+                </div>
+                <h1 className="bd-large-title">{contentLargeTitle}</h1>
+              </>
+            )}
             <CenterPanel
               ref={centerPanelRef}
               mode={mode}

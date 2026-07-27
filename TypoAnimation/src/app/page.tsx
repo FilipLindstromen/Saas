@@ -9,6 +9,7 @@ import { SceneList } from '@/components/SceneList';
 import { SceneStylePanel } from '@/components/SceneStylePanel';
 import { ThemePanel } from '@/components/ThemePanel';
 import { VideoSyncPanel } from '@/components/VideoSyncPanel';
+import { ExportPanel } from '@/components/ExportPanel';
 import type { ProjectSummary } from '@/lib/projectStore';
 
 const SAMPLE_SCRIPT = `### Hook
@@ -169,6 +170,9 @@ export default function Home() {
           <button onClick={handleNew} className="rounded border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100">
             New
           </button>
+          <div className="ml-2 border-l border-neutral-200 pl-2">
+            <ExportPanel project={project} />
+          </div>
         </div>
       </header>
 
