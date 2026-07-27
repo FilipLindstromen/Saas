@@ -22,6 +22,7 @@ window.SAAS_APPS_CATALOG = [
       { name: 'AutoCaptions', href: 'AutoCaptions/', icon: 'auto-captions.svg' },
       { name: 'Uploader', href: 'Uploader/', icon: 'uploader.svg' },
       { name: 'VSL Writer', href: 'VSLWriter/', icon: 'vsl-writer.svg' },
+      { name: 'TypoAnimation', href: 'TypoAnimation/', icon: 'typo-animation.svg' },
     ],
   },
   {

@@ -29,6 +29,7 @@ import {
   Info,
   Lightbulb,
   RefreshCw,
+  Search,
   ShoppingCart,
   SquareCheckBig,
   Trash2,
@@ -126,6 +127,8 @@ export interface ViewItem {
 
 interface ItemsViewAreaProps {
   mode: string;
+  /** Mobile List view's segmented control changes the workspace mode directly. */
+  onModeChange?: (mode: "work" | "personal" | "all") => void;
   projectId: string | null;
   category: string | null;
   itemType: string | null;
@@ -133,6 +136,7 @@ interface ItemsViewAreaProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
+  onSearchFilterChange?: (value: string) => void;
   dueDateFilter?: DueDateFilterPreset;
   reloadKey?: number;
   /** Mobile: render ScopeBar in one row with type / view / filter (passed from page when scope is shown). */
@@ -462,6 +466,7 @@ function sortItemsByListOrder(list: ViewItem[]): ViewItem[] {
 
 export function ItemsViewArea({
   mode,
+  onModeChange,
   projectId,
   category,
   itemType,
@@ -469,6 +474,7 @@ export function ItemsViewArea({
   viewType: controlledViewType,
   onViewTypeChange,
   searchFilter = "",
+  onSearchFilterChange,
   dueDateFilter = "all",
   reloadKey = 0,
   scopeSlot,
@@ -3833,6 +3839,11 @@ function ListView({
   onUpdate,
   reorderEnabled = false,
   onReorder,
+  mode,
+  onModeChange,
+  searchFilter = "",
+  onSearchFilterChange,
+  showToolbar = false,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
@@ -3844,6 +3855,12 @@ function ListView({
   onUpdate?: (id: string, updates: { title?: string; content?: string }) => void;
   reorderEnabled?: boolean;
   onReorder?: (orderedIds: string[]) => void;
+  mode?: string;
+  onModeChange?: (mode: "work" | "personal" | "all") => void;
+  searchFilter?: string;
+  onSearchFilterChange?: (value: string) => void;
+  /** Show the mobile-only search field + All/Work/Personal segmented control above the list. */
+  showToolbar?: boolean;
 }) {
   const { t } = useI18n();
   const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
@@ -4291,6 +4308,35 @@ function ListView({
         boxSizing: "border-box",
       }}
     >
+      {showToolbar && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div className="bd-list-search-field">
+            <Search size={17} strokeWidth={1.8} aria-hidden />
+            <input
+              type="search"
+              value={searchFilter}
+              onChange={(e) => onSearchFilterChange?.(e.target.value)}
+              placeholder={t("items.search")}
+              aria-label={t("items.search")}
+            />
+          </div>
+          {onModeChange && (
+            <div className="bd-list-segmented" role="group" aria-label={t("topBar.workspaceSwipe")}>
+              {(["all", "work", "personal"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`bd-list-segmented-item${mode === m ? " bd-list-segmented-item--active" : ""}`}
+                  onClick={() => onModeChange(m)}
+                  aria-pressed={mode === m}
+                >
+                  {t(MODE_LABEL_KEY[m])}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {(() => {
         let globalIdx = 0;
         return grouped.map(([type, groupItems]) => {

@@ -644,6 +644,10 @@ export default function BrainDumpPage() {
             <CenterPanel
               ref={centerPanelRef}
               mode={mode}
+              onModeChange={(next) => {
+                setTodayViewActive(false);
+                setMode(next);
+              }}
               onTranscriptReady={() => {}}
               onOrganized={handleOrganized}
               onAutoSave={handleAutoSave}
@@ -662,6 +666,7 @@ export default function BrainDumpPage() {
                 setViewType(v);
               }}
               searchFilter={searchFilter}
+              onSearchFilterChange={setSearchFilter}
               dueDateFilter={dueDateFilter}
               scopeSlot={isMobileLayout ? scopeBarSlot : null}
               onDumpRecordingChange={setDumpRecordingActive}

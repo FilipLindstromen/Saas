@@ -85,6 +85,8 @@ export function DumpEmptyHintCallout({ className = "" }: { className?: string })
 
 interface CenterPanelProps {
   mode: string;
+  /** Mobile List view's segmented control changes the workspace mode directly. */
+  onModeChange?: (mode: "work" | "personal" | "all") => void;
   onTranscriptReady: (text: string) => void;
   onOrganized: (items: OrganizedItemPreview[], transcript: string) => void;
   onAutoSave?: (items: OrganizedItemPreview[], transcript: string) => void | Promise<void>;
@@ -102,6 +104,7 @@ interface CenterPanelProps {
   viewType?: ItemsViewType;
   onViewTypeChange?: (v: ItemsViewType) => void;
   searchFilter?: string;
+  onSearchFilterChange?: (value: string) => void;
   dueDateFilter?: import("@/lib/due-date-filter").DueDateFilterPreset;
   /** Mobile: ScopeBar rendered in one row with items toolbar (from page). */
   scopeSlot?: ReactNode;
@@ -137,6 +140,7 @@ export type BrainDumpCenterHandle = {
 export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(function CenterPanel(
   {
     mode,
+    onModeChange,
     onTranscriptReady,
     onOrganized,
     onAutoSave,
@@ -152,6 +156,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
     viewType,
     onViewTypeChange,
     searchFilter = "",
+    onSearchFilterChange,
     dueDateFilter = "all",
     scopeSlot = null,
     onWorkProjectsChanged,
@@ -1391,6 +1396,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       {!isInbox && (
         <ItemsViewArea
           mode={mode}
+          onModeChange={onModeChange}
           projectId={projectId ?? null}
           category={category ?? null}
           itemType={itemType ?? null}
@@ -1398,6 +1404,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           viewType={viewType}
           onViewTypeChange={onViewTypeChange}
           searchFilter={searchFilter}
+          onSearchFilterChange={onSearchFilterChange}
           dueDateFilter={dueDateFilter}
           reloadKey={itemsReloadKey}
           scopeSlot={scopeSlot}

@@ -346,41 +346,53 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </option>
             ))}
           </select>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "1rem" }}>
-            <input
-              type="checkbox"
-              checked={showEntryTitles}
-              onChange={(e) => {
-                const v = e.target.checked;
-                setShowEntryTitles(v);
-                saveShowEntryTitles(v);
-              }}
-              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
-            />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "1rem" }}>
             <span>{t("settings.showEntryTitles")}</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "1rem" }}>
-            <input
-              type="checkbox"
-              checked={showDumpFace}
-              onChange={(e) => {
-                const v = e.target.checked;
-                setShowDumpFace(v);
-                saveShowDumpFace(v);
-              }}
-              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
-            />
+            <label className="bd-ios-switch">
+              <input
+                type="checkbox"
+                checked={showEntryTitles}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setShowEntryTitles(v);
+                  saveShowEntryTitles(v);
+                }}
+              />
+              <span className="bd-ios-switch-track">
+                <span className="bd-ios-switch-knob" />
+              </span>
+            </label>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "1rem" }}>
             <span>{t("settings.showDumpFace")}</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
-            <input
-              type="checkbox"
-              checked={soundEffects}
-              onChange={(e) => setSoundEffects(e.target.checked)}
-              style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--accent)" }}
-            />
+            <label className="bd-ios-switch">
+              <input
+                type="checkbox"
+                checked={showDumpFace}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setShowDumpFace(v);
+                  saveShowDumpFace(v);
+                }}
+              />
+              <span className="bd-ios-switch-track">
+                <span className="bd-ios-switch-knob" />
+              </span>
+            </label>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
             <span>{t("settings.soundEffects")}</span>
-          </label>
+            <label className="bd-ios-switch">
+              <input
+                type="checkbox"
+                checked={soundEffects}
+                onChange={(e) => setSoundEffects(e.target.checked)}
+              />
+              <span className="bd-ios-switch-track">
+                <span className="bd-ios-switch-knob" />
+              </span>
+            </label>
+          </div>
           <p style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", margin: "0 0 1rem", lineHeight: 1.45, paddingLeft: "1.625rem" }}>
             {t("settings.soundEffectsHelp")}
           </p>
