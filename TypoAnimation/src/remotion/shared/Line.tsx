@@ -18,6 +18,12 @@ export interface LineProps {
   /** render each word as a solid-color chip (the "Nike poster" emphasis treatment) */
   chip?: boolean;
   theme: ResolvedSceneTheme;
+  /**
+   * Per-word entrance start times (seconds, scene-local), one per word — when provided
+   * (a scene synced to a transcribed voiceover), each word enters at its actual spoken
+   * time instead of the fixed 55ms stagger from `start`.
+   */
+  wordStartsSec?: number[] | null;
 }
 
 // Word-by-word kinetic text: opacity/translateY/scale/rotate/blur entrance per word,
@@ -37,8 +43,9 @@ export function Line({
   letterSpacing = '-0.02em',
   chip = false,
   theme,
+  wordStartsSec,
 }: LineProps) {
-  const words = String(text).split(' ');
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
   const centered = align === 'center';
   const chipBg = theme.dark ? theme.bg : theme.accent;
   const chipColor = theme.dark ? theme.accent : theme.bg;
@@ -62,7 +69,8 @@ export function Line({
       }}
     >
       {words.map((w, i) => {
-        const m = enter(t, { start: start + i * 0.055, end, inDur: 0.26, outDur: 0.16, rise: 60, rot: 11, blur: 10 });
+        const wordStart = wordStartsSec && wordStartsSec[i] != null ? wordStartsSec[i] : start + i * 0.055;
+        const m = enter(t, { start: wordStart, end, inDur: 0.26, outDur: 0.16, rise: 60, rot: 11, blur: 10 });
         return (
           <span
             key={i}

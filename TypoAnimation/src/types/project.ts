@@ -53,6 +53,8 @@ export interface VideoAsset {
   path: string;
   durationMs: number;
   mode: 'background' | 'pip' | 'hidden';
+  /** offset into the source video where composition frame 0 begins, set when scenes are synced to VO */
+  trimStartMs?: number;
 }
 
 export interface Project {

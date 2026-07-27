@@ -20,9 +20,10 @@
 # production
 /build
 
-# runtime data: uploaded videos, saved projects, rendered exports
+# runtime data: uploaded videos, saved projects, rendered exports, whisper.cpp binary+model
 /data/
 /out/
+/public/uploads/
 
 # misc
 .DS_Store

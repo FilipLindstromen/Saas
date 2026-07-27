@@ -85,11 +85,17 @@ export function MainComposition({ project }: MainCompositionProps) {
     return { scene, frames, fromFrame, startSec };
   });
 
+  const trimBeforeFrames = project.video?.trimStartMs ? Math.round((project.video.trimStartMs / 1000) * fps) : 0;
+
   return (
     <AbsoluteFill style={{ background: project.theme.bg }}>
       {project.video && project.video.mode === 'background' && (
         <AbsoluteFill>
-          <OffthreadVideo src={project.video.path} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <OffthreadVideo
+            src={project.video.path}
+            trimBefore={trimBeforeFrames}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </AbsoluteFill>
       )}
       {laidOut.map(({ scene, frames, fromFrame, startSec }, i) => (
@@ -109,7 +115,11 @@ export function MainComposition({ project }: MainCompositionProps) {
             border: `4px solid ${project.theme.ink}`,
           }}
         >
-          <OffthreadVideo src={project.video.path} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <OffthreadVideo
+            src={project.video.path}
+            trimBefore={trimBeforeFrames}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         </div>
       )}
     </AbsoluteFill>

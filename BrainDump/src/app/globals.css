@@ -1270,6 +1270,69 @@ select.bd-input::-ms-expand {
   }
 }
 
+.bd-dump-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.bd-dump-success-icon {
+  color: var(--bd-success);
+  margin-bottom: 0.5rem;
+}
+
+.bd-dump-success-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.bd-dump-success-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.bd-dump-success-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  background: var(--bg-hover);
+  border-radius: 12px;
+  padding: 0.6875rem 0.8125rem;
+  text-align: left;
+}
+
+.bd-dump-success-item-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.bd-dump-success-item-title {
+  font-size: 0.90625rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bd-dump-success-done-btn {
+  width: 100%;
+  margin-top: 1.125rem;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  background: var(--bd-brand-accent);
+  color: #ffffff;
+}
+
 .bd-dump-overlay-body {
   width: 100%;
   display: flex;
@@ -5597,12 +5660,11 @@ button.bd-shopping-toggle[aria-pressed="true"] {
     padding-inline: 0.85rem;
   }
 
-  /* Voice dump modal: tighter safe-area padding on small screens */
+  /* Voice dump modal: bottom sheet on mobile, matching the capture-sheet design */
   .bd-modal-backdrop.bd-dump-overlay {
-    align-items: center !important;
+    align-items: flex-end !important;
     justify-content: center !important;
-    padding: max(0.5rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom))
-      max(0.65rem, env(safe-area-inset-left)) !important;
+    padding: 0 !important;
   }
 
   .bd-dump-overlay-wrapper {
@@ -5615,9 +5677,12 @@ button.bd-shopping-toggle[aria-pressed="true"] {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: var(--bd-space-4) var(--bd-space-4) var(--bd-space-5) !important;
+    padding: var(--bd-space-4) var(--bd-space-4) max(var(--bd-space-5), env(safe-area-inset-bottom)) !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
+    border-radius: 22px 22px 0 0 !important;
+    animation: bd-sheet-enter var(--bd-duration-emphasis) var(--bd-ease-soft) both !important;
+    transform-origin: 50% 100% !important;
   }
 
   .bd-dump-sheet-content {

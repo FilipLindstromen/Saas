@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, Square, Mic, List, Camera, X, HelpCircle } from "lucide-react";
+import { ArrowDown, CircleCheckBig, Square, Mic, List, Camera, X, HelpCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { loadFormState, saveFormState, saveDebugSnapshot } from "@/lib/form-storage";
 import { fetchWithTimeout, postJsonWithTimeout } from "@/lib/safe-fetch-json";
@@ -216,6 +216,8 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
   const [isMobile, setIsMobile] = useState(false);
   const [recordingElapsed, setRecordingElapsed] = useState("0:00");
   const [organizeSuccess, setOrganizeSuccess] = useState<string | null>(null);
+  /** Mobile capture sheet: itemized success state shown before the sheet closes. */
+  const [captureSuccessItems, setCaptureSuccessItems] = useState<OrganizedItemPreview[] | null>(null);
   const [unclearItems, setUnclearItems] = useState<{ items: OrganizedItemPreview[]; allItems: OrganizedItemPreview[]; transcript: string } | null>(null);
   const [showDumpOverlay, setShowDumpOverlay] = useState(false);
   const [showHelpOverlay, setShowHelpOverlay] = useState(false);
@@ -735,6 +737,10 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           setSaveLoading(false);
         }
         setOrganizeSuccess(null);
+        if (isMobile && n > 0) {
+          setCaptureSuccessItems(items);
+          return;
+        }
         showDumpOverlayRef.current = false;
         setShowDumpOverlay(false);
         if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
@@ -745,8 +751,16 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       setOrganizeSuccess(n ? t("center.organizedReview", { n }) : null);
       if (n) setTimeout(() => setOrganizeSuccess(null), 5000);
     },
-    [onAutoSave, onOrganized, onDumpFinished, onDumpSaved, mode, t]
+    [onAutoSave, onOrganized, onDumpFinished, onDumpSaved, mode, t, isMobile]
   );
+
+  const finishCaptureSuccess = useCallback(() => {
+    setCaptureSuccessItems(null);
+    showDumpOverlayRef.current = false;
+    setShowDumpOverlay(false);
+    if (mode !== "inbox") setItemsReloadKey((k) => k + 1);
+    onDumpFinished?.();
+  }, [mode, onDumpFinished]);
 
   const organize = useCallback(async (transcriptOverride?: string) => {
     const text = (transcriptOverride ?? transcript).trim();
@@ -1211,37 +1225,39 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           role="dialog"
           aria-modal="true"
           aria-labelledby="bd-voice-dump-title"
-          onClick={closeDumpOverlay}
+          onClick={captureSuccessItems ? finishCaptureSuccess : closeDumpOverlay}
         >
           <div className="bd-dump-overlay-wrapper">
             {/* Switch buttons float above the panel, stacked vertically */}
-            <div className="bd-dump-switch-row bd-dump-switch-row--floating" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className="bd-btn bd-dump-switch-btn bd-dump-switch-btn--floating"
-                disabled={isDumpProcessing}
-                onClick={() => {
-                  leaveVoiceDumpSessionForOtherInput();
-                  setTypedDumpText("");
-                  setShowTypedDumpSheet(true);
-                }}
-              >
-                <List size={15} strokeWidth={2} aria-hidden="true" />
-                {t("center.typeDump")}
-              </button>
-              <button
-                type="button"
-                className="bd-btn bd-dump-switch-btn bd-dump-switch-btn--floating"
-                disabled={isDumpProcessing}
-                onClick={() => {
-                  leaveVoiceDumpSessionForOtherInput();
-                  requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
-                }}
-              >
-                <Camera size={15} strokeWidth={2} aria-hidden="true" />
-                {t("bottom.photoFromCamera")}
-              </button>
-            </div>
+            {!captureSuccessItems && (
+              <div className="bd-dump-switch-row bd-dump-switch-row--floating" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="bd-btn bd-dump-switch-btn bd-dump-switch-btn--floating"
+                  disabled={isDumpProcessing}
+                  onClick={() => {
+                    leaveVoiceDumpSessionForOtherInput();
+                    setTypedDumpText("");
+                    setShowTypedDumpSheet(true);
+                  }}
+                >
+                  <List size={15} strokeWidth={2} aria-hidden="true" />
+                  {t("center.typeDump")}
+                </button>
+                <button
+                  type="button"
+                  className="bd-btn bd-dump-switch-btn bd-dump-switch-btn--floating"
+                  disabled={isDumpProcessing}
+                  onClick={() => {
+                    leaveVoiceDumpSessionForOtherInput();
+                    requestAnimationFrame(() => photoAnchorRef.current?.openMenu());
+                  }}
+                >
+                  <Camera size={15} strokeWidth={2} aria-hidden="true" />
+                  {t("bottom.photoFromCamera")}
+                </button>
+              </div>
+            )}
 
             <div
               className="bd-panel bd-modal-panel bd-dump-sheet-inner"
@@ -1251,7 +1267,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
                 <button
                   type="button"
                   className="bd-btn bd-dump-sheet-header-btn bd-dump-sheet-close-btn"
-                  onClick={closeDumpOverlay}
+                  onClick={captureSuccessItems ? finishCaptureSuccess : closeDumpOverlay}
                   disabled={isDumpProcessing}
                   aria-label={t("center.cancelDump")}
                   title={t("center.cancelDump")}
@@ -1273,8 +1289,34 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
               </header>
 
               <div className="bd-dump-sheet-content">
-                {showDumpFace && <DumpListeningFace variant="sheet" />}
-                {dumpPanelContent}
+                {captureSuccessItems ? (
+                  <div className="bd-dump-success">
+                    <CircleCheckBig size={44} strokeWidth={1.6} className="bd-dump-success-icon" aria-hidden />
+                    <p className="bd-dump-success-title">
+                      {t("center.organizedReview", { n: captureSuccessItems.length })}
+                    </p>
+                    <div className="bd-dump-success-list">
+                      {captureSuccessItems.map((it, i) => (
+                        <div key={i} className="bd-dump-success-item">
+                          <span
+                            className="bd-dump-success-item-dot"
+                            style={{ background: it.domain === "work" ? "var(--bd-domain-work)" : "var(--bd-domain-personal)" }}
+                            aria-hidden
+                          />
+                          <span className="bd-dump-success-item-title">{it.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" className="bd-dump-success-done-btn" onClick={finishCaptureSuccess}>
+                      {t("settings.done")}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {showDumpFace && <DumpListeningFace variant="sheet" />}
+                    {dumpPanelContent}
+                  </>
+                )}
               </div>
             </div>
           </div>

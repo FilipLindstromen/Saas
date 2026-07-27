@@ -8,6 +8,7 @@ import { ScriptEditor } from '@/components/ScriptEditor';
 import { SceneList } from '@/components/SceneList';
 import { SceneStylePanel } from '@/components/SceneStylePanel';
 import { ThemePanel } from '@/components/ThemePanel';
+import { VideoSyncPanel } from '@/components/VideoSyncPanel';
 import type { ProjectSummary } from '@/lib/projectStore';
 
 const SAMPLE_SCRIPT = `### Hook
@@ -124,6 +125,16 @@ export default function Home() {
     setSelectedSceneId(loaded.scenes[0]?.id ?? null);
   };
 
+  const handleBulkSceneUpdate = (updates: { id: string; patch: Partial<Scene> }[]) =>
+    setProject((p) => {
+      const map = new Map(updates.map((u) => [u.id, u.patch]));
+      return {
+        ...p,
+        scenes: p.scenes.map((s) => (map.has(s.id) ? { ...s, ...map.get(s.id) } : s)),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
   const handleNew = () => {
     setProject(createEmptyProject());
     setSelectedSceneId(null);
@@ -173,6 +184,9 @@ export default function Home() {
             onDuplicate={handleDuplicate}
             onAdd={handleAdd}
           />
+          <div className="border-t border-neutral-200 pt-3">
+            <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
+          </div>
         </div>
 
         <div className="flex items-start justify-center">
