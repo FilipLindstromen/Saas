@@ -26,6 +26,10 @@
 /public/uploads/
 /public/renders/
 
+# packaged desktop app
+/electron-dist/
+/TypoAnimation-win32-x64/
+
 # misc
 .DS_Store
 *.pem

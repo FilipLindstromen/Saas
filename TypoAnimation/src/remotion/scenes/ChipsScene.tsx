@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
+import { BrollBackground } from '../shared/BrollBackground';
 import { enter, pop } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -12,6 +13,7 @@ import type { SceneComponentProps } from '../shared/sceneProps';
 export function ChipsScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
+      <BrollBackground broll={scene.broll} />
       <Chrome
         theme={theme}
         label={label}

@@ -41,16 +41,16 @@ export function ExportPanel({ project }: { project: Project }) {
       <button
         onClick={startExport}
         disabled={busy || project.scenes.length === 0}
-        className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+        className="rounded-xl bg-gradient-to-br from-[#ff6b35] to-[#ff4757] px-4 py-1.5 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
       >
         {busy ? `Rendering… ${Math.round((job?.progress ?? 0) * 100)}%` : 'Export MP4'}
       </button>
       {job?.status === 'done' && job.url && (
-        <a href={job.url} download className="text-xs font-medium text-neutral-700 underline">
+        <a href={job.url} download className="text-xs font-medium text-white/90 underline hover:text-white">
           Download
         </a>
       )}
-      {job?.status === 'error' && <span className="text-xs text-red-600">{job.error}</span>}
+      {job?.status === 'error' && <span className="text-xs text-[#ff4757]">{job.error}</span>}
     </div>
   );
 }

@@ -34,6 +34,8 @@ export default function Home() {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<ProjectSummary[]>([]);
   const [status, setStatus] = useState<string>('');
+  const [brollStatus, setBrollStatus] = useState<string>('');
+  const [brollBusy, setBrollBusy] = useState(false);
 
   const refreshProjectList = () => {
     fetch('/api/projects')
@@ -62,13 +64,11 @@ export default function Home() {
     setSelectedSceneId(scenes[0]?.id ?? null);
   };
 
-  const handleMove = (id: string, direction: -1 | 1) =>
+  const handleReorder = (fromIndex: number, toIndex: number) =>
     setProject((p) => {
-      const idx = p.scenes.findIndex((s) => s.id === id);
-      const next = idx + direction;
-      if (idx < 0 || next < 0 || next >= p.scenes.length) return p;
       const scenes = p.scenes.slice();
-      [scenes[idx], scenes[next]] = [scenes[next], scenes[idx]];
+      const [moved] = scenes.splice(fromIndex, 1);
+      scenes.splice(toIndex, 0, moved);
       return { ...p, scenes, updatedAt: new Date().toISOString() };
     });
 
@@ -136,6 +136,40 @@ export default function Home() {
       };
     });
 
+  const handleAutoSelectBroll = async () => {
+    const eligible = project.scenes.filter((s) => !s.broll);
+    if (eligible.length === 0) {
+      setBrollStatus('Every scene already has b-roll.');
+      setTimeout(() => setBrollStatus(''), 2000);
+      return;
+    }
+    setBrollBusy(true);
+    setBrollStatus(`Finding b-roll for ${eligible.length} scene(s)…`);
+    try {
+      const res = await fetch('/api/broll/autoselect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenes: project.scenes }),
+      });
+      const data = (await res.json()) as {
+        updates?: { id: string; patch: Partial<Scene> }[];
+        skipped?: { id: string; reason: string }[];
+      };
+      if (data.updates?.length) handleBulkSceneUpdate(data.updates);
+      const skippedCount = data.skipped?.length || 0;
+      setBrollStatus(
+        skippedCount
+          ? `Added b-roll to ${data.updates?.length || 0} scene(s), skipped ${skippedCount}.`
+          : `Added b-roll to ${data.updates?.length || 0} scene(s).`
+      );
+    } catch {
+      setBrollStatus('Auto-select failed.');
+    } finally {
+      setBrollBusy(false);
+      setTimeout(() => setBrollStatus(''), 4000);
+    }
+  };
+
   const handleNew = () => {
     setProject(createEmptyProject());
     setSelectedSceneId(null);
@@ -145,32 +179,38 @@ export default function Home() {
   const selectedScene = project.scenes.find((s) => s.id === selectedSceneId) || null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-50 text-neutral-900">
-      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-2.5">
-        <h1 className="text-base font-semibold">TypoAnimation</h1>
+    <div className="flex min-h-screen flex-col bg-[#0a0a0a] text-white">
+      <header className="flex items-center justify-between border-b border-white/[0.06] bg-[#1f1f1f]/90 px-5 py-3 backdrop-blur-xl">
+        <h1 className="text-[1.25rem] font-semibold tracking-tight text-white">TypoAnimation</h1>
         <div className="flex items-center gap-2">
-          {status && <span className="text-xs text-neutral-500">{status}</span>}
+          {status && <span className="text-xs text-white/45">{status}</span>}
           <select
             defaultValue=""
             onChange={(e) => handleLoad(e.target.value)}
-            className="rounded border border-neutral-300 px-2 py-1 text-xs"
+            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs text-white"
           >
-            <option value="" disabled>
+            <option value="" disabled className="bg-[#1f1f1f]">
               Load project…
             </option>
             {savedProjects.map((p) => (
-              <option key={p.id} value={p.id}>
+              <option key={p.id} value={p.id} className="bg-[#1f1f1f]">
                 {p.name}
               </option>
             ))}
           </select>
-          <button onClick={handleSave} className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700">
+          <button
+            onClick={handleSave}
+            className="rounded-xl bg-gradient-to-br from-[#ff6b35] to-[#ff4757] px-4 py-1.5 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5"
+          >
             Save
           </button>
-          <button onClick={handleNew} className="rounded border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100">
+          <button
+            onClick={handleNew}
+            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15"
+          >
             New
           </button>
-          <div className="ml-2 border-l border-neutral-200 pl-2">
+          <div className="ml-2 border-l border-white/10 pl-3">
             <ExportPanel project={project} />
           </div>
         </div>
@@ -178,17 +218,29 @@ export default function Home() {
 
       <div className="grid flex-1 grid-cols-[340px_1fr_320px] gap-4 p-4">
         <div className="flex flex-col gap-4 overflow-y-auto">
-          <ScriptEditor value={scriptText} onChange={setScriptText} onGenerate={handleGenerate} />
+          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+            <ScriptEditor value={scriptText} onChange={setScriptText} onGenerate={handleGenerate} />
+          </div>
           <SceneList
             scenes={project.scenes}
             selectedId={selectedSceneId}
             onSelect={setSelectedSceneId}
-            onMove={handleMove}
+            onReorder={handleReorder}
             onRemove={handleRemove}
             onDuplicate={handleDuplicate}
             onAdd={handleAdd}
           />
-          <div className="border-t border-neutral-200 pt-3">
+          <div className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+            <button
+              onClick={handleAutoSelectBroll}
+              disabled={brollBusy || project.scenes.length === 0}
+              className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
+            >
+              {brollBusy ? 'Selecting b-roll…' : 'Auto-select b-roll for all scenes'}
+            </button>
+            {brollStatus && <p className="text-xs text-white/45">{brollStatus}</p>}
+          </div>
+          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
             <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
           </div>
         </div>
@@ -200,8 +252,10 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col gap-4 overflow-y-auto">
-          <ThemePanel project={project} onChange={patchProject} />
-          <div className="border-t border-neutral-200 pt-3">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+            <ThemePanel project={project} onChange={patchProject} />
+          </div>
+          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
             <SceneStylePanel scene={selectedScene} onChange={patchScene} />
           </div>
         </div>

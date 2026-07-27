@@ -9,31 +9,27 @@ import { updateJob } from './renderJobs';
 const ENTRY_POINT = path.join(process.cwd(), 'src', 'remotion', 'index.ts');
 const RENDER_DIR = path.join(process.cwd(), 'public', 'renders');
 
-// Bundling the composition is the slow part (tens of seconds) and doesn't depend on the
-// project being rendered, so it's cached across requests/jobs for this process's lifetime.
-let bundleLocationPromise: Promise<string> | null = null;
+// NOT cached across requests: Remotion's bundle() copies `public/` into the bundle output as
+// a one-time snapshot. Uploads, downloaded b-roll clips, and rendered exports all land in
+// public/ AFTER the app starts — a cached bundle from before a given upload/b-roll download
+// would 404 on it during render (confirmed: this broke b-roll and would equally break the
+// primary webcam-video render path). Re-bundling per render costs ~20-50s against a
+// multi-minute render anyway, so correctness wins over the caching that used to be here.
 function getBundleLocation(): Promise<string> {
-  if (!bundleLocationPromise) {
-    bundleLocationPromise = bundle({
-      entryPoint: ENTRY_POINT,
-      onProgress: () => {},
-      // Remotion's bundler is a separate build from Next's own (it bundles src/remotion/index.ts
-      // standalone for rendering) and doesn't read tsconfig's `paths`, so the `@/*` alias every
-      // file here uses needs to be added explicitly or every `@/...` import fails to resolve.
-      bundlerOverride: (config) => ({
-        ...config,
-        resolve: {
-          ...config.resolve,
-          alias: { ...config.resolve?.alias, '@': path.join(process.cwd(), 'src') },
-        },
-      }),
-    }).catch((err) => {
-      // Don't let a failed bundle attempt permanently poison the cache for later requests.
-      bundleLocationPromise = null;
-      throw err;
-    });
-  }
-  return bundleLocationPromise;
+  return bundle({
+    entryPoint: ENTRY_POINT,
+    onProgress: () => {},
+    // Remotion's bundler is a separate build from Next's own (it bundles src/remotion/index.ts
+    // standalone for rendering) and doesn't read tsconfig's `paths`, so the `@/*` alias every
+    // file here uses needs to be added explicitly or every `@/...` import fails to resolve.
+    bundlerOverride: (config) => ({
+      ...config,
+      resolve: {
+        ...config.resolve,
+        alias: { ...config.resolve?.alias, '@': path.join(process.cwd(), 'src') },
+      },
+    }),
+  });
 }
 
 export async function renderProject(jobId: string, project: Project): Promise<string> {

@@ -19,6 +19,17 @@ export interface CaptionWord {
   endMs: number;
 }
 
+export interface BrollAsset {
+  /** local /broll/... path, downloaded from the provider so rendering never depends on a live external URL */
+  path: string;
+  provider: 'pexels' | 'pixabay';
+  sourceId: string;
+  thumbnail?: string;
+  credit?: string;
+  /** 0..1 dark scrim over the video so text stays readable; defaults to 0.45 */
+  opacity?: number;
+}
+
 export interface Scene {
   id: string;
   name: string;
@@ -39,6 +50,8 @@ export interface Scene {
   compareRows?: CompareRow[];
   /** present once this scene has been synced to an uploaded voiceover */
   wordTimings?: CaptionWord[];
+  /** stock b-roll video behind this scene's content, from Pexels/Pixabay */
+  broll?: BrollAsset;
 }
 
 export interface ProjectTheme {

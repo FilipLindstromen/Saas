@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
+import { BrollBackground } from '../shared/BrollBackground';
 import { sceneCaptionText } from '../shared/caption';
 import { alignWordTimingsToScene } from '../shared/wordTiming';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -16,6 +17,7 @@ export function PlainScene({ scene, theme, t, dur, label, showCaptions, showTime
   const aligned = alignWordTimingsToScene(scene);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
+      <BrollBackground broll={scene.broll} />
       <Chrome
         theme={theme}
         label={label}

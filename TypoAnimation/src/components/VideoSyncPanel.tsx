@@ -96,44 +96,44 @@ export function VideoSyncPanel({
 
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">Voiceover sync</h2>
+      <h2 className="text-[0.95rem] font-semibold text-white">Voiceover sync</h2>
 
-      <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500">
+      <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
         Webcam / voiceover video
         <input
           type="file"
           accept="video/*"
           disabled={busy}
           onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-          className="text-xs"
+          className="text-xs text-white/65 file:mr-2 file:rounded-lg file:border-0 file:bg-[#141414] file:px-2 file:py-1 file:text-xs file:text-white"
         />
       </label>
 
       {project.video && (
         <>
-          <div className="text-xs text-neutral-600">
+          <div className="text-xs text-white/45">
             {project.video.path} · {fmt(project.video.durationMs)}
           </div>
 
-          <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500">
+          <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
             Show video as
             <select
-              className="rounded border border-neutral-300 px-2 py-1 text-neutral-900"
+              className="rounded-xl border border-white/10 bg-[#141414] px-2 py-1.5 text-white"
               value={project.video.mode}
               onChange={(e) =>
                 onProjectChange({ video: { ...project.video!, mode: e.target.value as VideoAsset['mode'] } })
               }
             >
-              <option value="background">Full-bleed background</option>
-              <option value="pip">Picture-in-picture</option>
-              <option value="hidden">Hidden (audio only)</option>
+              <option value="background" className="bg-[#1f1f1f]">Full-bleed background</option>
+              <option value="pip" className="bg-[#1f1f1f]">Picture-in-picture</option>
+              <option value="hidden" className="bg-[#1f1f1f]">Hidden (audio only)</option>
             </select>
           </label>
 
           <button
             onClick={handleTranscribe}
             disabled={busy}
-            className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+            className="rounded-xl bg-gradient-to-br from-[#ff6b35] to-[#ff4757] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {project.captions ? 'Re-transcribe' : 'Transcribe voice (local, no API key)'}
           </button>
@@ -142,28 +142,28 @@ export function VideoSyncPanel({
 
       {project.captions && segments.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-neutral-500">
+          <span className="text-xs font-medium text-white/65">
             Detected {segments.length} beat(s) from silence gaps
           </span>
-          <div className="max-h-32 overflow-y-auto rounded border border-neutral-200 text-xs">
+          <div className="max-h-32 overflow-y-auto rounded-xl border border-white/10 bg-[#141414] text-xs">
             {segments.map((s, i) => (
-              <div key={i} className="border-b border-neutral-100 px-2 py-1 last:border-0">
-                <span className="text-neutral-400">{fmt(s.startMs)}–{fmt(s.endMs)}</span>{' '}
-                <span className="text-neutral-700">{s.words.map((w) => w.text).join(' ')}</span>
+              <div key={i} className="border-b border-white/[0.06] px-2 py-1 last:border-0">
+                <span className="text-white/45">{fmt(s.startMs)}–{fmt(s.endMs)}</span>{' '}
+                <span className="text-white/90">{s.words.map((w) => w.text).join(' ')}</span>
               </div>
             ))}
           </div>
           <button
             onClick={handleSync}
             disabled={busy}
-            className="rounded border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 disabled:opacity-50"
+            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
           >
             Sync scene timing + word reveal to voiceover
           </button>
         </div>
       )}
 
-      {status && <p className="text-xs text-neutral-500">{status}</p>}
+      {status && <p className="text-xs text-white/45">{status}</p>}
     </div>
   );
 }

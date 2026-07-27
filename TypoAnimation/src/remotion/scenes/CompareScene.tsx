@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
+import { BrollBackground } from '../shared/BrollBackground';
 import { draw } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -14,6 +15,7 @@ export function CompareScene({ scene, theme, t, dur, label, showCaptions, showTi
   const rows = scene.compareRows || [];
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
+      <BrollBackground broll={scene.broll} />
       <Chrome
         theme={theme}
         label={label}

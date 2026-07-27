@@ -2,6 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
+import { BrollBackground } from '../shared/BrollBackground';
 import { draw } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -15,6 +16,7 @@ export function PosterScene({ scene, theme, t, dur, label, showCaptions, showTim
   const ruleP = draw(t, lastLineStart + 0.35, dur * 0.85);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
+      <BrollBackground broll={scene.broll} />
       <Chrome
         theme={theme}
         label={label}
