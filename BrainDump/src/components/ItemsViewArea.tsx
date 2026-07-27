@@ -178,6 +178,12 @@ function itemTypeFilterKey(it: Pick<ViewItem, "itemType" | "progress" | "kanbanC
   return it.itemType;
 }
 
+const MODE_LABEL_KEY: Record<"all" | "work" | "personal", string> = {
+  all: "mode.all",
+  work: "mode.work",
+  personal: "mode.personal",
+};
+
 const ENTRY_TYPES_BY_DOMAIN: Record<string, { value: string; label: string }[]> = {
   work: [
     { value: "task", label: "Task" },
@@ -1566,6 +1572,11 @@ export function ItemsViewArea({
               onUpdate={updateEntryContent}
               reorderEnabled={canReorderEntries}
               onReorder={reorderEntriesPersist}
+              mode={mode}
+              onModeChange={onModeChange}
+              searchFilter={searchFilter}
+              onSearchFilterChange={onSearchFilterChange}
+              showToolbar={isMobile && !inboxViewActive}
             />
           )}
         </>
@@ -4316,8 +4327,8 @@ function ListView({
               type="search"
               value={searchFilter}
               onChange={(e) => onSearchFilterChange?.(e.target.value)}
-              placeholder={t("items.search")}
-              aria-label={t("items.search")}
+              placeholder={t("scope.searchPlaceholder")}
+              aria-label={t("scope.searchPlaceholder")}
             />
           </div>
           {onModeChange && (

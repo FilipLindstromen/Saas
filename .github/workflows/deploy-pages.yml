@@ -65,6 +65,15 @@ jobs:
           if [ -z "$URL" ]; then URL="#"; fi
           sed "s|__METACONNECT_APP_URL__|${URL}|g" docs/meta-connect-landing.html > deploy/MetaConnect/index.html
 
+      - name: Add TypoAnimation landing page
+        env:
+          TYPOANIMATION_APP_URL: ${{ secrets.TYPOANIMATION_APP_URL }}
+        run: |
+          mkdir -p deploy/TypoAnimation
+          URL="${TYPOANIMATION_APP_URL:-}"
+          if [ -z "$URL" ]; then URL="#"; fi
+          sed "s|__TYPOANIMATION_APP_URL__|${URL}|g" docs/typo-animation-landing.html > deploy/TypoAnimation/index.html
+
       - name: Build Web Quiz Generator
         run: |
           cd webquizgenerator

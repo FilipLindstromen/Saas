@@ -5046,6 +5046,60 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   }
 }
 
+/* Mobile List view: local search field */
+.bd-list-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+}
+
+.bd-list-search-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
+.bd-list-search-field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Mobile List view: All / Work / Personal segmented control */
+.bd-list-segmented {
+  display: flex;
+  gap: 0.25rem;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+}
+
+.bd-list-segmented-item {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 0.4375rem 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-secondary);
+  transition:
+    background var(--bd-duration-fast) var(--bd-ease-soft),
+    color var(--bd-duration-fast) var(--bd-ease-soft);
+}
+
+.bd-list-segmented-item--active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
 .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {
   flex: 1 1 0;
   min-width: 0;
