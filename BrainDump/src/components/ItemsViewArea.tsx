@@ -42,7 +42,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { playTaskCompleteCheer } from "@/lib/task-complete-sound";
 import { emitGamificationFromResponseBody } from "@/lib/gamification-client";
-import { getLastNewBatchIds, pruneLastNewBatchIds, subscribeNewBatch } from "@/lib/newBatch";
+import { getLastNewBatchIds, pruneLastNewBatchIds, removeFromLastNewBatch, subscribeNewBatch } from "@/lib/newBatch";
 import {
   BRAINDUMP_SUGGESTED_ITEM_TYPES_EVENT,
   type SuggestedItemTypeDetail,
@@ -1017,6 +1017,10 @@ export function ItemsViewArea({
     [items, fetchItems]
   );
 
+  const fileInboxItem = useCallback((id: string) => {
+    removeFromLastNewBatch(id);
+  }, []);
+
   const updateEntryContent = useCallback((id: string, updates: { title?: string; content?: string }) => {
     fetch(`/api/organized-items/${id}`, {
       method: "PATCH",
@@ -1541,7 +1545,15 @@ export function ItemsViewArea({
         )}
 
       {items.length > 0 && filteredItems.length === 0 ? (
-        <p className="bd-empty">{t("items.emptySearch")}</p>
+        inboxViewActive ? (
+          <div className="bd-inbox-zero">
+            <CircleCheckBig size={40} strokeWidth={1.6} aria-hidden />
+            <p className="bd-inbox-zero-title">{t("items.inboxZeroTitle")}</p>
+            <p className="bd-inbox-zero-hint">{t("items.inboxZeroHint")}</p>
+          </div>
+        ) : (
+          <p className="bd-empty">{t("items.emptySearch")}</p>
+        )
       ) : (
         <>
           {items.length === 0 ? (
@@ -1577,6 +1589,10 @@ export function ItemsViewArea({
               searchFilter={searchFilter}
               onSearchFilterChange={onSearchFilterChange}
               showToolbar={isMobile && !inboxViewActive}
+              inboxViewActive={inboxViewActive}
+              onSetItemDomain={updateItemDomain}
+              onSetItemType={updateItemType}
+              onFileItem={fileInboxItem}
             />
           )}
         </>
@@ -3039,13 +3055,17 @@ function CalendarView({
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
-  /** Increment + direction drives slide-in animation when changing weeks. */
-  const [weekStripSlideKey, setWeekStripSlideKey] = useState(0);
-  const [weekStripSlideDir, setWeekStripSlideDir] = useState<"prev" | "next" | null>(null);
+  /** Increment + direction drives slide-in animation when changing months. */
+  const [monthSlideKey, setMonthSlideKey] = useState(0);
+  const [monthSlideDir, setMonthSlideDir] = useState<"prev" | "next" | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(() => {
     const n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  });
+  const [viewMonth, setViewMonth] = useState(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
   });
 
   const todayNorm = (() => {
@@ -3058,16 +3078,29 @@ function CalendarView({
     [items]
   );
 
-  const weekStart = useMemo(() => startOfWeekMonday(selectedDate), [selectedDate]);
+  const monthWeeks = useMemo(() => {
+    const gridStart = startOfWeekMonday(viewMonth);
+    const weeks: Date[][] = [];
+    const cursor = new Date(gridStart);
+    for (let w = 0; w < 6; w += 1) {
+      const days: Date[] = [];
+      for (let d = 0; d < 7; d += 1) {
+        days.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      weeks.push(days);
+    }
+    return weeks;
+  }, [viewMonth]);
 
-  const weekDays = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(weekStart);
-        d.setDate(weekStart.getDate() + i);
-        return d;
-      }),
-    [weekStart]
+  const weekdayLabels = useMemo(
+    () => monthWeeks[0].map((d) => d.toLocaleDateString(undefined, { weekday: "narrow" })),
+    [monthWeeks]
+  );
+
+  const dayHasItems = useCallback(
+    (d: Date) => getScheduledItemsForCalendarDay(d, scheduledItems).length > 0,
+    [scheduledItems]
   );
 
   const dayItems = useMemo(
@@ -3075,32 +3108,28 @@ function CalendarView({
     [selectedDate, scheduledItems]
   );
 
-  const shiftWeek = useCallback((dir: number, options?: { animate?: boolean }) => {
-    const animate = options?.animate !== false;
-    if (animate) {
-      setWeekStripSlideDir(dir > 0 ? "next" : "prev");
-      setWeekStripSlideKey((k) => k + 1);
-    }
-    setSelectedDate((d) => {
-      const n = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      n.setDate(n.getDate() + dir * 7);
-      return n;
+  const shiftMonth = useCallback((dir: number) => {
+    setMonthSlideDir(dir > 0 ? "next" : "prev");
+    setMonthSlideKey((k) => k + 1);
+    setViewMonth((d) => new Date(d.getFullYear(), d.getMonth() + dir, 1));
+  }, []);
+
+  const selectDay = useCallback((d: Date) => {
+    const picked = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    setSelectedDate(picked);
+    setViewMonth((prev) => {
+      if (prev.getFullYear() === picked.getFullYear() && prev.getMonth() === picked.getMonth()) return prev;
+      setMonthSlideDir(picked.getTime() > prev.getTime() ? "next" : "prev");
+      setMonthSlideKey((k) => k + 1);
+      return new Date(picked.getFullYear(), picked.getMonth(), 1);
     });
   }, []);
 
   const goToday = useCallback(() => {
     const n = new Date();
     const target = new Date(n.getFullYear(), n.getMonth(), n.getDate());
-    setSelectedDate((prev) => {
-      const wPrev = startOfWeekMonday(prev).getTime();
-      const wNext = startOfWeekMonday(target).getTime();
-      if (wPrev !== wNext) {
-        setWeekStripSlideDir(wNext > wPrev ? "next" : "prev");
-        setWeekStripSlideKey((k) => k + 1);
-      }
-      return target;
-    });
-  }, []);
+    selectDay(target);
+  }, [selectDay]);
 
   const SWIPE_MIN_PX = 48;
   const onWeekTouchStart = useCallback((e: React.TouchEvent) => {
@@ -3115,16 +3144,16 @@ function CalendarView({
       touchStartX.current = null;
       touchStartY.current = null;
       if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy)) return;
-      if (dx > 0) shiftWeek(-1);
-      else shiftWeek(1);
+      if (dx > 0) shiftMonth(-1);
+      else shiftMonth(1);
     },
-    [shiftWeek]
+    [shiftMonth]
   );
 
-  const headerMonthLine = selectedDate.toLocaleDateString(undefined, { month: "long" });
+  const headerMonthLine = viewMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const headerMainLine = isSameCalendarDay(selectedDate, todayNorm)
     ? t("scope.dateFilterToday")
-    : selectedDate.toLocaleDateString(undefined, { weekday: "long" });
+    : selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
   const gap = isMobile ? "0.5rem" : "0.85rem";
 
@@ -3159,10 +3188,10 @@ function CalendarView({
           <button type="button" className="bd-btn" onClick={goToday} style={{ padding: "0.4rem 0.65rem", fontSize: "0.8125rem" }}>
             {t("scope.dateFilterToday")}
           </button>
-          <button type="button" className="bd-btn" onClick={() => shiftWeek(-1)} style={{ padding: "0.4rem 0.5rem" }} aria-label={t("items.calendarWeekPrev")}>
+          <button type="button" className="bd-btn" onClick={() => shiftMonth(-1)} style={{ padding: "0.4rem 0.5rem" }} aria-label={t("items.calendarWeekPrev")}>
             ‹
           </button>
-          <button type="button" className="bd-btn" onClick={() => shiftWeek(1)} style={{ padding: "0.4rem 0.5rem" }} aria-label={t("items.calendarWeekNext")}>
+          <button type="button" className="bd-btn" onClick={() => shiftMonth(1)} style={{ padding: "0.4rem 0.5rem" }} aria-label={t("items.calendarWeekNext")}>
             ›
           </button>
         </div>
@@ -3171,7 +3200,7 @@ function CalendarView({
       <div
         className="bd-calendar-week-strip-viewport"
         role="group"
-        aria-label={t("items.viewCalendar")}
+        aria-label={headerMonthLine}
         onTouchStart={onWeekTouchStart}
         onTouchEnd={onWeekTouchEnd}
         style={{
@@ -3182,79 +3211,99 @@ function CalendarView({
         }}
       >
         <div
-          key={weekStripSlideKey}
+          key={monthSlideKey}
           className={
-            weekStripSlideKey > 0 && weekStripSlideDir
-              ? weekStripSlideDir === "next"
+            monthSlideKey > 0 && monthSlideDir
+              ? monthSlideDir === "next"
                 ? "bd-calendar-week-strip-inner bd-calendar-week-strip-inner--in-next"
                 : "bd-calendar-week-strip-inner bd-calendar-week-strip-inner--in-prev"
               : "bd-calendar-week-strip-inner"
           }
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "stretch",
-          }}
         >
-          {weekDays.map((d) => {
-            const sel = isSameCalendarDay(d, selectedDate);
-            const letter = d.toLocaleDateString(undefined, { weekday: "narrow" });
-            return (
-              <button
-                key={calendarDateKey(d)}
-                type="button"
-                onClick={() => setSelectedDate(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}
+          <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", marginBottom: "0.3rem" }}>
+            {weekdayLabels.map((label, i) => (
+              <span
+                key={i}
                 style={{
                   flex: 1,
-                  minWidth: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "0.2rem",
-                  padding: "0.35rem 0.1rem",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  borderRadius: 8,
+                  textAlign: "center",
+                  fontSize: isMobile ? "0.68rem" : "0.72rem",
+                  fontWeight: 700,
+                  color: "var(--text-tertiary)",
                 }}
               >
-                <span style={{ fontSize: isMobile ? "0.68rem" : "0.72rem", fontWeight: 500, color: "var(--text-tertiary)", lineHeight: 1 }}>
-                  {letter}
-                </span>
-                <span
-                  style={{
-                    width: isMobile ? 38 : 40,
-                    height: isMobile ? 38 : 40,
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: isMobile ? "0.9rem" : "0.95rem",
-                    lineHeight: 1,
-                    ...(sel
-                      ? {
-                          background: "var(--accent)",
-                          color: "var(--bd-btn-primary-fg)",
-                          boxShadow: "0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent)",
-                        }
-                      : { color: "var(--text-primary)", background: "transparent" }),
-                  }}
-                >
-                  {d.getDate()}
-                </span>
-              </button>
-            );
-          })}
+                {label}
+              </span>
+            ))}
+          </div>
+          {monthWeeks.map((week, wi) => (
+            <div key={wi} style={{ display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+              {week.map((d) => {
+                const inMonth = d.getMonth() === viewMonth.getMonth();
+                const sel = isSameCalendarDay(d, selectedDate);
+                const isToday = isSameCalendarDay(d, todayNorm);
+                const hasItems = dayHasItems(d);
+                return (
+                  <button
+                    key={calendarDateKey(d)}
+                    type="button"
+                    onClick={() => selectDay(d)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      aspectRatio: "1",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "3px",
+                      padding: "2px",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: isMobile ? 30 : 34,
+                        height: isMobile ? 30 : 34,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: sel || isToday ? 700 : 500,
+                        fontSize: isMobile ? "0.8125rem" : "0.875rem",
+                        lineHeight: 1,
+                        ...(sel
+                          ? {
+                              background: "var(--bd-brand-accent)",
+                              color: "#ffffff",
+                              boxShadow: "0 2px 10px rgba(var(--bd-brand-accent-rgb), 0.35)",
+                            }
+                          : {
+                              color: !inMonth ? "var(--text-quaternary)" : isToday ? "var(--bd-brand-accent)" : "var(--text-primary)",
+                              background: "transparent",
+                            }),
+                      }}
+                    >
+                      {d.getDate()}
+                    </span>
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: hasItems ? (sel ? "#ffffff" : "var(--bd-brand-accent)") : "transparent",
+                      }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
-
-      {isMobile ? (
-        <p style={{ fontSize: "0.68rem", color: "var(--text-quaternary)", margin: "-0.05rem 0 0", textAlign: "center", lineHeight: 1.35 }}>
-          {t("items.calendarSwipeHint")}
-        </p>
-      ) : null}
 
       <div
         style={{
@@ -3855,6 +3904,10 @@ function ListView({
   searchFilter = "",
   onSearchFilterChange,
   showToolbar = false,
+  inboxViewActive = false,
+  onSetItemDomain,
+  onSetItemType,
+  onFileItem,
 }: {
   items: ViewItem[];
   showEntryTitles?: boolean;
@@ -3872,6 +3925,11 @@ function ListView({
   onSearchFilterChange?: (value: string) => void;
   /** Show the mobile-only search field + All/Work/Personal segmented control above the list. */
   showToolbar?: boolean;
+  /** Inbox tab: render chip-based domain/type triage cards instead of standard rows. */
+  inboxViewActive?: boolean;
+  onSetItemDomain?: (id: string, domain: "work" | "personal") => void;
+  onSetItemType?: (id: string, type: string) => void;
+  onFileItem?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const bindMobileField = useMobileEntryFieldGestures(isMobile, onItemContextMenu);
@@ -3925,6 +3983,65 @@ function ListView({
   };
 
   const renderEntry = (it: ViewItem, index: number) => {
+    if (inboxViewActive && onSetItemDomain && onSetItemType && onFileItem) {
+      const domain = it.domain === "personal" ? "personal" : "work";
+      const triageTypes = ["task", "note", "calendar"];
+      return (
+        <SwipeDeleteRow
+          key={it.id}
+          entryId={it.id}
+          swipeOpenId={swipeOpenId}
+          setSwipeOpenId={setSwipeOpenId}
+          onDelete={() => onDelete(it.id)}
+          disabled={false}
+          slideSurface="elevated"
+        >
+          <div className="bd-inbox-triage-card">
+            <div className="bd-inbox-triage-card-head">
+              <span className="bd-inbox-triage-card-title">{it.title?.trim() || "—"}</span>
+              <button
+                type="button"
+                className="bd-inbox-triage-discard"
+                onClick={() => onDelete(it.id)}
+                aria-label={t("items.inboxDiscard")}
+                title={t("items.inboxDiscard")}
+              >
+                <X size={16} strokeWidth={2} aria-hidden />
+              </button>
+            </div>
+            <div className="bd-inbox-triage-chip-row">
+              {(["work", "personal"] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={`bd-inbox-triage-chip bd-inbox-triage-chip--domain${domain === d ? ` bd-inbox-triage-chip--domain-${d}-active` : ""}`}
+                  aria-pressed={domain === d}
+                  onClick={() => onSetItemDomain(it.id, d)}
+                >
+                  {t(MODE_LABEL_KEY[d])}
+                </button>
+              ))}
+            </div>
+            <div className="bd-inbox-triage-chip-row">
+              {triageTypes.map((ty) => (
+                <button
+                  key={ty}
+                  type="button"
+                  className={`bd-inbox-triage-chip${(it.itemType || "note") === ty ? " bd-inbox-triage-chip--active" : ""}`}
+                  aria-pressed={(it.itemType || "note") === ty}
+                  onClick={() => onSetItemType(it.id, ty)}
+                >
+                  {formatTypeLabel(ty, t)}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="bd-inbox-triage-file-btn" onClick={() => onFileItem(it.id)}>
+              {t("items.inboxFile")}
+            </button>
+          </div>
+        </SwipeDeleteRow>
+      );
+    }
     const ep = enterStaggerProps(index);
     const taskRec = parseTaskRecurrence(it.recurrence);
     // For recurring tasks, only show as completed if done specifically today

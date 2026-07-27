@@ -6,20 +6,25 @@ export interface ParsedBlock {
   lines: { text: string; accent?: boolean }[];
 }
 
-// Parses the "### SceneName / ^ kicker / > accent line" copy-script format — a direct port
-// of the reference prototype's `parseCopyScript`. Returns one block per "### " header.
+// Parses the "### SceneName / ^ kicker / > accent line" copy-script format — based on the
+// reference prototype's `parseCopyScript`, with one fix: the reference's single combined
+// regex (`^###\s*(.+?)\s*\n?([\s\S]*)$`) has a latent bug where the lazy `(.+?)` capture
+// collapses to just the first character of the name (e.g. "Hook" -> "H", with "ook" leaking
+// into the first line) because the unconditionally-satisfiable `[\s\S]*$` tail lets the lazy
+// quantifier succeed at length 1. Splitting the header line out explicitly avoids that.
 export function parseStructuredScript(text: string): ParsedBlock[] {
   if (!text) return [];
   const blocks = String(text).split(/\n(?=###\s)/);
   const out: ParsedBlock[] = [];
   for (const block of blocks) {
-    const m = block.match(/^###\s*(.+?)\s*\n?([\s\S]*)$/);
-    if (!m) continue;
-    const name = m[1].trim();
+    const blockLines = block.split('\n');
+    const headerMatch = blockLines[0].match(/^###\s*(.+?)\s*$/);
+    if (!headerMatch) continue;
+    const name = headerMatch[1].trim();
     if (!name) continue;
     let kicker: string | null = null;
     const lines: { text: string; accent?: boolean }[] = [];
-    for (const raw of m[2].split('\n')) {
+    for (const raw of blockLines.slice(1)) {
       const l = raw.trim();
       if (!l) continue;
       if (l.startsWith('^ ')) kicker = l.slice(2).trim();

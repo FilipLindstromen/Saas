@@ -33,6 +33,14 @@ export function getLastNewBatchIds(): Set<string> {
   }
 }
 
+/** Remove a single id from the batch set (e.g. once the user has filed/triaged it). */
+export function removeFromLastNewBatch(id: string): void {
+  const stored = getLastNewBatchIds();
+  if (!stored.has(id)) return;
+  stored.delete(id);
+  saveLastNewBatchIds([...stored]);
+}
+
 /** Drop batch ids that no longer exist (deleted/trashed); returns remaining count. */
 export function pruneLastNewBatchIds(validIds: Set<string>): number {
   const stored = getLastNewBatchIds();
