@@ -26,9 +26,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function SceneStylePanel({
   scene,
   onChange,
+  hideBroll,
 }: {
   scene: Scene | null;
   onChange: (id: string, patch: Partial<Scene>) => void;
+  hideBroll?: boolean;
 }) {
   if (!scene) {
     return (
@@ -146,7 +148,7 @@ export function SceneStylePanel({
         <input className={inputClass} value={scene.kicker || ''} onChange={(e) => patch({ kicker: e.target.value || undefined })} />
       </Field>
 
-      <BrollPanel scene={scene} onChange={patch} />
+      {!hideBroll && <BrollPanel scene={scene} onChange={patch} />}
 
       {scene.style === 'bignumber' && (
         <div className="flex gap-3">

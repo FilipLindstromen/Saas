@@ -117,11 +117,15 @@ export default function Home() {
 
   const handleSave = async () => {
     setStatus('Saving…');
-    await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(project),
-    });
+    if (IS_STATIC) {
+      saveLocalProject(project);
+    } else {
+      await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project),
+      });
+    }
     setStatus('Saved');
     refreshProjectList();
     setTimeout(() => setStatus(''), 1500);
@@ -129,6 +133,13 @@ export default function Home() {
 
   const handleLoad = async (id: string) => {
     if (!id) return;
+    if (IS_STATIC) {
+      const loaded = loadLocalProject(id);
+      if (!loaded) return;
+      setProject(loaded);
+      setSelectedSceneId(loaded.scenes[0]?.id ?? null);
+      return;
+    }
     const res = await fetch(`/api/projects?id=${encodeURIComponent(id)}`);
     if (!res.ok) return;
     const loaded = (await res.json()) as Project;
@@ -220,9 +231,11 @@ export default function Home() {
           >
             New
           </button>
-          <div className="ml-2 border-l border-white/10 pl-3">
-            <ExportPanel project={project} />
-          </div>
+          {!IS_STATIC && (
+            <div className="ml-2 border-l border-white/10 pl-3">
+              <ExportPanel project={project} />
+            </div>
+          )}
         </div>
       </header>
 
@@ -240,19 +253,29 @@ export default function Home() {
             onDuplicate={handleDuplicate}
             onAdd={handleAdd}
           />
-          <div className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-            <button
-              onClick={handleAutoSelectBroll}
-              disabled={brollBusy || project.scenes.length === 0}
-              className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
-            >
-              {brollBusy ? 'Selecting b-roll…' : 'Auto-select b-roll for all scenes'}
-            </button>
-            {brollStatus && <p className="text-xs text-white/45">{brollStatus}</p>}
-          </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-            <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
-          </div>
+          {IS_STATIC ? (
+            <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-xs text-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+              Webcam voice sync, b-roll, and MP4 export need a real server (ffmpeg, local
+              speech-to-text, video rendering) — this preview build is static. Run the full app
+              locally (see the Saas hub card) for those.
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                <button
+                  onClick={handleAutoSelectBroll}
+                  disabled={brollBusy || project.scenes.length === 0}
+                  className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
+                >
+                  {brollBusy ? 'Selecting b-roll…' : 'Auto-select b-roll for all scenes'}
+                </button>
+                {brollStatus && <p className="text-xs text-white/45">{brollStatus}</p>}
+              </div>
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-start justify-center">
@@ -266,7 +289,7 @@ export default function Home() {
             <ThemePanel project={project} onChange={patchProject} />
           </div>
           <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-            <SceneStylePanel scene={selectedScene} onChange={patchScene} />
+            <SceneStylePanel scene={selectedScene} onChange={patchScene} hideBroll={IS_STATIC} />
           </div>
         </div>
       </div>

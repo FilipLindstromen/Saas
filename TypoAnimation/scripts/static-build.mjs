@@ -7,7 +7,7 @@
 // generateable, which none of ours are. Temporarily move src/app/api/ out of the way, build,
 // put it back (even on failure) so the regular `npm run dev`/`npm run build` are unaffected.
 
-import { existsSync, renameSync } from 'fs';
+import { existsSync, renameSync, rmSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -16,6 +16,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const apiDir = path.join(ROOT, 'src', 'app', 'api');
 const apiBackup = path.join(ROOT, 'src', 'app', '_api_disabled_for_static_build');
+
+// A stale .next/ from a previous `next dev`/`next build` run (with api/ present) leaves
+// behind a generated type-check file (.next/dev/types/validator.ts) that still imports the
+// now-moved route handlers, which fails the build with a bogus "cannot find module" error.
+// Always start this build fresh.
+rmSync(path.join(ROOT, '.next'), { recursive: true, force: true });
 
 let moved = false;
 try {
