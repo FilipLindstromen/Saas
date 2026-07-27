@@ -58,11 +58,17 @@
   --bd-dump-mic-fg: #ffffff;
   --bd-dump-mic-border: color-mix(in srgb, #ffffff 28%, #c2410c);
   --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.38);
+  /* Brand orange — canonical token; reused anywhere an "on"/active accent is needed */
+  --bd-brand-accent: #e85d2d;
+  --bd-brand-accent-rgb: 232, 93, 45;
   /* Today timeline — same brand orange as the dump mic */
-  --bd-timeline-accent: #e85d2d;
-  --bd-timeline-accent-rgb: 232, 93, 45;
+  --bd-timeline-accent: var(--bd-brand-accent);
+  --bd-timeline-accent-rgb: var(--bd-brand-accent-rgb);
   --bd-timeline-time-color: color-mix(in srgb, #e85d2d 62%, #ffffff 38%);
   --bd-timeline-card-bg: var(--bg-elevated);
+  /* Domain tags — iOS systemBlue/systemPurple, same in both themes */
+  --bd-domain-work: #0a84ff;
+  --bd-domain-personal: #af52de;
   /* Stacking: menus/sheets above chrome; modals above menus; processing on top */
   --bd-z-bottom-bar: 350;
   --bd-z-dropdown: 5000;
@@ -127,10 +133,14 @@
   --bd-dump-mic-fg: #ffffff;
   --bd-dump-mic-border: color-mix(in srgb, #ffffff 35%, #c2410c);
   --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.28);
-  --bd-timeline-accent: #e85d2d;
-  --bd-timeline-accent-rgb: 232, 93, 45;
+  --bd-brand-accent: #e85d2d;
+  --bd-brand-accent-rgb: 232, 93, 45;
+  --bd-timeline-accent: var(--bd-brand-accent);
+  --bd-timeline-accent-rgb: var(--bd-brand-accent-rgb);
   --bd-timeline-time-color: color-mix(in srgb, #e85d2d 78%, #000000 22%);
   --bd-timeline-card-bg: var(--bg-elevated);
+  --bd-domain-work: #0a84ff;
+  --bd-domain-personal: #af52de;
 }
 
 * {
@@ -3036,6 +3046,32 @@ select.bd-input::-ms-expand {
   gap: 0.35rem;
 }
 
+.bd-topbar-avatar-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--bd-brand-accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.bd-topbar-avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Mobile: compact workspace pill (label + mode glyph) */
 .bd-topbar-workspace-pill {
   display: inline-flex;
@@ -4041,13 +4077,13 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 }
 
 .bd-timeline-tag--work {
-  background: rgba(var(--bd-timeline-accent-rgb), 0.18);
-  color: var(--bd-timeline-time-color);
+  background: var(--bd-domain-work);
+  color: #ffffff;
 }
 
 .bd-timeline-tag--personal {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
+  background: var(--bd-domain-personal);
+  color: #ffffff;
 }
 
 .bd-timeline-day--tick .bd-timeline-node {
@@ -4935,6 +4971,79 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 /* No entries anywhere yet — only the record button shows, so center it instead of hugging the edge. */
 .bd-bottom-bar-pill--mic-only {
   justify-content: center;
+}
+
+.bd-bottom-bar-pill {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bd-bottom-bar-pill {
+    background: var(--bg-elevated);
+  }
+}
+
+/* iOS-style pill toggle switch */
+.bd-ios-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.bd-ios-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.bd-ios-switch-track {
+  width: 50px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  box-sizing: border-box;
+  transition: background var(--bd-duration-normal) var(--bd-ease-soft);
+}
+
+.bd-ios-switch input:checked + .bd-ios-switch-track {
+  background: var(--bd-brand-accent);
+}
+
+.bd-ios-switch input:focus-visible + .bd-ios-switch-track {
+  outline: 2px solid var(--bd-brand-accent);
+  outline-offset: 2px;
+}
+
+.bd-ios-switch-knob {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--bd-duration-normal) var(--bd-ease-spring);
+}
+
+.bd-ios-switch input:checked + .bd-ios-switch-track .bd-ios-switch-knob {
+  transform: translateX(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-ios-switch-track,
+  .bd-ios-switch-knob {
+    transition-duration: 0.01ms;
+  }
 }
 
 .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {

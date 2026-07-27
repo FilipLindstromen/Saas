@@ -612,6 +612,7 @@ export default function BrainDumpPage() {
           }}
           showUncategorizedWorkspace={hasUncategorizedEntries}
           onOpenMobileNav={() => setMobileNavOpen(true)}
+          onOpenProfile={() => setShowProfile(true)}
           scopeSlot={isMobileLayout || todayViewActive ? null : scopeBarSlot}
         />
 

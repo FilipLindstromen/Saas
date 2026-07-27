@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useI18n } from "@/lib/i18n";
 
 type Mode = "inbox" | "work" | "personal" | "all";
@@ -14,6 +15,8 @@ interface TopBarProps {
   showUncategorizedWorkspace?: boolean;
   /** Opens the slide-out nav on small screens (sidebar lives in AppSidebar). */
   onOpenMobileNav?: () => void;
+  /** Opens the profile/settings sheet — persistent entry point shown on every screen. */
+  onOpenProfile?: () => void;
   /** Project / area scope controls (ScopeBar); omit in inbox mode. Desktop only — mobile uses the items strip. */
   scopeSlot?: ReactNode;
 }
@@ -131,10 +134,16 @@ export function TopBar({
   onModeChange,
   showUncategorizedWorkspace: _showUncategorizedWorkspace = true,
   onOpenMobileNav,
+  onOpenProfile,
   scopeSlot = null,
 }: TopBarProps) {
   const { t } = useI18n();
+  const { data: session } = useSession();
   const [isMobile, setIsMobile] = useState(false);
+
+  const user = session?.user;
+  const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "—";
+  const profileInitial = (displayName[0] || "?").toUpperCase();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -194,17 +203,34 @@ export function TopBar({
         ) : (
           <div className="bd-topbar-grow" aria-hidden />
         )}
-        {onOpenMobileNav && isMobile ? (
+        {(onOpenMobileNav || onOpenProfile) && isMobile ? (
           <div className="bd-topbar-end">
-            <button
-              type="button"
-              className="bd-btn bd-topbar-menu-btn"
-              onClick={onOpenMobileNav}
-              title={t("sidebar.menu")}
-              aria-label={t("sidebar.menu")}
-            >
-              <Menu size={22} strokeWidth={2} aria-hidden />
-            </button>
+            {onOpenProfile ? (
+              <button
+                type="button"
+                className="bd-topbar-avatar-btn"
+                onClick={onOpenProfile}
+                title={user?.email || t("sidebar.profile")}
+                aria-label={t("sidebar.profile")}
+              >
+                {user?.image ? (
+                  <img src={user.image} alt="" width={34} height={34} referrerPolicy="no-referrer" />
+                ) : (
+                  <span aria-hidden>{profileInitial}</span>
+                )}
+              </button>
+            ) : null}
+            {onOpenMobileNav ? (
+              <button
+                type="button"
+                className="bd-btn bd-topbar-menu-btn"
+                onClick={onOpenMobileNav}
+                title={t("sidebar.menu")}
+                aria-label={t("sidebar.menu")}
+              >
+                <Menu size={22} strokeWidth={2} aria-hidden />
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
