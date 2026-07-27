@@ -1330,7 +1330,7 @@ export function ItemsViewArea({
 
   const mobileToolbarCompactInner = (
     <>
-      {onItemTypeSelect && !inboxViewActive && (
+      {onItemTypeSelect && !inboxViewActive && viewType !== "calendar" && (
         <button
           type="button"
           className={isMobile ? "bd-btn bd-mobile-type-chip-pill" : "bd-btn"}
@@ -1398,7 +1398,7 @@ export function ItemsViewArea({
         ) : (
           <>
             <div className="bd-items-toolbar-left">
-              {onItemTypeSelect && !inboxViewActive && (mode === "work" || mode === "personal" || mode === "all") && (
+              {onItemTypeSelect && !inboxViewActive && viewType !== "calendar" && (mode === "work" || mode === "personal" || mode === "all") && (
                 <div
                   className={isMobile ? "bd-scope-strip bd-items-type-filters" : undefined}
                   style={{

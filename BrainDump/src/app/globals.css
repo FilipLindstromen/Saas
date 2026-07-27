@@ -58,6 +58,11 @@
   --bd-dump-mic-fg: #ffffff;
   --bd-dump-mic-border: color-mix(in srgb, #ffffff 28%, #c2410c);
   --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.38);
+  /* Today timeline — same brand orange as the dump mic */
+  --bd-timeline-accent: #e85d2d;
+  --bd-timeline-accent-rgb: 232, 93, 45;
+  --bd-timeline-time-color: color-mix(in srgb, #e85d2d 62%, #ffffff 38%);
+  --bd-timeline-card-bg: var(--bg-elevated);
   /* Stacking: menus/sheets above chrome; modals above menus; processing on top */
   --bd-z-bottom-bar: 350;
   --bd-z-dropdown: 5000;
@@ -122,6 +127,10 @@
   --bd-dump-mic-fg: #ffffff;
   --bd-dump-mic-border: color-mix(in srgb, #ffffff 35%, #c2410c);
   --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.28);
+  --bd-timeline-accent: #e85d2d;
+  --bd-timeline-accent-rgb: 232, 93, 45;
+  --bd-timeline-time-color: color-mix(in srgb, #e85d2d 78%, #000000 22%);
+  --bd-timeline-card-bg: var(--bg-elevated);
 }
 
 * {
@@ -3867,24 +3876,6 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 
 .bd-timeline-day {
   position: relative;
-  padding: 2.35rem 0 2rem;
-}
-
-.bd-timeline-day::before {
-  content: "";
-  position: absolute;
-  left: 0.58rem;
-  top: 0.65rem;
-  bottom: -0.35rem;
-  width: 2px;
-  background: var(--bd-accent, #3b82f6);
-  border-radius: 1px;
-  opacity: 0.82;
-  pointer-events: none;
-}
-
-.bd-timeline-day:last-child::before {
-  bottom: 1.25rem;
 }
 
 .bd-timeline-day--today .bd-timeline-day-label {
@@ -3894,53 +3885,107 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 .bd-timeline-day-label {
   margin: 0;
   padding: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-family: var(--bd-font-heading, inherit);
+  font-size: 1rem;
+  font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .bd-timeline-row {
-  display: grid;
-  grid-template-columns: 1.35rem minmax(0, 1fr);
-  gap: 0 0.85rem;
-  align-items: start;
+  display: flex;
+  align-items: stretch;
+  gap: 0.85rem;
+  padding-bottom: 1.6rem;
+  transition: opacity var(--bd-duration-normal, 0.2s) var(--bd-ease-soft, ease);
 }
 
-.bd-timeline-row--label {
-  margin-bottom: 0.55rem;
+.bd-timeline-day:last-child .bd-timeline-row {
+  padding-bottom: 0.5rem;
 }
 
-.bd-timeline-row--event {
-  padding: 0.45rem 0;
+.bd-timeline-row--faded {
+  opacity: 0.45;
 }
 
 .bd-timeline-spine {
+  flex: none;
+  width: 16px;
   display: flex;
-  justify-content: center;
-  padding-top: 0.28rem;
+  flex-direction: column;
+  align-items: center;
   position: relative;
   z-index: 1;
 }
 
+.bd-timeline-rail-seg {
+  width: 2.5px;
+  flex: 1;
+  border-radius: 2px;
+}
+
 .bd-timeline-node {
-  width: 10px;
-  height: 10px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  border: 2px solid var(--bd-accent, #3b82f6);
+  border: 2.5px solid var(--bd-timeline-accent);
   background: var(--bg-primary);
   box-sizing: border-box;
   flex-shrink: 0;
-}
-
-.bd-timeline-node--day {
-  width: 11px;
-  height: 11px;
+  margin: 3px 0;
 }
 
 .bd-timeline-node--today {
-  background: var(--bd-accent, #3b82f6);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bd-accent, #3b82f6) 22%, transparent);
+  width: 15px;
+  height: 15px;
+  border: none;
+  background: var(--bd-timeline-accent);
+  box-shadow: 0 0 0 4px rgba(var(--bd-timeline-accent-rgb), 0.22);
+}
+
+.bd-timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.bd-timeline-day-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.bd-timeline-row--faded .bd-timeline-day-header {
+  margin-bottom: 0.2rem;
+}
+
+.bd-timeline-day-badge {
+  font-family: var(--bd-font-heading, inherit);
+  font-weight: 800;
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--bd-timeline-accent);
+  color: #28251f;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.bd-timeline-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.bd-timeline-card {
+  display: flex;
+  gap: 0.625rem;
+  align-items: flex-start;
+  padding: 0.6875rem 0.8125rem;
+  background: var(--bd-timeline-card-bg);
+  border-radius: 14px;
+  cursor: pointer;
 }
 
 .bd-timeline-day-empty {
@@ -3949,18 +3994,26 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   color: var(--text-tertiary);
 }
 
+.bd-timeline-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
 .bd-timeline-event-content {
   min-width: 0;
   padding-bottom: 0.1rem;
 }
 
 .bd-timeline-event-time {
-  font-size: 0.75rem;
-  font-weight: 500;
+  flex: none;
+  width: 42px;
+  padding-top: 0.05rem;
+  font-family: var(--bd-font-heading, inherit);
+  font-size: 0.6875rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  color: var(--text-tertiary);
+  color: var(--bd-timeline-time-color);
   line-height: 1.35;
-  margin-bottom: 0.15rem;
 }
 
 .bd-timeline-event-head {
@@ -3969,8 +4022,35 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   gap: 0.45rem;
 }
 
-.bd-timeline-day--tick .bd-timeline-node--day,
-.bd-timeline-day--tick .bd-timeline-node--today {
+.bd-timeline-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.bd-timeline-tag {
+  display: inline-block;
+  font-family: var(--bd-font-heading, inherit);
+  font-size: 0.59375rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.bd-timeline-tag--work {
+  background: rgba(var(--bd-timeline-accent-rgb), 0.18);
+  color: var(--bd-timeline-time-color);
+}
+
+.bd-timeline-tag--personal {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.bd-timeline-day--tick .bd-timeline-node {
   animation: bd-timeline-tick-shake 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
@@ -4850,6 +4930,11 @@ button.bd-shopping-toggle[aria-pressed="true"] {
     0 6px 22px rgba(15, 23, 42, 0.12),
     0 1px 0 rgba(255, 255, 255, 0.9);
   border-color: var(--border-subtle);
+}
+
+/* No entries anywhere yet — only the record button shows, so center it instead of hugging the edge. */
+.bd-bottom-bar-pill--mic-only {
+  justify-content: center;
 }
 
 .bd-bottom-bar .bd-bottom-bar-pill > .bd-bottom-bar-pill-item {

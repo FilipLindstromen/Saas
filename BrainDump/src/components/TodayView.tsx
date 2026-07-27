@@ -33,6 +33,9 @@ const INITIAL_PAST_DAYS = 7;
 const INITIAL_FUTURE_DAYS = 21;
 const LOAD_MORE_DAYS = 14;
 const SCROLL_LOAD_THRESHOLD = 280;
+const RAIL_OPACITY_ACTIVE = 0.75;
+const RAIL_OPACITY_EMPTY = 0.22;
+const RAIL_ACCENT_RGB = "232, 93, 45";
 
 export type TodayItemRow = {
   id: string;
@@ -161,19 +164,36 @@ export const TodayView = forwardRef<TodayViewHandle, TodayViewProps>(function To
     return keys;
   }, [pastDays, futureDays]);
 
-  const formatDayLabel = useCallback(
+  const dayItemsByKey = useMemo(() => {
+    const map = new Map<string, TodayItemRow[]>();
+    for (const key of dayKeys) map.set(key, itemsForDate(allItems, key));
+    return map;
+  }, [dayKeys, allItems]);
+
+  const dayRailOpacities = useMemo(
+    () => dayKeys.map((key) => ((dayItemsByKey.get(key)?.length ?? 0) > 0 ? RAIL_OPACITY_ACTIVE : RAIL_OPACITY_EMPTY)),
+    [dayKeys, dayItemsByKey]
+  );
+
+  const formatDayDate = useCallback(
+    (dateKey: string) =>
+      new Date(`${dateKey}T12:00:00`).toLocaleDateString(locale === "sv" ? "sv-SE" : undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    [locale]
+  );
+
+  const dayBadgeLabel = useCallback(
     (dateKey: string) => {
       const offset = dayOffsetFromKeys(dateKey, todayKey);
-      const formatted = new Date(`${dateKey}T12:00:00`).toLocaleDateString(
-        locale === "sv" ? "sv-SE" : undefined,
-        { weekday: "long", month: "long", day: "numeric" }
-      );
-      if (offset === 0) return `${t("today.title")} · ${formatted}`;
-      if (offset === -1) return `${t("today.yesterday")} · ${formatted}`;
-      if (offset === 1) return `${t("today.tomorrow")} · ${formatted}`;
-      return formatted;
+      if (offset === 0) return t("today.title");
+      if (offset === -1) return t("today.yesterday");
+      if (offset === 1) return t("today.tomorrow");
+      return null;
     },
-    [locale, t, todayKey]
+    [t, todayKey]
   );
 
   const load = useCallback(async () => {
@@ -408,9 +428,17 @@ export const TodayView = forwardRef<TodayViewHandle, TodayViewProps>(function To
           {error}
         </p>
       ) : (
-        dayKeys.map((dateKey) => {
-          const dayItems = itemsForDate(allItems, dateKey);
+        dayKeys.map((dateKey, dayIndex) => {
+          const dayItems = dayItemsByKey.get(dateKey) ?? [];
           const isToday = dateKey === todayKey;
+          const hasItems = dayItems.length > 0;
+          const badgeLabel = dayBadgeLabel(dateKey);
+
+          const thisOp = dayRailOpacities[dayIndex];
+          const prevOp = dayIndex === 0 ? thisOp : dayRailOpacities[dayIndex - 1];
+          const nextOp = dayIndex === dayRailOpacities.length - 1 ? thisOp : dayRailOpacities[dayIndex + 1];
+          const railTop = `linear-gradient(to bottom, rgba(${RAIL_ACCENT_RGB}, ${prevOp}), rgba(${RAIL_ACCENT_RGB}, ${thisOp}))`;
+          const railBottom = `linear-gradient(to bottom, rgba(${RAIL_ACCENT_RGB}, ${thisOp}), rgba(${RAIL_ACCENT_RGB}, ${nextOp}))`;
 
           return (
             <section
@@ -419,155 +447,156 @@ export const TodayView = forwardRef<TodayViewHandle, TodayViewProps>(function To
               className={`bd-timeline-day${isToday ? " bd-timeline-day--today" : ""}${tickDayKey === dateKey ? " bd-timeline-day--tick" : ""}`}
               data-date={dateKey}
             >
-              <div className="bd-timeline-row bd-timeline-row--label">
+              <div className={`bd-timeline-row${hasItems ? "" : " bd-timeline-row--faded"}`}>
                 <div className="bd-timeline-spine" aria-hidden>
-                  <span className={`bd-timeline-node${isToday ? " bd-timeline-node--today" : " bd-timeline-node--day"}`} />
+                  <span className="bd-timeline-rail-seg" style={{ background: railTop }} />
+                  <span className={`bd-timeline-node${isToday ? " bd-timeline-node--today" : ""}`} />
+                  <span className="bd-timeline-rail-seg" style={{ background: railBottom }} />
                 </div>
-                <h2 className="bd-timeline-day-label">{formatDayLabel(dateKey)}</h2>
-              </div>
+                <div className="bd-timeline-content">
+                  <div className="bd-timeline-day-header">
+                    {badgeLabel ? <span className="bd-timeline-day-badge">{badgeLabel}</span> : null}
+                    <h2 className="bd-timeline-day-label">{formatDayDate(dateKey)}</h2>
+                  </div>
 
-              {dayItems.length === 0 ? (
-                <div className="bd-timeline-row">
-                  <div className="bd-timeline-spine" aria-hidden />
-                  <p className="bd-timeline-day-empty">{t("today.dayEmpty")}</p>
-                </div>
-              ) : (
-                dayItems.map((it) => {
-                  const taskRec = parseTaskRecurrence(it.recurrence);
-                  const done = isDoneOnDate(it, dateKey);
-                  const isTaskItem = isTask(it);
-                  const isEditing = editing?.id === it.id;
-                  const timeLabel = formatTimeLabel(it.scheduledTime);
-                  const contentPreview = (it.content ?? "").trim();
+                  {!hasItems ? (
+                    <p className="bd-timeline-day-empty">{t("today.dayEmpty")}</p>
+                  ) : (
+                    <div className="bd-timeline-cards">
+                      {dayItems.map((it) => {
+                        const taskRec = parseTaskRecurrence(it.recurrence);
+                        const done = isDoneOnDate(it, dateKey);
+                        const isTaskItem = isTask(it);
+                        const isEditing = editing?.id === it.id;
+                        const timeLabel = formatTimeLabel(it.scheduledTime);
+                        const contentPreview = (it.content ?? "").trim();
 
-                  return (
-                    <SwipeDeleteRow
-                      key={`${dateKey}-${it.id}`}
-                      entryId={it.id}
-                      swipeOpenId={swipeOpenId}
-                      setSwipeOpenId={setSwipeOpenId}
-                      onDelete={() => handleDelete(it.id)}
-                      disabled={isEditing}
-                      slideSurface="canvas"
-                    >
-                      <div
-                        className="bd-timeline-row bd-timeline-row--event"
-                        data-bd-mobile-entry={isMobile ? "1" : undefined}
-                        onDoubleClick={() => goToWorkspace(it)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div className="bd-timeline-spine" aria-hidden>
-                          <span className="bd-timeline-node" />
-                        </div>
-                        <div className="bd-timeline-event-content">
-                          {timeLabel ? (
-                            <div className="bd-timeline-event-time">{timeLabel}</div>
-                          ) : null}
-                          <div className="bd-timeline-event-head">
-                            {isTaskItem ? (
-                              <label
-                                className="bd-todo-checkbox-wrap bd-timeline-event-check"
-                                data-bd-no-swipe
-                                onClick={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="bd-todo-checkbox"
-                                  data-bd-no-swipe
-                                  checked={done}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleTaskComplete(it.id, e.target.checked, dateKey);
-                                  }}
-                                  aria-label={done ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
-                                />
-                              </label>
-                            ) : (
-                              <span className="bd-timeline-event-type">
-                                <EntryTypeIcon type={it.itemType || "note"} size={18} />
-                              </span>
-                            )}
+                        return (
+                          <SwipeDeleteRow
+                            key={`${dateKey}-${it.id}`}
+                            entryId={it.id}
+                            swipeOpenId={swipeOpenId}
+                            setSwipeOpenId={setSwipeOpenId}
+                            onDelete={() => handleDelete(it.id)}
+                            disabled={isEditing}
+                            slideSurface="canvas"
+                          >
+                            <div
+                              className="bd-timeline-card"
+                              data-bd-mobile-entry={isMobile ? "1" : undefined}
+                              onDoubleClick={() => goToWorkspace(it)}
+                            >
+                              {timeLabel ? (
+                                <div className="bd-timeline-event-time">{timeLabel}</div>
+                              ) : null}
+                              <div className="bd-timeline-card-body">
+                                <div className="bd-timeline-event-head">
+                                  {isTaskItem ? (
+                                    <label
+                                      className="bd-todo-checkbox-wrap bd-timeline-event-check"
+                                      data-bd-no-swipe
+                                      onClick={(e) => e.stopPropagation()}
+                                      onPointerDown={(e) => e.stopPropagation()}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="bd-todo-checkbox"
+                                        data-bd-no-swipe
+                                        checked={done}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          handleTaskComplete(it.id, e.target.checked, dateKey);
+                                        }}
+                                        aria-label={done ? t("items.taskToggleOpen") : t("items.taskToggleDone")}
+                                      />
+                                    </label>
+                                  ) : (
+                                    <span className="bd-timeline-event-type">
+                                      <EntryTypeIcon type={it.itemType || "note"} size={18} />
+                                    </span>
+                                  )}
 
-                            {isEditing ? (
-                              <input
-                                ref={inputRef}
-                                type="text"
-                                data-bd-no-swipe
-                                className="bd-timeline-event-edit"
-                                value={editing!.value}
-                                onChange={(e) =>
-                                  setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))
-                                }
-                                onBlur={() => commitEdit(it.id, editing!.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape") setEditing(null);
-                                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                                }}
-                                onDoubleClick={(e) => e.stopPropagation()}
-                                aria-label={t("menu.edit")}
-                              />
-                            ) : (
-                              <div
-                                className={`bd-timeline-event-title${done ? " bd-timeline-event-title--done" : ""}`}
-                                onClick={
-                                  !isMobile
-                                    ? () => setEditing({ id: it.id, value: it.title ?? "" })
-                                    : undefined
-                                }
-                                {...(isMobile
-                                  ? bindMobileField(
-                                      it as unknown as ViewItem,
-                                      () => setEditing({ id: it.id, value: it.title ?? "" }),
-                                      () => goToWorkspace(it)
-                                    )
-                                  : {})}
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation();
-                                  goToWorkspace(it);
-                                }}
-                              >
-                                {it.title?.trim() || "—"}
+                                  {isEditing ? (
+                                    <input
+                                      ref={inputRef}
+                                      type="text"
+                                      data-bd-no-swipe
+                                      className="bd-timeline-event-edit"
+                                      value={editing!.value}
+                                      onChange={(e) =>
+                                        setEditing((prev) => (prev ? { ...prev, value: e.target.value } : null))
+                                      }
+                                      onBlur={() => commitEdit(it.id, editing!.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Escape") setEditing(null);
+                                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                      }}
+                                      onDoubleClick={(e) => e.stopPropagation()}
+                                      aria-label={t("menu.edit")}
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`bd-timeline-event-title${done ? " bd-timeline-event-title--done" : ""}`}
+                                      onClick={
+                                        !isMobile
+                                          ? () => setEditing({ id: it.id, value: it.title ?? "" })
+                                          : undefined
+                                      }
+                                      {...(isMobile
+                                        ? bindMobileField(
+                                            it as unknown as ViewItem,
+                                            () => setEditing({ id: it.id, value: it.title ?? "" }),
+                                            () => goToWorkspace(it)
+                                          )
+                                        : {})}
+                                      onDoubleClick={(e) => {
+                                        e.stopPropagation();
+                                        goToWorkspace(it);
+                                      }}
+                                    >
+                                      {it.title?.trim() || "—"}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {contentPreview ? (
+                                  <p className="bd-timeline-event-desc">{contentPreview}</p>
+                                ) : null}
+
+                                <div className="bd-timeline-card-footer">
+                                  <span
+                                    className={`bd-timeline-tag bd-timeline-tag--${it.domain === "work" ? "work" : "personal"}`}
+                                  >
+                                    {domainLabel(it.domain)}
+                                  </span>
+                                  {isTaskItem && taskRec.isRecurring && (
+                                    <div className="bd-task-recur-badge">
+                                      <RefreshCw size={11} strokeWidth={2.5} aria-hidden />
+                                      {taskRec.pattern === "daily"
+                                        ? t("items.taskRepeatEveryDay")
+                                        : taskRec.days.length > 0
+                                          ? taskRec.days.map((d) => t(`habitReminder.dayShort.${["", "mon","tue","wed","thu","fri","sat","sun"][d]}`)).join(" · ")
+                                          : t("items.taskRepeatBadge")}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {it.project?.name || it.category ? (
+                                  <div className="bd-timeline-event-meta">
+                                    {it.project?.name ? <span>{it.project.name}</span> : null}
+                                    {it.project?.name && it.category ? <span aria-hidden>·</span> : null}
+                                    {it.category ? <span>{formatAreaLabel(it.category)}</span> : null}
+                                  </div>
+                                ) : null}
                               </div>
-                            )}
-                          </div>
-
-                          {contentPreview ? (
-                            <p className="bd-timeline-event-desc">{contentPreview}</p>
-                          ) : null}
-
-                          {isTaskItem && taskRec.isRecurring && (
-                            <div className="bd-task-recur-badge">
-                              <RefreshCw size={11} strokeWidth={2.5} aria-hidden />
-                              {taskRec.pattern === "daily"
-                                ? t("items.taskRepeatEveryDay")
-                                : taskRec.days.length > 0
-                                  ? taskRec.days.map((d) => t(`habitReminder.dayShort.${["", "mon","tue","wed","thu","fri","sat","sun"][d]}`)).join(" · ")
-                                  : t("items.taskRepeatBadge")}
                             </div>
-                          )}
-
-                          <div className="bd-timeline-event-meta">
-                            <span>{domainLabel(it.domain)}</span>
-                            {it.project?.name ? (
-                              <>
-                                <span aria-hidden>·</span>
-                                <span>{it.project.name}</span>
-                              </>
-                            ) : null}
-                            {it.category ? (
-                              <>
-                                <span aria-hidden>·</span>
-                                <span>{formatAreaLabel(it.category)}</span>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </SwipeDeleteRow>
-                  );
-                })
-              )}
+                          </SwipeDeleteRow>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </section>
           );
         })

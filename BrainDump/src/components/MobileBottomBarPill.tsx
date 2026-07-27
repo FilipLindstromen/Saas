@@ -24,6 +24,8 @@ export type MobileBottomBarPillProps = {
   viewType: ItemsViewType;
   todayViewActive: boolean;
   inboxActive: boolean;
+  /** No entries anywhere in the account yet — hide the view-switcher buttons and show only the record button. */
+  hasAnyEntries: boolean;
   dumpRecordingActive: boolean;
   centerPanelRef: RefObject<BrainDumpCenterHandle | null>;
   /** List view empty — show hint above the dump mic. */
@@ -48,6 +50,7 @@ export function MobileBottomBarPill({
   viewType,
   todayViewActive,
   inboxActive,
+  hasAnyEntries,
   dumpRecordingActive,
   centerPanelRef,
   showDumpEmptyHint = false,
@@ -116,67 +119,77 @@ export function MobileBottomBarPill({
   }, [measureHighlight]);
 
   return (
-    <nav ref={pillRef} className="bd-bottom-bar-pill" aria-label={t("items.chooseView")}>
-      <div
-        className="bd-bottom-bar-pill-highlight"
-        aria-hidden
-        style={{
-          left: highlight.left,
-          top: highlight.top,
-          width: highlight.width,
-          height: highlight.height,
-          opacity: highlight.visible ? 1 : 0,
-        }}
-      />
-      <button
-        ref={todayRef}
-        type="button"
-        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onTodayClick}
-        title={t("today.title")}
-        aria-label={t("bottom.todayNav")}
-        aria-pressed={todayViewActive}
-      >
-        <Sun
-          className="bd-bottom-bar-pill-icon"
-          size={24}
-          strokeWidth={2}
-          aria-hidden="true"
+    <nav
+      ref={pillRef}
+      className={`bd-bottom-bar-pill${hasAnyEntries ? "" : " bd-bottom-bar-pill--mic-only"}`}
+      aria-label={t("items.chooseView")}
+    >
+      {hasAnyEntries ? (
+        <div
+          className="bd-bottom-bar-pill-highlight"
+          aria-hidden
+          style={{
+            left: highlight.left,
+            top: highlight.top,
+            width: highlight.width,
+            height: highlight.height,
+            opacity: highlight.visible ? 1 : 0,
+          }}
         />
-      </button>
-      <button
-        ref={calendarRef}
-        type="button"
-        className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive && !inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectCalendar}
-        title={t("items.viewCalendar")}
-        aria-label={t("items.viewCalendar")}
-        aria-current={viewType === "calendar" && !todayViewActive && !inboxActive ? "page" : undefined}
-      >
-        <span
-          className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar"
-          style={{ position: "relative", display: "inline-flex" }}
-          aria-hidden="true"
+      ) : null}
+      {hasAnyEntries ? (
+        <button
+          ref={todayRef}
+          type="button"
+          className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--today${todayViewActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+          onClick={onTodayClick}
+          title={t("today.title")}
+          aria-label={t("bottom.todayNav")}
+          aria-pressed={todayViewActive}
         >
-          <Calendar size={24} strokeWidth={2} />
+          <Sun
+            className="bd-bottom-bar-pill-icon"
+            size={24}
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+        </button>
+      ) : null}
+      {hasAnyEntries ? (
+        <button
+          ref={calendarRef}
+          type="button"
+          className={`bd-bottom-bar-pill-item${viewType === "calendar" && !todayViewActive && !inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+          onClick={onSelectCalendar}
+          title={t("items.viewCalendar")}
+          aria-label={t("items.viewCalendar")}
+          aria-current={viewType === "calendar" && !todayViewActive && !inboxActive ? "page" : undefined}
+        >
           <span
-            className="bd-bottom-bar-cal-day"
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "66%",
-              transform: "translate(-50%, -50%)",
-              fontSize: "9px",
-              fontWeight: 600,
-              lineHeight: 1,
-              color: "currentColor",
-              pointerEvents: "none",
-            }}
+            className="bd-bottom-bar-pill-icon bd-bottom-bar-pill-icon--calendar"
+            style={{ position: "relative", display: "inline-flex" }}
+            aria-hidden="true"
           >
-            {new Date().getDate()}
+            <Calendar size={24} strokeWidth={2} />
+            <span
+              className="bd-bottom-bar-cal-day"
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "66%",
+                transform: "translate(-50%, -50%)",
+                fontSize: "9px",
+                fontWeight: 600,
+                lineHeight: 1,
+                color: "currentColor",
+                pointerEvents: "none",
+              }}
+            >
+              {new Date().getDate()}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+      ) : null}
       <div className="bd-bottom-bar-pill-mic-wrap">
         {showDumpEmptyHint ? (
           <div className="bd-bottom-bar-capture-stack">
@@ -204,35 +217,39 @@ export function MobileBottomBarPill({
           )}
         </button>
       </div>
-      <button
-        ref={listRef}
-        type="button"
-        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive && !inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectList}
-        title={t("items.viewList")}
-        aria-label={t("items.viewList")}
-        aria-current={viewType === "list" && !todayViewActive && !inboxActive ? "page" : undefined}
-      >
-        <CheckSquare className="bd-bottom-bar-pill-icon" size={24} strokeWidth={2} aria-hidden="true" />
-      </button>
-      <button
-        ref={inboxRef}
-        type="button"
-        className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--inbox${inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
-        onClick={onSelectInbox}
-        title={t("bottom.inboxNav")}
-        aria-label={t("bottom.inboxNav")}
-        aria-current={inboxActive ? "page" : undefined}
-      >
-        <span className="bd-bottom-bar-pill-icon-wrap">
-          <Inbox className="bd-bottom-bar-pill-icon" size={24} strokeWidth={2} aria-hidden="true" />
-          {newInboxCount > 0 ? (
-            <span className="bd-bottom-bar-inbox-badge" aria-hidden>
-              {newInboxCount > 9 ? "9+" : newInboxCount}
-            </span>
-          ) : null}
-        </span>
-      </button>
+      {hasAnyEntries ? (
+        <button
+          ref={listRef}
+          type="button"
+          className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--tasks${viewType === "list" && !todayViewActive && !inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+          onClick={onSelectList}
+          title={t("items.viewList")}
+          aria-label={t("items.viewList")}
+          aria-current={viewType === "list" && !todayViewActive && !inboxActive ? "page" : undefined}
+        >
+          <CheckSquare className="bd-bottom-bar-pill-icon" size={24} strokeWidth={2} aria-hidden="true" />
+        </button>
+      ) : null}
+      {hasAnyEntries ? (
+        <button
+          ref={inboxRef}
+          type="button"
+          className={`bd-bottom-bar-pill-item bd-bottom-bar-pill-item--inbox${inboxActive ? " bd-bottom-bar-pill-item--active" : ""}`}
+          onClick={onSelectInbox}
+          title={t("bottom.inboxNav")}
+          aria-label={t("bottom.inboxNav")}
+          aria-current={inboxActive ? "page" : undefined}
+        >
+          <span className="bd-bottom-bar-pill-icon-wrap">
+            <Inbox className="bd-bottom-bar-pill-icon" size={24} strokeWidth={2} aria-hidden="true" />
+            {newInboxCount > 0 ? (
+              <span className="bd-bottom-bar-inbox-badge" aria-hidden>
+                {newInboxCount > 9 ? "9+" : newInboxCount}
+              </span>
+            ) : null}
+          </span>
+        </button>
+      ) : null}
     </nav>
   );
 }

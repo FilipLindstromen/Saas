@@ -69,6 +69,7 @@ export default function BrainDumpPage() {
   const [projectNames, setProjectNames] = useState<string[]>([]);
   const [viewType, setViewType] = useState<ItemsViewType>(loadViewPreference);
   const [hasUncategorizedEntries, setHasUncategorizedEntries] = useState(false);
+  const [hasAnyEntries, setHasAnyEntries] = useState(true);
   const [dumpRecordingActive, setDumpRecordingActive] = useState(false);
   const [dumpEmptyHintActive, setDumpEmptyHintActive] = useState(false);
   const [authProviders, setAuthProviders] = useState<Awaited<ReturnType<typeof getProviders>>>(null);
@@ -226,15 +227,31 @@ export default function BrainDumpPage() {
     }
   }, [status]);
 
-  useEffect(() => {
-    void refreshUncategorizedAvailability();
-  }, [refreshUncategorizedAvailability]);
+  const refreshHasAnyEntries = useCallback(async () => {
+    if (status !== "authenticated") return;
+    try {
+      const r = await fetch("/api/organized-items?countOnly=true");
+      const d = (await r.json()) as { count?: number };
+      if (!r.ok) return;
+      setHasAnyEntries((d.count ?? 0) > 0);
+    } catch {
+      setHasAnyEntries(true);
+    }
+  }, [status]);
 
   useEffect(() => {
-    const onReload = () => void refreshUncategorizedAvailability();
+    void refreshUncategorizedAvailability();
+    void refreshHasAnyEntries();
+  }, [refreshUncategorizedAvailability, refreshHasAnyEntries]);
+
+  useEffect(() => {
+    const onReload = () => {
+      void refreshUncategorizedAvailability();
+      void refreshHasAnyEntries();
+    };
     window.addEventListener("braindump-reload-items", onReload);
     return () => window.removeEventListener("braindump-reload-items", onReload);
-  }, [refreshUncategorizedAvailability]);
+  }, [refreshUncategorizedAvailability, refreshHasAnyEntries]);
 
   useEffect(() => {
     if (!hasUncategorizedEntries && mode === "inbox") {
@@ -684,6 +701,7 @@ export default function BrainDumpPage() {
             viewType={viewType}
             todayViewActive={todayViewActive}
             inboxActive={inboxViewActive}
+            hasAnyEntries={hasAnyEntries}
             dumpRecordingActive={dumpRecordingActive}
             centerPanelRef={centerPanelRef}
             showDumpEmptyHint={dumpEmptyHintActive}
