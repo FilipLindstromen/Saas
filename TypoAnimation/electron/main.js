@@ -1,28 +1,30 @@
-// Electron main process: starts the Next.js production server in-process (no child_process
-// needed — Electron's main process is itself a Node.js runtime with this project's
-// node_modules on its module path) and opens a native window pointed at it. Desktop-shell
-// wrapper only; the app itself is unchanged — this just removes the "open a terminal, run
-// npm run dev, open a browser tab" steps for local, single-user use.
+// Electron main process — a thin launcher only. It does NOT ship a copy of the app: it starts
+// the Next.js production server directly out of the live TypoAnimation project folder on this
+// PC, so a code change just needs `npm run build` in that folder — no re-packaging this exe —
+// to show up next time it's launched. That's also why packaging this (see package.json's
+// "package:win" script) only tars up this small `electron/` folder rather than the whole
+// project: the .next build output and node_modules are read live from PROJECT_DIR below, not
+// copied into the packaged app.
 const path = require('path');
 const http = require('http');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 
 const PORT = 3210;
-const PROJECT_DIR = path.join(__dirname, '..');
 
-// Every API route (upload/transcribe/render/projects) resolves its data/uploads/renders
-// paths off `process.cwd()`, which is correct when launched via `npm run dev`/`next start`
-// (cwd is naturally the project root) but is NOT guaranteed once packaged — Windows launches
-// a double-clicked .exe with cwd set to the .exe's own folder, not the app's resources
-// directory where this project (and its node_modules) actually live. Fix cwd once, up front,
-// before anything reads it.
+// Hardcoded to this machine's project location (this is a "just for me" launcher, not a
+// redistributable installer). If the project folder ever moves, update this one line.
+const PROJECT_DIR = 'C:\\Users\\Filip Lindström\\Documents\\GitProjects\\Saas\\TypoAnimation';
+
 process.chdir(PROJECT_DIR);
 
 let mainWindow;
 let httpServer;
 
 async function startNextServer() {
-  const next = require('next');
+  // Resolve `next` from the live project's own node_modules explicitly — this file doesn't
+  // live next to that node_modules (it's packaged separately), so a bare require('next')
+  // would fail to find it via normal upward node_modules resolution.
+  const next = require(path.join(PROJECT_DIR, 'node_modules', 'next'));
   const nextApp = next({ dev: false, dir: PROJECT_DIR });
   const handle = nextApp.getRequestHandler();
   await nextApp.prepare();
@@ -54,6 +56,10 @@ app.whenReady().then(async () => {
     createWindow();
   } catch (err) {
     console.error('Failed to start TypoAnimation server:', err);
+    dialog.showErrorBox(
+      'TypoAnimation failed to start',
+      `${err && err.message ? err.message : err}\n\nMake sure "npm run build" has been run in:\n${PROJECT_DIR}`
+    );
     app.quit();
   }
 

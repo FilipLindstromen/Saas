@@ -10,7 +10,7 @@
     "lint": "eslint",
     "electron": "electron .",
     "desktop": "next build && electron .",
-    "package:win": "next build && electron-packager . TypoAnimation --platform=win32 --arch=x64 --out=. --overwrite --no-prune --ignore=\"^/TypoAnimation-win32-x64\" --ignore=\"^/public/uploads\" --ignore=\"^/public/renders\" --ignore=\"^/\\.git\""
+    "package:win": "electron-packager electron TypoAnimation --platform=win32 --arch=x64 --out=. --overwrite --no-asar"
   },
   "dependencies": {
     "@remotion/captions": "^4.0.499",

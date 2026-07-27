@@ -10,7 +10,13 @@ import { SceneStylePanel } from '@/components/SceneStylePanel';
 import { ThemePanel } from '@/components/ThemePanel';
 import { VideoSyncPanel } from '@/components/VideoSyncPanel';
 import { ExportPanel } from '@/components/ExportPanel';
+import { listLocalProjects, loadLocalProject, saveLocalProject } from '@/lib/localProjectStore';
 import type { ProjectSummary } from '@/lib/projectStore';
+
+// Set at build time by scripts/static-build.mjs for the GitHub Pages build: no server exists
+// there, so upload/transcribe/render/b-roll (which all need one) are hidden, and project
+// save/load falls back to the browser's own localStorage instead of the /api/projects route.
+const IS_STATIC = process.env.NEXT_PUBLIC_STATIC_EXPORT === 'true';
 
 const SAMPLE_SCRIPT = `### Hook
 ^ Anxiety — Part One
@@ -38,6 +44,10 @@ export default function Home() {
   const [brollBusy, setBrollBusy] = useState(false);
 
   const refreshProjectList = () => {
+    if (IS_STATIC) {
+      setSavedProjects(listLocalProjects());
+      return;
+    }
     fetch('/api/projects')
       .then((r) => r.json())
       .then(setSavedProjects)
