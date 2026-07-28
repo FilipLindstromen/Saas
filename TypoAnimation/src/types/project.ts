@@ -78,6 +78,9 @@ export interface VideoAsset {
   trimStartMs?: number;
 }
 
+/** work-area / export shape: 1080x1080, 1920x1080 (landscape), or 1080x1920 (portrait) */
+export type AspectRatio = '1:1' | '16:9' | '9:16';
+
 export interface Project {
   id: string;
   name: string;
@@ -85,6 +88,8 @@ export interface Project {
   label?: string;
   showCaptions?: boolean;
   showTimecode?: boolean;
+  /** defaults to '1:1' (1080x1080) when unset, for backward compatibility with older projects */
+  aspectRatio?: AspectRatio;
   theme: ProjectTheme;
   scenes: Scene[];
   video?: VideoAsset;

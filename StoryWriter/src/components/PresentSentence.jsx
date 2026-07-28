@@ -18,17 +18,19 @@ export default function PresentSentence({ text, animation, phase = 'enter', rule
   if (animation === 'fade-words' && phase !== 'exit') {
     const stagger = rules?.wordStaggerMs ?? 70;
     return (
-      <div className={className} style={style} aria-live="polite">
-        {words.map((word, i) => (
-          <span
-            key={`${word}-${i}`}
-            className={`present-view__word${phase === 'idle' ? ' present-view__word--visible' : ''}`}
-            style={phase === 'enter' ? { animationDelay: `${i * stagger}ms` } : undefined}
-          >
-            {word}
-            {i < words.length - 1 ? '\u00A0' : ''}
-          </span>
-        ))}
+      <div className={`${className} present-view__sentence--fade-words`} style={style} aria-live="polite">
+        <span className="present-view__word-line">
+          {words.map((word, i) => (
+            <span
+              key={`${word}-${i}`}
+              className={`present-view__word${phase === 'idle' ? ' present-view__word--visible' : ''}`}
+              style={phase === 'enter' ? { animationDelay: `${i * stagger}ms` } : undefined}
+            >
+              {word}
+              {i < words.length - 1 ? ' ' : ''}
+            </span>
+          ))}
+        </span>
       </div>
     );
   }

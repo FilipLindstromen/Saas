@@ -3,13 +3,15 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { MainComposition, computeTotalDurationInFrames, sceneStartFrame } from '@/remotion/Composition';
-import { FPS, WIDTH, HEIGHT } from '@/remotion/constants';
+import { FPS, getCompositionSize } from '@/remotion/constants';
 import type { Project } from '@/types/project';
 
 export function PreviewPlayer({ project, selectedSceneId }: { project: Project; selectedSceneId?: string | null }) {
   const playerRef = useRef<PlayerRef>(null);
   const projectRef = useRef(project);
   projectRef.current = project;
+
+  const { width, height } = getCompositionSize(project.aspectRatio);
 
   const durationInFrames = useMemo(
     () => computeTotalDurationInFrames(project, FPS),
@@ -34,10 +36,10 @@ export function PreviewPlayer({ project, selectedSceneId }: { project: Project; 
       component={MainComposition}
       inputProps={{ project }}
       durationInFrames={durationInFrames}
-      compositionWidth={WIDTH}
-      compositionHeight={HEIGHT}
+      compositionWidth={width}
+      compositionHeight={height}
       fps={FPS}
-      style={{ width: '100%', aspectRatio: '1 / 1' }}
+      style={{ width: '100%', aspectRatio: `${width} / ${height}` }}
       controls
       loop
       clickToPlay

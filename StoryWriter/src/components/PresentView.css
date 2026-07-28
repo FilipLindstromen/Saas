@@ -82,15 +82,41 @@
   text-align: center;
 }
 
+/* Word-by-word: use normal text flow so line breaks match final layout from frame one */
+.present-view__sentence--fade-words.present-view__sentence--enter,
+.present-view__sentence--fade-words.present-view__sentence--idle,
+.present-view__sentence--fade-words-exit.present-view__sentence--exit {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 0;
+  height: auto;
+  transform: translateY(-50%);
+  text-align: center;
+}
+
+.present-view__word-line {
+  display: inline;
+  text-align: center;
+  line-height: inherit;
+}
+
 .present-view__sentence--idle {
   position: relative;
   text-align: center;
 }
 
+.present-view__sentence--fade-words.present-view__sentence--idle {
+  position: absolute;
+  transform: translateY(-50%);
+}
+
 .present-view__word {
-  display: inline-block;
+  display: inline;
   opacity: 0;
-  transform: translateY(8px);
   animation: present-word-fade-in 0.42s ease-out forwards;
 }
 
@@ -167,11 +193,9 @@
 @keyframes present-word-fade-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

@@ -308,7 +308,10 @@ export default function Home() {
           </div>
 
           <div className="flex items-start justify-center">
-            <div className="w-full max-w-[640px]">
+            <div
+              className="w-full"
+              style={{ maxWidth: project.aspectRatio === '16:9' ? 900 : project.aspectRatio === '9:16' ? 360 : 640 }}
+            >
               <PreviewPlayer project={project} selectedSceneId={selectedSceneId} />
             </div>
           </div>

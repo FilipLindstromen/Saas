@@ -1,9 +1,15 @@
 'use client';
 
 import React from 'react';
-import type { Project, ProjectTheme } from '@/types/project';
+import type { AspectRatio, Project, ProjectTheme } from '@/types/project';
 import { COLOR_PRESETS } from '@/lib/colors';
 import { FONT_PAIRING_OPTIONS } from '@/lib/fontPairings';
+
+const ASPECT_RATIO_OPTIONS: { value: AspectRatio; sub: string }[] = [
+  { value: '1:1', sub: '1080×1080' },
+  { value: '16:9', sub: '1920×1080' },
+  { value: '9:16', sub: '1080×1920' },
+];
 
 export function ThemePanel({
   project,
@@ -86,6 +92,30 @@ export function ThemePanel({
           ))}
         </select>
       </label>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-white/65">Work area / export size</span>
+        <div className="flex gap-1.5">
+          {ASPECT_RATIO_OPTIONS.map((o) => {
+            const active = (project.aspectRatio || '1:1') === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => onChange({ aspectRatio: o.value })}
+                className={`flex-1 rounded-xl border px-2 py-1.5 text-center text-xs font-semibold transition-colors ${
+                  active
+                    ? 'border-transparent bg-gradient-to-br from-[#ff6b35] to-[#ff4757] text-white'
+                    : 'border-white/10 text-white/65 hover:border-white/20'
+                }`}
+              >
+                {o.value}
+                <div className="text-[0.65rem] font-normal opacity-75">{o.sub}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
         Scene transition
