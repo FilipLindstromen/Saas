@@ -6,25 +6,27 @@ export interface ParsedBlock {
   lines: { text: string; accent?: boolean }[];
 }
 
-// Parses the "### SceneName / ^ kicker / > accent line" copy-script format — based on the
-// reference prototype's `parseCopyScript`, with one fix: the reference's single combined
-// regex (`^###\s*(.+?)\s*\n?([\s\S]*)$`) has a latent bug where the lazy `(.+?)` capture
-// collapses to just the first character of the name (e.g. "Hook" -> "H", with "ook" leaking
-// into the first line) because the unconditionally-satisfiable `[\s\S]*$` tail lets the lazy
-// quantifier succeed at length 1. Splitting the header line out explicitly avoids that.
+// Parses the "### SceneName / ^ kicker / > accent line" copy-script format. Scene boundaries
+// are blank lines (a paragraph = a scene): a single line break adds a line to the current
+// scene, a blank line starts a new one. The "### Name" header is optional per-paragraph —
+// when present it names the scene and is stripped from the body; when absent the scene is
+// auto-named. This means pasted text never needs "### " headers to split into scenes, only
+// blank lines between them.
 export function parseStructuredScript(text: string): ParsedBlock[] {
   if (!text) return [];
-  const blocks = String(text).split(/\n(?=###\s)/);
+  const blocks = String(text)
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean);
   const out: ParsedBlock[] = [];
   for (const block of blocks) {
     const blockLines = block.split('\n');
     const headerMatch = blockLines[0].match(/^###\s*(.+?)\s*$/);
-    if (!headerMatch) continue;
-    const name = headerMatch[1].trim();
-    if (!name) continue;
+    const bodyLines = headerMatch ? blockLines.slice(1) : blockLines;
+    const name = (headerMatch && headerMatch[1].trim()) || `Scene ${out.length + 1}`;
     let kicker: string | null = null;
     const lines: { text: string; accent?: boolean }[] = [];
-    for (const raw of blockLines.slice(1)) {
+    for (const raw of bodyLines) {
       const l = raw.trim();
       if (!l) continue;
       if (l.startsWith('^ ')) kicker = l.slice(2).trim();
@@ -57,31 +59,12 @@ function toScene(name: string, kicker: string | null | undefined, lines: { text:
   });
 }
 
-// Freeform-paste fallback: no "### " headers present, so split on blank lines (paragraph
-// boundaries) into one scene per paragraph, one Line per non-empty source line within it.
-function parseFreeform(text: string): Scene[] {
-  const paragraphs = text
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  return paragraphs.map((para, i) => {
-    const lines = para
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => ({ text: l }));
-    return toScene(`Scene ${i + 1}`, null, lines);
-  });
-}
-
-// Entry point for the "paste your script" box: tries the structured "### Name" format
-// first, falls back to auto-splitting freeform pasted text by paragraph.
+// Entry point for the "paste your script" box: blank lines split scenes, "### Name" headers
+// are an optional way to name a scene explicitly, "^ " marks a kicker line, "> " marks an
+// accent line, and everything else is a plain line.
 export function parseScript(text: string): Scene[] {
   if (!text || !text.trim()) return [];
-  if (/(^|\n)###\s/.test(text)) {
-    return parseStructuredScript(text).map((b) => toScene(b.name, b.kicker, b.lines));
-  }
-  return parseFreeform(text);
+  return parseStructuredScript(text).map((b) => toScene(b.name, b.kicker, b.lines));
 }
 
 // Serializes scenes back into the "### Name / ^ kicker / > accent" editable script format,

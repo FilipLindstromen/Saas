@@ -93,7 +93,7 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
             inset: 0,
             zIndex: "var(--bd-z-modal)" as never,
             background: isGo
-              ? "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%)"
+              ? "linear-gradient(165deg, #ff9e7f 0%, #ff5a36 45%, #e14a26 100%)"
               : "linear-gradient(160deg, #0c0c10 0%, #111116 100%)",
             display: "flex",
             alignItems: "center",
@@ -199,7 +199,7 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
           {/* Header: gradient banner with dice icon */}
           <div
             style={{
-              background: "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 50%, #d64d22 100%)",
+              background: "linear-gradient(165deg, #ff9e7f 0%, #ff5a36 50%, #e14a26 100%)",
               padding: "1.25rem 1.5rem 1rem",
               display: "flex",
               alignItems: "flex-start",
@@ -334,22 +334,22 @@ export function LuckyTaskOverlay({ isOpen, task, onClose }: LuckyTaskOverlayProp
                 fontWeight: 700,
                 fontSize: "0.9375rem",
                 padding: "0.625rem 1.5rem",
-                background: "linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%)",
+                background: "linear-gradient(165deg, #ff9e7f 0%, #ff5a36 45%, #e14a26 100%)",
                 color: "#fff",
                 border: "none",
                 borderRadius: "999px",
                 cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(232,93,45,0.35)",
+                boxShadow: "0 4px 14px rgba(255,90,54,0.35)",
                 transition: "filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease",
                 letterSpacing: "0.01em",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.filter = "brightness(1.08)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(232,93,45,0.5)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(255,90,54,0.5)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.filter = "";
-                e.currentTarget.style.boxShadow = "0 4px 14px rgba(232,93,45,0.35)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(255,90,54,0.35)";
               }}
               onMouseDown={(e) => {
                 e.currentTarget.style.transform = "scale(0.97)";

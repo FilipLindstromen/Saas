@@ -364,7 +364,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       if (cancelled.current || !canvasRef.current) return;
       animationRef.current = requestAnimationFrame(runVisualizer);
       const bg = cssColor("--bg-tertiary", "#181f2a");
-      const accent = cssColor("--accent", "#e85d2d");
+      const accent = cssColor("--bd-brand-accent", "#ff5a36");
       const grid = cssColor("--border-default", "rgba(128,128,128,0.25)");
 
       ctx.fillStyle = bg;
@@ -737,7 +737,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
           setSaveLoading(false);
         }
         setOrganizeSuccess(null);
-        if (isMobile && n > 0) {
+        if (n > 0) {
           setCaptureSuccessItems(items);
           return;
         }
@@ -751,7 +751,7 @@ export const CenterPanel = forwardRef<BrainDumpCenterHandle, CenterPanelProps>(f
       setOrganizeSuccess(n ? t("center.organizedReview", { n }) : null);
       if (n) setTimeout(() => setOrganizeSuccess(null), 5000);
     },
-    [onAutoSave, onOrganized, onDumpFinished, onDumpSaved, mode, t, isMobile]
+    [onAutoSave, onOrganized, onDumpFinished, onDumpSaved, mode, t]
   );
 
   const finishCaptureSuccess = useCallback(

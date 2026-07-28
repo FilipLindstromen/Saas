@@ -35,7 +35,7 @@ const LOAD_MORE_DAYS = 14;
 const SCROLL_LOAD_THRESHOLD = 280;
 const RAIL_OPACITY_ACTIVE = 0.75;
 const RAIL_OPACITY_EMPTY = 0.22;
-const RAIL_ACCENT_RGB = "232, 93, 45";
+const RAIL_ACCENT_RGB = "255, 90, 54";
 
 export type TodayItemRow = {
   id: string;

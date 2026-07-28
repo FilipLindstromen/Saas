@@ -41,30 +41,30 @@
   --bd-overlay-sheet: rgba(8, 12, 20, 0.62);
   --bd-overlay-processing: rgba(4, 8, 14, 0.8);
   /* Semantic status */
-  --bd-danger: #ff7a88;
+  --bd-danger: #ff453a;
   --bd-danger-bg: color-mix(in srgb, var(--bd-danger) 14%, transparent);
   --bd-danger-border: color-mix(in srgb, var(--bd-danger) 32%, transparent);
   --bd-danger-text: #ffb0b8;
   --text-danger: var(--bd-danger-text);
-  --bd-success: #4ade80;
+  --bd-success: #34c759;
   --bd-success-bg: color-mix(in srgb, var(--bd-success) 11%, transparent);
   --bd-success-border: color-mix(in srgb, var(--bd-success) 26%, transparent);
   --bd-success-text: #c8f7d4;
   /* Regions — “what belongs where” */
   --bd-surface-scope: color-mix(in srgb, #fff 5%, var(--bg-primary));
   --bd-chrome-edge: rgba(255, 255, 255, 0.09);
-  /* Mobile bottom dump mic — warm red-orange */
-  --bd-dump-mic-bg: linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%);
+  /* Mobile bottom dump mic — warm coral-orange */
+  --bd-dump-mic-bg: linear-gradient(165deg, #ff9e7f 0%, #ff5a36 45%, #e14a26 100%);
   --bd-dump-mic-fg: #ffffff;
-  --bd-dump-mic-border: color-mix(in srgb, #ffffff 28%, #c2410c);
-  --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.38);
-  /* Brand orange — canonical token; reused anywhere an "on"/active accent is needed */
-  --bd-brand-accent: #e85d2d;
-  --bd-brand-accent-rgb: 232, 93, 45;
+  --bd-dump-mic-border: color-mix(in srgb, #ffffff 28%, #e14a26);
+  --bd-dump-mic-shadow: 0 6px 22px rgba(255, 90, 54, 0.38);
+  /* Brand coral-orange — canonical token; reused anywhere an "on"/active accent is needed */
+  --bd-brand-accent: #ff5a36;
+  --bd-brand-accent-rgb: 255, 90, 54;
   /* Today timeline — same brand orange as the dump mic */
   --bd-timeline-accent: var(--bd-brand-accent);
   --bd-timeline-accent-rgb: var(--bd-brand-accent-rgb);
-  --bd-timeline-time-color: color-mix(in srgb, #e85d2d 62%, #ffffff 38%);
+  --bd-timeline-time-color: color-mix(in srgb, #ff5a36 62%, #ffffff 38%);
   --bd-timeline-card-bg: var(--bg-elevated);
   /* Domain tags — iOS systemBlue/systemPurple, same in both themes */
   --bd-domain-work: #0a84ff;
@@ -118,26 +118,26 @@
   --bd-overlay-modal: rgba(15, 23, 42, 0.5);
   --bd-overlay-sheet: rgba(15, 23, 42, 0.38);
   --bd-overlay-processing: rgba(15, 23, 42, 0.52);
-  --bd-danger: #dc2626;
+  --bd-danger: #ff3b30;
   --bd-danger-bg: color-mix(in srgb, var(--bd-danger) 10%, transparent);
   --bd-danger-border: color-mix(in srgb, var(--bd-danger) 28%, transparent);
   --bd-danger-text: #b91c1c;
   --text-danger: var(--bd-danger-text);
-  --bd-success: #16a34a;
+  --bd-success: #34c759;
   --bd-success-bg: color-mix(in srgb, var(--bd-success) 10%, transparent);
   --bd-success-border: color-mix(in srgb, var(--bd-success) 22%, transparent);
   --bd-success-text: #14532d;
   --bd-surface-scope: color-mix(in srgb, #0f172a 4%, var(--bg-primary));
   --bd-chrome-edge: rgba(15, 23, 42, 0.1);
-  --bd-dump-mic-bg: linear-gradient(165deg, #ff8f6b 0%, #e85d2d 45%, #d64d22 100%);
+  --bd-dump-mic-bg: linear-gradient(165deg, #ff9e7f 0%, #ff5a36 45%, #e14a26 100%);
   --bd-dump-mic-fg: #ffffff;
-  --bd-dump-mic-border: color-mix(in srgb, #ffffff 35%, #c2410c);
-  --bd-dump-mic-shadow: 0 6px 22px rgba(232, 93, 45, 0.28);
-  --bd-brand-accent: #e85d2d;
-  --bd-brand-accent-rgb: 232, 93, 45;
+  --bd-dump-mic-border: color-mix(in srgb, #ffffff 35%, #e14a26);
+  --bd-dump-mic-shadow: 0 6px 22px rgba(255, 90, 54, 0.28);
+  --bd-brand-accent: #ff5a36;
+  --bd-brand-accent-rgb: 255, 90, 54;
   --bd-timeline-accent: var(--bd-brand-accent);
   --bd-timeline-accent-rgb: var(--bd-brand-accent-rgb);
-  --bd-timeline-time-color: color-mix(in srgb, #e85d2d 78%, #000000 22%);
+  --bd-timeline-time-color: color-mix(in srgb, #ff5a36 78%, #000000 22%);
   --bd-timeline-card-bg: var(--bg-elevated);
   --bd-domain-work: #0a84ff;
   --bd-domain-personal: #af52de;
@@ -5010,7 +5010,7 @@ button.bd-shopping-toggle[aria-pressed="true"] {
     filter: brightness(1.16);
     box-shadow:
       0 0 0 5px color-mix(in srgb, var(--bd-dump-mic-fg) 28%, transparent),
-      0 8px 26px rgba(232, 93, 45, 0.42);
+      0 8px 26px rgba(255, 90, 54, 0.42);
   }
 }
 
@@ -5399,7 +5399,7 @@ button.bd-shopping-toggle[aria-pressed="true"] {
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--bd-accent, #e85d2d);
+  background: var(--bd-danger);
   color: #fff;
   font-size: 0.625rem;
   font-weight: 700;
@@ -5475,7 +5475,7 @@ button.bd-shopping-toggle[aria-pressed="true"] {
 
 .bd-bottom-bar .bd-bottom-dump-mic:hover {
   filter: brightness(1.05);
-  box-shadow: 0 8px 28px rgba(232, 93, 45, 0.45);
+  box-shadow: 0 8px 28px rgba(255, 90, 54, 0.45);
 }
 
 .bd-bottom-bar .bd-bottom-dump-mic.bd-bottom-dump-mic--recording {
