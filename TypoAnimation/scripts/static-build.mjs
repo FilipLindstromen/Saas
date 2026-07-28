@@ -32,7 +32,11 @@ try {
   execSync('npx next build', {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, STATIC_EXPORT: 'true' },
+    env: {
+      ...process.env,
+      STATIC_EXPORT: 'true',
+      NEXT_PUBLIC_STATIC_EXPORT: 'true',
+    },
   });
 } finally {
   if (moved) renameSync(apiBackup, apiDir);

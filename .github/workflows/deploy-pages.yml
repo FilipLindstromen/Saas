@@ -65,14 +65,14 @@ jobs:
           if [ -z "$URL" ]; then URL="#"; fi
           sed "s|__METACONNECT_APP_URL__|${URL}|g" docs/meta-connect-landing.html > deploy/MetaConnect/index.html
 
-      - name: Add TypoAnimation landing page
-        env:
-          TYPOANIMATION_APP_URL: ${{ secrets.TYPOANIMATION_APP_URL }}
+      - name: Build TypoAnimation (static preview)
         run: |
-          mkdir -p deploy/TypoAnimation
-          URL="${TYPOANIMATION_APP_URL:-}"
-          if [ -z "$URL" ]; then URL="#"; fi
-          sed "s|__TYPOANIMATION_APP_URL__|${URL}|g" docs/typo-animation-landing.html > deploy/TypoAnimation/index.html
+          cd TypoAnimation
+          npm install
+          export NEXT_PUBLIC_BASE_PATH="/${{ github.event.repository.name }}/TypoAnimation"
+          export NEXT_PUBLIC_STATIC_EXPORT="true"
+          node scripts/static-build.mjs
+          cp -r out ../deploy/TypoAnimation
 
       - name: Build Web Quiz Generator
         run: |
