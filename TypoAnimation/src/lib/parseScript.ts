@@ -1,4 +1,4 @@
-import { createScene, type Scene } from '@/types/project';
+import { createScene, type Scene, type SceneLine, type SceneStyle } from '@/types/project';
 
 export interface ParsedBlock {
   name: string;
@@ -49,13 +49,48 @@ function estimateDuration(kicker: string | null | undefined, lines: { text: stri
   return Math.min(6.5, Math.max(2.2, 1.6 + words * 0.22));
 }
 
-function toScene(name: string, kicker: string | null | undefined, lines: { text: string; accent?: boolean }[]): Scene {
+// A line that's just a bare number, optionally with a directly-attached short symbol
+// ("90", "50%", "10x", "3+") — deliberately tight so it only catches unambiguous stat
+// callouts, not any line that happens to contain a number ("90 seconds later" doesn't match).
+const BIG_NUMBER_LINE = /^(\d+(?:\.\d+)?)([%xX+]?)$/;
+
+function extractBigNumber(lines: SceneLine[]): { number: number; suffix?: string; rest: SceneLine[] } | null {
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].text.trim().match(BIG_NUMBER_LINE);
+    if (!m) continue;
+    const number = Number(m[1]);
+    if (!Number.isFinite(number)) continue;
+    return { number, suffix: m[2] || undefined, rest: lines.slice(0, i).concat(lines.slice(i + 1)) };
+  }
+  return null;
+}
+
+// Picks a scene style from its content: a standalone number line reads as a stat callout, a
+// run of 3+ short phrases reads as a tag/feature list, and a line or two of few words reads as
+// a punchy poster statement — anything longer/more prose-like stays the general-purpose
+// word-by-word default. Styles that need data this parser can't infer from plain text
+// (comparison rows, rotating words, b-roll footage) are left for manual selection afterward.
+function pickSceneStyle(kicker: string | null | undefined, lines: SceneLine[]): SceneStyle {
+  if (extractBigNumber(lines)) return 'bignumber';
+  if (lines.length >= 3 && lines.every((l) => wordCount(l.text) <= 3)) return 'chips';
+  const totalWords = (kicker ? wordCount(kicker) : 0) + lines.reduce((n, l) => n + wordCount(l.text), 0);
+  if (lines.length > 0 && lines.length <= 2 && totalWords <= 8) return 'poster';
+  return 'plain';
+}
+
+function toScene(name: string, kicker: string | null | undefined, lines: SceneLine[]): Scene {
+  const style = pickSceneStyle(kicker, lines);
+  const big = style === 'bignumber' ? extractBigNumber(lines) : null;
+  const finalLines = big ? big.rest : lines;
   return createScene({
     name,
-    style: 'plain',
-    lines,
+    style,
+    lines: finalLines,
     kicker: kicker || undefined,
-    durationSec: estimateDuration(kicker, lines),
+    durationSec: estimateDuration(kicker, finalLines),
+    number: big ? big.number : undefined,
+    numberSuffix: big?.suffix,
+    dark: style === 'poster' ? true : undefined,
   });
 }
 

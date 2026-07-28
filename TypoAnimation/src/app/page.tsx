@@ -263,9 +263,9 @@ export default function Home() {
       </header>
 
       {mode === 'plan' ? (
-        <div className="flex flex-1 justify-center p-4">
-          <div className="w-full max-w-2xl">
-            <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+        <div className="flex flex-1 justify-center overflow-hidden p-4">
+          <div className="flex w-full max-w-2xl flex-col">
+            <div className="flex flex-1 flex-col rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
               <ScriptEditor value={scriptText} onChange={setScriptText} onGenerate={handleGenerate} />
             </div>
           </div>
