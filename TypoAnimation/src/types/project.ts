@@ -1,4 +1,4 @@
-export type SceneStyle = 'plain' | 'poster' | 'bignumber' | 'compare' | 'chips';
+export type SceneStyle = 'plain' | 'poster' | 'bignumber' | 'compare' | 'chips' | 'falling';
 
 export interface SceneLine {
   text: string;
@@ -122,6 +122,8 @@ export function defaultDurationForStyle(style: SceneStyle): number {
       return 3.8;
     case 'chips':
       return 3.4;
+    case 'falling':
+      return 4.5;
     case 'plain':
     default:
       return 2.6;

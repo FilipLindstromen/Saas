@@ -9,6 +9,7 @@ const STYLE_LABELS: Record<SceneStyle, string> = {
   bignumber: 'Big number',
   compare: 'Compare',
   chips: 'Chips (outline)',
+  falling: 'Falling lines',
 };
 
 // One glyph per style, shown in the thumbnail slot in place of a real rendered preview.
@@ -18,6 +19,7 @@ const STYLE_GLYPHS: Record<SceneStyle, string> = {
   bignumber: '42',
   compare: '▤',
   chips: '◫',
+  falling: '↓',
 };
 
 function DuplicateIcon() {

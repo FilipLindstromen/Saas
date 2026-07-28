@@ -12,6 +12,7 @@ const STYLE_OPTIONS: { value: SceneStyle; label: string }[] = [
   { value: 'bignumber', label: 'Big number — animated counter' },
   { value: 'compare', label: 'Compare — animated bars' },
   { value: 'chips', label: 'Chips — outlined pill list' },
+  { value: 'falling', label: 'Falling lines — sequential drop-in reveal' },
 ];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

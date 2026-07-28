@@ -8,6 +8,7 @@ import { ScriptEditor } from '@/components/ScriptEditor';
 import { SceneList } from '@/components/SceneList';
 import { SceneStylePanel } from '@/components/SceneStylePanel';
 import { ThemePanel } from '@/components/ThemePanel';
+import { SettingsOverlay } from '@/components/SettingsOverlay';
 import { VideoSyncPanel } from '@/components/VideoSyncPanel';
 import { ExportPanel } from '@/components/ExportPanel';
 import { listLocalProjects, loadLocalProject, saveLocalProject } from '@/lib/localProjectStore';
@@ -42,6 +43,8 @@ export default function Home() {
   const [status, setStatus] = useState<string>('');
   const [brollStatus, setBrollStatus] = useState<string>('');
   const [brollBusy, setBrollBusy] = useState(false);
+  const [mode, setMode] = useState<'plan' | 'edit'>('plan');
+  const [themeOverlayOpen, setThemeOverlayOpen] = useState(false);
 
   const refreshProjectList = () => {
     if (IS_STATIC) {
@@ -72,6 +75,7 @@ export default function Home() {
     const scenes = parseScript(scriptText);
     setProject((p) => ({ ...p, scenes, updatedAt: new Date().toISOString() }));
     setSelectedSceneId(scenes[0]?.id ?? null);
+    setMode('edit');
   };
 
   const handleReorder = (fromIndex: number, toIndex: number) =>
@@ -138,6 +142,7 @@ export default function Home() {
       if (!loaded) return;
       setProject(loaded);
       setSelectedSceneId(loaded.scenes[0]?.id ?? null);
+      setMode('edit');
       return;
     }
     const res = await fetch(`/api/projects?id=${encodeURIComponent(id)}`);
@@ -145,6 +150,7 @@ export default function Home() {
     const loaded = (await res.json()) as Project;
     setProject(loaded);
     setSelectedSceneId(loaded.scenes[0]?.id ?? null);
+    setMode('edit');
   };
 
   const handleBulkSceneUpdate = (updates: { id: string; patch: Partial<Scene> }[]) =>
@@ -195,6 +201,7 @@ export default function Home() {
     setProject(createEmptyProject());
     setSelectedSceneId(null);
     setScriptText('');
+    setMode('plan');
   };
 
   const selectedScene = project.scenes.find((s) => s.id === selectedSceneId) || null;
@@ -202,7 +209,22 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-[#0a0a0a] text-white">
       <header className="flex items-center justify-between border-b border-white/[0.06] bg-[#1f1f1f]/90 px-5 py-3 backdrop-blur-xl">
-        <h1 className="text-[1.25rem] font-semibold tracking-tight text-white">TypoAnimation</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-[1.25rem] font-semibold tracking-tight text-white">TypoAnimation</h1>
+          <div className="flex rounded-xl border border-white/10 bg-[#141414] p-0.5">
+            {(['plan', 'edit'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`rounded-[10px] px-3.5 py-1 text-xs font-semibold capitalize transition-colors ${
+                  mode === m ? 'bg-gradient-to-br from-[#ff6b35] to-[#ff4757] text-white' : 'text-white/55 hover:text-white/85'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           {status && <span className="text-xs text-white/45">{status}</span>}
           <select
@@ -239,60 +261,75 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="grid flex-1 grid-cols-[340px_1fr_320px] gap-4 p-4">
-        <div className="flex flex-col gap-4 overflow-y-auto">
-          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-            <ScriptEditor value={scriptText} onChange={setScriptText} onGenerate={handleGenerate} />
-          </div>
-          <SceneList
-            scenes={project.scenes}
-            selectedId={selectedSceneId}
-            onSelect={setSelectedSceneId}
-            onReorder={handleReorder}
-            onRemove={handleRemove}
-            onDuplicate={handleDuplicate}
-            onAdd={handleAdd}
-          />
-          {IS_STATIC ? (
-            <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-xs text-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-              Webcam voice sync, b-roll, and MP4 export need a real server (ffmpeg, local
-              speech-to-text, video rendering) — this preview build is static. Run the full app
-              locally (see the Saas hub card) for those.
+      {mode === 'plan' ? (
+        <div className="flex flex-1 justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+              <ScriptEditor value={scriptText} onChange={setScriptText} onGenerate={handleGenerate} />
             </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-                <button
-                  onClick={handleAutoSelectBroll}
-                  disabled={brollBusy || project.scenes.length === 0}
-                  className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
-                >
-                  {brollBusy ? 'Selecting b-roll…' : 'Auto-select b-roll for all scenes'}
-                </button>
-                {brollStatus && <p className="text-xs text-white/45">{brollStatus}</p>}
+          </div>
+        </div>
+      ) : (
+        <div className="grid flex-1 grid-cols-[340px_1fr_320px] gap-4 p-4">
+          <div className="flex flex-col gap-4 overflow-y-auto">
+            <SceneList
+              scenes={project.scenes}
+              selectedId={selectedSceneId}
+              onSelect={setSelectedSceneId}
+              onReorder={handleReorder}
+              onRemove={handleRemove}
+              onDuplicate={handleDuplicate}
+              onAdd={handleAdd}
+            />
+            {IS_STATIC ? (
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-xs text-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                Webcam voice sync, b-roll, and MP4 export need a real server (ffmpeg, local
+                speech-to-text, video rendering) — this preview build is static. Run the full app
+                locally (see the Saas hub card) for those.
               </div>
-              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-                <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
-              </div>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                  <button
+                    onClick={handleAutoSelectBroll}
+                    disabled={brollBusy || project.scenes.length === 0}
+                    className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
+                  >
+                    {brollBusy ? 'Selecting b-roll…' : 'Auto-select b-roll for all scenes'}
+                  </button>
+                  {brollStatus && <p className="text-xs text-white/45">{brollStatus}</p>}
+                </div>
+                <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                  <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
+                </div>
+              </>
+            )}
+          </div>
 
-        <div className="flex items-start justify-center">
-          <div className="w-full max-w-[640px]">
-            <PreviewPlayer project={project} />
+          <div className="flex items-start justify-center">
+            <div className="w-full max-w-[640px]">
+              <PreviewPlayer project={project} selectedSceneId={selectedSceneId} />
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto">
-          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-            <ThemePanel project={project} onChange={patchProject} />
-          </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-            <SceneStylePanel scene={selectedScene} onChange={patchScene} hideBroll={IS_STATIC} />
+          <div className="flex flex-col gap-4 overflow-y-auto">
+            <button
+              onClick={() => setThemeOverlayOpen(true)}
+              className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-colors hover:bg-[#252525]"
+            >
+              <span className="text-[0.95rem] font-semibold text-white">Theme settings</span>
+              <span className="text-xs text-white/45">Colors, fonts, captions →</span>
+            </button>
+            <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+              <SceneStylePanel scene={selectedScene} onChange={patchScene} hideBroll={IS_STATIC} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      <SettingsOverlay open={themeOverlayOpen} onClose={() => setThemeOverlayOpen(false)} title="Theme settings">
+        <ThemePanel project={project} onChange={patchProject} />
+      </SettingsOverlay>
     </div>
   );
 }

@@ -23,6 +23,8 @@ import PresentView from './components/PresentView';
 import RambleRecorder from './components/RambleRecorder';
 import ProjectSelector from './components/ProjectSelector';
 import TabBar from '@shared/TabBar/TabBar';
+import { copyTextToClipboard } from './utils/clipboard';
+import { formatStoryForClipboard } from './utils/storyPlainText';
 import './App.css';
 
 const INPUT_PANEL_MIN = 280;
@@ -59,7 +61,9 @@ function App() {
   const [theme, setThemeState] = useState(() => getTheme());
   const [settingsPresentationFont, setSettingsPresentationFont] = useState('Poppins');
   const [settingsPresentationSize, setSettingsPresentationSize] = useState('medium');
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const resizeStartRef = useRef({ x: 0, width: 0 });
+  const copyFeedbackTimerRef = useRef(null);
   const persistedRef = useRef(persisted);
   persistedRef.current = persisted;
 
@@ -375,6 +379,27 @@ function App() {
     setProjects(updated);
   }, [projects, currentProjectId, switchProject]);
 
+  const handleCopyStory = useCallback(async () => {
+    const output = formatStoryForClipboard(sectionOrder, sectionDefs, sectionsData);
+    if (!output.trim()) {
+      alert('No story copy to copy.');
+      return;
+    }
+    try {
+      await copyTextToClipboard(output);
+      setCopyFeedback(true);
+      if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current);
+      copyFeedbackTimerRef.current = setTimeout(() => setCopyFeedback(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      alert('Could not copy to clipboard. Check browser permissions and try again.');
+    }
+  }, [sectionOrder, sectionDefs, sectionsData]);
+
+  useEffect(() => () => {
+    if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current);
+  }, []);
+
   const handleGenerate = async () => {
     setError('');
     const apiKey = getSettings().openaiApiKey?.trim();
@@ -464,6 +489,24 @@ function App() {
         </div>
 
         <div className="app-header-actions">
+          <button
+            type="button"
+            className={`app-settings-btn${copyFeedback ? ' app-settings-btn--copied' : ''}`}
+            onClick={handleCopyStory}
+            title={copyFeedback ? 'Copied!' : 'Copy all story copy to clipboard'}
+            aria-label="Copy all story copy to clipboard"
+          >
+            {copyFeedback ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+          </button>
           {view === 'edit' && (
             <button
               type="button"

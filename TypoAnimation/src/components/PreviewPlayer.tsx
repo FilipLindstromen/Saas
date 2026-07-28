@@ -1,12 +1,16 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { Player } from '@remotion/player';
-import { MainComposition, computeTotalDurationInFrames } from '@/remotion/Composition';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Player, type PlayerRef } from '@remotion/player';
+import { MainComposition, computeTotalDurationInFrames, sceneStartFrame } from '@/remotion/Composition';
 import { FPS, WIDTH, HEIGHT } from '@/remotion/constants';
 import type { Project } from '@/types/project';
 
-export function PreviewPlayer({ project }: { project: Project }) {
+export function PreviewPlayer({ project, selectedSceneId }: { project: Project; selectedSceneId?: string | null }) {
+  const playerRef = useRef<PlayerRef>(null);
+  const projectRef = useRef(project);
+  projectRef.current = project;
+
   const durationInFrames = useMemo(
     () => computeTotalDurationInFrames(project, FPS),
     // scene identity + durations are what actually change the timeline length; re-deriving
@@ -15,8 +19,18 @@ export function PreviewPlayer({ project }: { project: Project }) {
     [project.scenes]
   );
 
+  // Deliberately keyed only on the selected scene id, not on `project` — selecting a scene
+  // should jump the playhead there once, but editing that scene's text afterward shouldn't
+  // keep yanking playback back to its start on every keystroke.
+  useEffect(() => {
+    if (!selectedSceneId) return;
+    const frame = sceneStartFrame(projectRef.current, selectedSceneId, FPS);
+    playerRef.current?.seekTo(frame);
+  }, [selectedSceneId]);
+
   return (
     <Player
+      ref={playerRef}
       component={MainComposition}
       inputProps={{ project }}
       durationInFrames={durationInFrames}

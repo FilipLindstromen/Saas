@@ -17,8 +17,6 @@ export function ThemePanel({
 
   return (
     <div className="flex flex-col gap-3 text-sm">
-      <h2 className="text-[0.95rem] font-semibold text-white">Theme</h2>
-
       <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
         Project name
         <input

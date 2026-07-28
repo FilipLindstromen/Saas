@@ -112,6 +112,10 @@
   background: var(--hover);
 }
 
+.app-settings-btn--copied {
+  color: var(--accent, #e67e22);
+}
+
 .app-main {
   flex: 1;
   display: flex;

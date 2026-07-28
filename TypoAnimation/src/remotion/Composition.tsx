@@ -8,6 +8,7 @@ import { PosterScene } from './scenes/PosterScene';
 import { BigNumberScene } from './scenes/BigNumberScene';
 import { CompareScene } from './scenes/CompareScene';
 import { ChipsScene } from './scenes/ChipsScene';
+import { FallingLinesScene } from './scenes/FallingLinesScene';
 
 const SCENE_COMPONENTS: Record<SceneStyle, React.ComponentType<SceneComponentProps>> = {
   plain: PlainScene,
@@ -15,6 +16,7 @@ const SCENE_COMPONENTS: Record<SceneStyle, React.ComponentType<SceneComponentPro
   bignumber: BigNumberScene,
   compare: CompareScene,
   chips: ChipsScene,
+  falling: FallingLinesScene,
 };
 
 // Must be a `type` alias, not an `interface` — Remotion's <Composition>/<Player> require
@@ -34,6 +36,17 @@ export function sceneFrames(scene: Scene, fps: number): number {
 export function computeTotalDurationInFrames(project: Project, fps: number): number {
   if (!project.scenes.length) return fps;
   return project.scenes.reduce((n, s) => n + sceneFrames(s, fps), 0);
+}
+
+// The frame at which a given scene's Sequence begins — same layout math as MainComposition's
+// own frameCursor loop, exposed so the editor can seek the preview player to a scene on select.
+export function sceneStartFrame(project: Project, sceneId: string, fps: number): number {
+  let frame = 0;
+  for (const s of project.scenes) {
+    if (s.id === sceneId) return frame;
+    frame += sceneFrames(s, fps);
+  }
+  return 0;
 }
 
 function SceneLayer({
