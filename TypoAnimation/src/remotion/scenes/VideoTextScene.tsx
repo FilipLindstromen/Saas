@@ -8,11 +8,22 @@ import type { ResolvedSceneTheme } from '../shared/theme';
 import type { BrollAsset } from '@/types/project';
 import type { SceneComponentProps } from '../shared/sceneProps';
 
-// A headline line filled with the scene's own b-roll footage instead of a flat color: the
-// video paints only where this line's glyphs are opaque, via `mix-blend-mode: destination-in`
-// compositing the (always-on-top, always-opaque) text against the video underneath it in an
-// isolated stacking context — a pure-CSS video-clipped-to-text mask, no canvas/SVG measuring
-// needed. Falls back to a normal ink-colored line when the scene has no b-roll attached.
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Matches the maxWidth convention other scene styles use for centered headline text
+// (PosterScene, PlainScene) — the 1080-wide square composition leaves this much room either
+// side of center before clipping.
+const MASK_W = 980;
+
+// A headline line filled with the scene's own b-roll footage instead of a flat color: an
+// inline SVG <text> (matching the line's font/size/weight, so it's an exact glyph match, not
+// an HTML-layout approximation) is used as a `mask-image` on the video, so only the pixels
+// under the letterforms are visible — a real clip, not a blend/tint. `destination-in` is
+// tempting but wrong here: that's a canvas/SVG compositing operator, not a valid
+// `mix-blend-mode` value, so the browser would silently drop it and show nothing. Falls back
+// to a normal ink-colored line when the scene has no b-roll attached.
 function VideoMaskedLine({
   text,
   t,
@@ -49,12 +60,25 @@ function VideoMaskedLine({
     );
   }
 
+  const maskHeight = Math.round(size * 1.3);
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${MASK_W}' height='${maskHeight}'>` +
+    `<text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' ` +
+    `font-family='${theme.fontHeading}' font-weight='${theme.headingWeight}' font-size='${size}' ` +
+    `letter-spacing='-2' fill='white'>${escapeXml(text)}</text></svg>`;
+  const maskImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  const maskProps: React.CSSProperties = {
+    WebkitMaskImage: maskImage,
+    maskImage,
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskPosition: 'center',
+  };
+
   return (
-    <div style={{ position: 'relative', isolation: 'isolate', opacity: m.opacity, transform: m.transform, filter: m.filter }}>
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <OffthreadVideo src={broll.path} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      </div>
-      <div style={{ position: 'relative', mixBlendMode: 'destination-in', color: '#000', ...textStyle }}>{text}</div>
+    <div style={{ opacity: m.opacity, transform: m.transform, filter: m.filter, width: MASK_W, height: maskHeight, ...maskProps }}>
+      <OffthreadVideo src={broll.path} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
     </div>
   );
 }

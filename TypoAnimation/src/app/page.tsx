@@ -104,8 +104,9 @@ export default function Home() {
       const scene = createScene({
         style,
         name: `Scene ${p.scenes.length + 1}`,
-        lines: [{ text: 'New line' }],
+        lines: [{ text: style === 'rotate' ? 'We are' : 'New line' }],
         dark: style === 'poster',
+        rotatingWords: style === 'rotate' ? ['fast', 'reliable', 'simple'] : undefined,
         compareRows:
           style === 'compare'
             ? [

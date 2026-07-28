@@ -13,6 +13,14 @@ const STYLE_OPTIONS: { value: SceneStyle; label: string }[] = [
   { value: 'compare', label: 'Compare — animated bars' },
   { value: 'chips', label: 'Chips — outlined pill list' },
   { value: 'falling', label: 'Falling lines — sequential drop-in reveal' },
+  { value: 'videotext', label: 'Video text — headline filled with b-roll' },
+  { value: 'rotate', label: 'Rotating word — cycling slot' },
+  { value: 'typewriter', label: 'Typewriter — character-by-character' },
+];
+
+const EMPHASIS_OPTIONS: { value: NonNullable<SceneLine['emphasis']>; label: string }[] = [
+  { value: 'chip', label: 'chip' },
+  { value: 'marker', label: 'marker' },
 ];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -50,6 +58,15 @@ export function SceneStylePanel({
   };
   const addLine = () => patch({ lines: [...scene.lines, { text: 'New line' }] });
   const removeLine = (i: number) => patch({ lines: scene.lines.filter((_, idx) => idx !== i) });
+
+  const rotatingWords = scene.rotatingWords || [];
+  const updateWord = (i: number, v: string) => {
+    const next = rotatingWords.slice();
+    next[i] = v;
+    patch({ rotatingWords: next });
+  };
+  const addWord = () => patch({ rotatingWords: [...rotatingWords, 'word'] });
+  const removeWord = (i: number) => patch({ rotatingWords: rotatingWords.filter((_, idx) => idx !== i) });
 
   const rows = scene.compareRows || [];
   const updateRow = (i: number, p: Partial<CompareRow>) => {
@@ -98,6 +115,11 @@ export function SceneStylePanel({
           Dark / full-bleed field
         </label>
       </div>
+
+      <label className="flex items-center gap-1.5 text-xs font-medium text-white/65">
+        <input type="checkbox" checked={!!scene.glitchIntro} onChange={(e) => patch({ glitchIntro: e.target.checked })} />
+        Glitch intro (RGB-split jitter, first ~0.2s)
+      </label>
 
       <Field label="Accent color override">
         <div className="flex flex-wrap gap-1.5">
@@ -171,6 +193,29 @@ export function SceneStylePanel({
         </div>
       )}
 
+      {scene.style === 'videotext' && !scene.broll && (
+        <p className="text-xs text-white/45">Pick a b-roll clip below to fill the headline with footage — without one it falls back to plain ink-colored text.</p>
+      )}
+
+      {scene.style === 'rotate' && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-white/65">Rotating words</span>
+            <button onClick={addWord} className="text-xs font-medium text-white/90 hover:text-[#ff6b35]">
+              + Add word
+            </button>
+          </div>
+          {rotatingWords.map((w, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input className={`flex-1 text-sm ${inputClass}`} value={w} onChange={(e) => updateWord(i, e.target.value)} />
+              <button onClick={() => removeWord(i)} className="rounded-lg px-1 text-white/45 hover:text-[#ff4757]">
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {scene.style === 'compare' ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
@@ -228,10 +273,25 @@ export function SceneStylePanel({
                 onChange={(e) => updateLine(i, { text: e.target.value })}
               />
               {scene.style !== 'chips' && (
-                <label className="flex items-center gap-1 text-xs text-white/65">
-                  <input type="checkbox" checked={!!l.accent} onChange={(e) => updateLine(i, { accent: e.target.checked })} />
-                  chip
-                </label>
+                <>
+                  <label className="flex items-center gap-1 text-xs text-white/65">
+                    <input type="checkbox" checked={!!l.accent} onChange={(e) => updateLine(i, { accent: e.target.checked })} />
+                    accent
+                  </label>
+                  {l.accent && (
+                    <select
+                      className="rounded-lg border border-white/10 bg-[#1a1a1a] px-1.5 py-1 text-xs text-white outline-none"
+                      value={l.emphasis || 'chip'}
+                      onChange={(e) => updateLine(i, { emphasis: e.target.value as SceneLine['emphasis'] })}
+                    >
+                      {EMPHASIS_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value} className="bg-[#1f1f1f]">
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </>
               )}
               <button onClick={() => removeLine(i)} className="rounded-lg px-1 text-white/45 hover:text-[#ff4757]">
                 ✕

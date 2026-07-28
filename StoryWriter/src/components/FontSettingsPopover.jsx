@@ -6,6 +6,7 @@ export default function FontSettingsPopover({ onApply }) {
   const [open, setOpen] = useState(false);
   const [font, setFont] = useState('Poppins');
   const [fontSize, setFontSize] = useState('medium');
+  const [lineHeight, setLineHeight] = useState('1.4');
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
 

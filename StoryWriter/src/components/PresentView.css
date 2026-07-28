@@ -56,34 +56,156 @@
   gap: 2rem;
 }
 
+.present-view__sentence-stage {
+  position: relative;
+  width: 100%;
+  min-height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .present-view__sentence {
   /* font-size set inline from settings (small/medium/large) */
   line-height: 1.4;
   color: var(--text);
+  width: 100%;
 }
 
-.present-view__sentence--slide-up {
-  animation: present-sentence-slide-up 0.35s ease-out forwards;
+.present-view__sentence--enter,
+.present-view__sentence--exit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
-.present-view__sentence--fade {
-  animation: present-sentence-fade 0.35s ease-out forwards;
+.present-view__sentence--idle {
+  position: relative;
+  text-align: center;
 }
 
-.present-view__sentence--slide-left {
-  animation: present-sentence-slide-left 0.35s ease-out forwards;
+.present-view__word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: present-word-fade-in 0.42s ease-out forwards;
 }
 
-.present-view__sentence--slide-right {
-  animation: present-sentence-slide-right 0.35s ease-out forwards;
-}
-
-.present-view__sentence--scale {
-  animation: present-sentence-scale 0.35s ease-out forwards;
-}
-
-.present-view__sentence--none {
+.present-view__word--visible {
+  opacity: 1;
+  transform: none;
   animation: none;
+}
+
+/* Drop from above into center, exit downward off screen */
+.present-view__sentence--drop-center.present-view__sentence--enter {
+  animation: present-drop-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.present-view__sentence--drop-center.present-view__sentence--exit {
+  animation: present-drop-out 0.48s cubic-bezier(0.55, 0, 0.9, 0.38) forwards;
+}
+
+.present-view__sentence--drop-center.present-view__sentence--idle {
+  opacity: 1;
+  transform: none;
+}
+
+/* Word-by-word exit: whole block fades and drops */
+.present-view__sentence--fade-words-exit.present-view__sentence--exit {
+  animation: present-words-block-out 0.38s ease-in forwards;
+}
+
+.present-view__sentence--slide-up.present-view__sentence--enter {
+  animation: present-sentence-slide-up 0.38s ease-out forwards;
+}
+
+.present-view__sentence--slide-down.present-view__sentence--exit {
+  animation: present-sentence-slide-down 0.38s ease-in forwards;
+}
+
+.present-view__sentence--fade.present-view__sentence--enter {
+  animation: present-sentence-fade 0.38s ease-out forwards;
+}
+
+.present-view__sentence--fade.present-view__sentence--exit {
+  animation: present-sentence-fade-out 0.34s ease-in forwards;
+}
+
+.present-view__sentence--slide-left.present-view__sentence--enter {
+  animation: present-sentence-slide-left 0.38s ease-out forwards;
+}
+
+.present-view__sentence--slide-right.present-view__sentence--enter {
+  animation: present-sentence-slide-right 0.38s ease-out forwards;
+}
+
+.present-view__sentence--slide-right.present-view__sentence--exit {
+  animation: present-sentence-slide-right-out 0.38s ease-in forwards;
+}
+
+.present-view__sentence--slide-left.present-view__sentence--exit {
+  animation: present-sentence-slide-left-out 0.38s ease-in forwards;
+}
+
+.present-view__sentence--scale.present-view__sentence--enter {
+  animation: present-sentence-scale 0.38s ease-out forwards;
+}
+
+.present-view__sentence--scale-out.present-view__sentence--exit {
+  animation: present-sentence-scale-out 0.34s ease-in forwards;
+}
+
+.present-view__sentence--none.present-view__sentence--enter,
+.present-view__sentence--none.present-view__sentence--exit {
+  animation: none;
+}
+
+@keyframes present-word-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes present-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-38vh);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes present-drop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(42vh);
+  }
+}
+
+@keyframes present-words-block-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(28px);
+  }
 }
 
 @keyframes present-sentence-slide-up {
@@ -106,21 +228,41 @@
   }
 }
 
+@keyframes present-sentence-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes present-sentence-slide-left {
   from {
     opacity: 0;
-    transform: translateX(-24px);
+    transform: translateX(-28px);
   }
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes present-sentence-slide-left-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-28px);
   }
 }
 
 @keyframes present-sentence-slide-right {
   from {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateX(28px);
   }
   to {
     opacity: 1;
@@ -128,14 +270,47 @@
   }
 }
 
+@keyframes present-sentence-slide-right-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+
 @keyframes present-sentence-scale {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.94);
   }
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes present-sentence-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes present-sentence-slide-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(24px);
   }
 }
 

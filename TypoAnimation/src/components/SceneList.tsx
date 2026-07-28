@@ -10,6 +10,9 @@ const STYLE_LABELS: Record<SceneStyle, string> = {
   compare: 'Compare',
   chips: 'Chips (outline)',
   falling: 'Falling lines',
+  videotext: 'Video text',
+  rotate: 'Rotating word',
+  typewriter: 'Typewriter',
 };
 
 // One glyph per style, shown in the thumbnail slot in place of a real rendered preview.
@@ -20,6 +23,9 @@ const STYLE_GLYPHS: Record<SceneStyle, string> = {
   compare: '▤',
   chips: '◫',
   falling: '↓',
+  videotext: '▶',
+  rotate: '⇅',
+  typewriter: '_',
 };
 
 function DuplicateIcon() {

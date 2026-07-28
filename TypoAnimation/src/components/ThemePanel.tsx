@@ -87,6 +87,20 @@ export function ThemePanel({
         </select>
       </label>
 
+      <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+        Scene transition
+        <select
+          className="rounded-xl border border-white/10 bg-[#141414] px-2 py-1.5 text-white"
+          value={theme.transition || 'cut'}
+          onChange={(e) => patchTheme({ transition: e.target.value as ProjectTheme['transition'] })}
+        >
+          <option value="cut" className="bg-[#1f1f1f]">Cut (default)</option>
+          <option value="fade" className="bg-[#1f1f1f]">Fade</option>
+          <option value="slide" className="bg-[#1f1f1f]">Slide</option>
+          <option value="wipe" className="bg-[#1f1f1f]">Wipe</option>
+        </select>
+      </label>
+
       <div className="flex flex-col gap-1.5 border-t border-white/[0.06] pt-3">
         <span className="text-xs font-medium text-white/65">Voiceover reference (chrome overlays)</span>
         <label className="flex items-center gap-1.5 text-xs text-white/90">

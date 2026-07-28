@@ -9,6 +9,11 @@ import { BigNumberScene } from './scenes/BigNumberScene';
 import { CompareScene } from './scenes/CompareScene';
 import { ChipsScene } from './scenes/ChipsScene';
 import { FallingLinesScene } from './scenes/FallingLinesScene';
+import { VideoTextScene } from './scenes/VideoTextScene';
+import { RotatingWordScene } from './scenes/RotatingWordScene';
+import { TypewriterScene } from './scenes/TypewriterScene';
+import { SceneTransition } from './shared/SceneTransition';
+import { GlitchIntro } from './shared/GlitchIntro';
 
 const SCENE_COMPONENTS: Record<SceneStyle, React.ComponentType<SceneComponentProps>> = {
   plain: PlainScene,
@@ -17,6 +22,9 @@ const SCENE_COMPONENTS: Record<SceneStyle, React.ComponentType<SceneComponentPro
   compare: CompareScene,
   chips: ChipsScene,
   falling: FallingLinesScene,
+  videotext: VideoTextScene,
+  rotate: RotatingWordScene,
+  typewriter: TypewriterScene,
 };
 
 // Must be a `type` alias, not an `interface` — Remotion's <Composition>/<Player> require
@@ -68,19 +76,23 @@ function SceneLayer({
   const theme = resolveSceneTheme(project.theme, scene);
   const Comp = SCENE_COMPONENTS[scene.style] || PlainScene;
   return (
-    <Comp
-      scene={scene}
-      theme={theme}
-      t={t}
-      dur={scene.durationSec}
-      label={project.label || project.name}
-      showCaptions={!!project.showCaptions}
-      showTimecode={!!project.showTimecode}
-      sceneIndex={sceneIndex}
-      sceneCount={project.scenes.length}
-      elapsedSec={startSec + t}
-      totalSec={totalSec}
-    />
+    <SceneTransition type={project.theme.transition} t={t} dur={scene.durationSec}>
+      <GlitchIntro active={scene.glitchIntro} t={t}>
+        <Comp
+          scene={scene}
+          theme={theme}
+          t={t}
+          dur={scene.durationSec}
+          label={project.label || project.name}
+          showCaptions={!!project.showCaptions}
+          showTimecode={!!project.showTimecode}
+          sceneIndex={sceneIndex}
+          sceneCount={project.scenes.length}
+          elapsedSec={startSec + t}
+          totalSec={totalSec}
+        />
+      </GlitchIntro>
+    </SceneTransition>
   );
 }
 

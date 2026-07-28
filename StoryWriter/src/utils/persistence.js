@@ -1,4 +1,5 @@
 import { isValidTargetOutcomeId } from '../constants/targetOutcomes';
+import { normalizePresentationAnimationRules } from './textAnimations';
 
 const STORAGE_KEY = 'storywriter_content';
 
@@ -32,6 +33,7 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
     sectionsData: empty,
     storyLength: 'medium',
     targetOutcome: DEFAULT_TARGET_OUTCOME_ID,
+    presentationAnimationRules: normalizePresentationAnimationRules(null),
   };
   if (!raw || typeof raw !== 'object') return defaults;
   const sectionOrder = Array.isArray(raw.sectionOrder) ? raw.sectionOrder : null;
@@ -77,6 +79,7 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
       typeof raw.targetOutcome === 'string' && isValidTargetOutcomeId(raw.targetOutcome)
         ? raw.targetOutcome
         : DEFAULT_TARGET_OUTCOME_ID,
+    presentationAnimationRules: normalizePresentationAnimationRules(raw.presentationAnimationRules),
   };
 }
 
@@ -111,6 +114,7 @@ export function saveContent(payload) {
       sectionsData,
       storyLength: payload.storyLength ?? 'medium',
       targetOutcome: payload.targetOutcome ?? DEFAULT_TARGET_OUTCOME_ID,
+      presentationAnimationRules: normalizePresentationAnimationRules(payload.presentationAnimationRules),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch (_) {}

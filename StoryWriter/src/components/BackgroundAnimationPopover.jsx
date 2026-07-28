@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getSettings, saveSettings, TEXT_ANIMATION_OPTIONS } from '../utils/settings';
+import { getSettings, saveSettings } from '../utils/settings';
 import './BackgroundAnimationPopover.css';
 
 const DURATION_MIN = 1;
@@ -13,7 +13,6 @@ export default function BackgroundAnimationPopover({ onApply }) {
   const [enabled, setEnabled] = useState(true);
   const [duration, setDuration] = useState(30);
   const [scale, setScale] = useState(1.15);
-  const [textAnimation, setTextAnimation] = useState('slide-up');
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -25,8 +24,6 @@ export default function BackgroundAnimationPopover({ onApply }) {
       setDuration(Math.min(DURATION_MAX, Math.max(DURATION_MIN, d || 30)));
       const sc = Number(s.presentationBackgroundAnimationScale);
       setScale(Math.min(SCALE_MAX, Math.max(SCALE_MIN, sc || 1.15)));
-      const ta = s.presentationTextAnimation;
-      setTextAnimation(TEXT_ANIMATION_OPTIONS.some((o) => o.value === ta) ? ta : 'slide-up');
     }
   }, [open]);
 
@@ -48,7 +45,6 @@ export default function BackgroundAnimationPopover({ onApply }) {
       presentationBackgroundAnimation: enabled,
       presentationBackgroundAnimationDuration: duration,
       presentationBackgroundAnimationScale: scale,
-      presentationTextAnimation: textAnimation,
     });
     setOpen(false);
     onApply?.();
@@ -90,20 +86,6 @@ export default function BackgroundAnimationPopover({ onApply }) {
               value={duration}
               onChange={(e) => setDuration(Math.min(DURATION_MAX, Math.max(DURATION_MIN, Number(e.target.value) || DURATION_MIN)))}
             />
-          </label>
-          <label className="background-animation-popover__label">
-            Text animation
-            <select
-              className="background-animation-popover__select"
-              value={textAnimation}
-              onChange={(e) => setTextAnimation(e.target.value)}
-            >
-              {TEXT_ANIMATION_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
           </label>
           <label className="background-animation-popover__label">
             Scale (zoom) — {(scale * 100).toFixed(0)}%

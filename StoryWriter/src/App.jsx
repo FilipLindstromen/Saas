@@ -24,6 +24,8 @@ import PresentView from './components/PresentView';
 import RambleRecorder from './components/RambleRecorder';
 import ProjectSelector from './components/ProjectSelector';
 import TabBar from '@shared/TabBar/TabBar';
+import PresentationAnimationPopover from './components/PresentationAnimationPopover';
+import { DEFAULT_PRESENTATION_ANIMATION_RULES } from './utils/textAnimations';
 import { copyTextToClipboard } from './utils/clipboard';
 import { formatStoryForClipboard } from './utils/storyPlainText';
 import './App.css';
@@ -39,12 +41,13 @@ const DEFAULT_STORY = {
   sectionsData: {},
   storyLength: 'medium',
   targetOutcome: DEFAULT_TARGET_OUTCOME_ID,
+  presentationAnimationRules: DEFAULT_PRESENTATION_ANIMATION_RULES,
 };
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [persisted, setPersisted] = useState(DEFAULT_STORY);
-  const { storyAbout, frameworkId, sectionOrder, sectionsData, storyLength, targetOutcome } = persisted;
+  const { storyAbout, frameworkId, sectionOrder, sectionsData, storyLength, targetOutcome, presentationAnimationRules } = persisted;
   const sectionDefs = getSectionDefs(frameworkId);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -78,6 +81,7 @@ function App() {
       sectionsData: createEmptySections(fid),
       storyLength: 'medium',
       targetOutcome: DEFAULT_TARGET_OUTCOME_ID,
+      presentationAnimationRules: DEFAULT_PRESENTATION_ANIMATION_RULES,
     };
   }, []);
 
@@ -535,6 +539,10 @@ function App() {
               </svg>
             </button>
           )}
+          <PresentationAnimationPopover
+            rules={presentationAnimationRules}
+            onApply={(rules) => setPersisted((prev) => ({ ...prev, presentationAnimationRules: rules }))}
+          />
           <FontSettingsPopover onApply={() => setSettingsVersion((v) => v + 1)} />
           <BackgroundAnimationPopover onApply={() => setSettingsVersion((v) => v + 1)} />
           <RecordingOptionsPopover onApply={() => setSettingsVersion((v) => v + 1)} />
@@ -744,6 +752,8 @@ function App() {
           sectionsData={sectionsData}
           onExit={() => setView('edit')}
           initialIndex={presentStartIndex}
+          animationRules={presentationAnimationRules}
+          settingsVersion={settingsVersion}
         />
       )}
 

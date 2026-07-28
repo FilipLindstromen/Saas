@@ -1,5 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { getSettings } from '../utils/settings';
+import {
+  normalizePresentationAnimationRules,
+  resolveAnimationForSentence,
+  getEnterDurationMs,
+  getExitDurationMs,
+  getExitAnimation,
+} from '../utils/textAnimations';
+import PresentSentence from './PresentSentence';
 import './PresentView.css';
 
 const FONT_SIZE_MAP = {
@@ -35,7 +43,7 @@ function getSentences(text) {
     .filter(Boolean);
 }
 
-export default function PresentView({ sectionOrder, sectionsData, onExit, initialIndex = 0 }) {
+export default function PresentView({ sectionOrder, sectionsData, onExit, initialIndex = 0, animationRules, settingsVersion = 0 }) {
   const settings = getSettings();
   const fontFamily = `'${settings.presentationFont || 'Poppins'}', sans-serif`;
   const fontSize = FONT_SIZE_MAP[settings.presentationFontSize] ?? FONT_SIZE_MAP.medium;
@@ -48,9 +56,10 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   const bgAnimation = Boolean(settings.presentationBackgroundAnimation);
   const bgAnimationDuration = Math.min(30, Math.max(1, Number(settings.presentationBackgroundAnimationDuration) || 10));
   const bgAnimationScale = Math.min(1.5, Math.max(1, Number(settings.presentationBackgroundAnimationScale) || 1.15));
-  const textAnimation = ['slide-up', 'fade', 'slide-left', 'slide-right', 'scale', 'none'].includes(settings.presentationTextAnimation)
-    ? settings.presentationTextAnimation
-    : 'slide-up';
+  const rules = useMemo(
+    () => normalizePresentationAnimationRules(animationRules),
+    [animationRules, settingsVersion]
+  );
 
   useEffect(() => {
     loadGoogleFont(settings.presentationFont || 'Poppins');
@@ -78,11 +87,41 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   }, [sentences.length, initialIndex]);
 
   const [currentIndex, setCurrentIndex] = useState(safeStartIndex);
+  const [leavingIndex, setLeavingIndex] = useState(null);
+  const [enterPhase, setEnterPhase] = useState('entering');
+  const transitionLockRef = useRef(false);
+  const transitionTimersRef = useRef([]);
+
+  const clearTransitionTimers = useCallback(() => {
+    transitionTimersRef.current.forEach((id) => clearTimeout(id));
+    transitionTimersRef.current = [];
+  }, []);
+
+  const queueTransitionTimer = useCallback((fn, ms) => {
+    const id = setTimeout(fn, ms);
+    transitionTimersRef.current.push(id);
+    return id;
+  }, []);
+
+  useEffect(() => () => clearTransitionTimers(), [clearTransitionTimers]);
 
   useEffect(() => {
     const max = Math.max(0, sentences.length - 1);
     setCurrentIndex((i) => (sentences.length === 0 ? 0 : Math.min(i, max)));
   }, [sentences.length]);
+
+  useEffect(() => {
+    if (sentences.length === 0) return;
+    setLeavingIndex(null);
+    setEnterPhase('entering');
+    clearTransitionTimers();
+    transitionLockRef.current = false;
+    const sentence = sentences[safeStartIndex] ?? '';
+    const animation = resolveAnimationForSentence(sentence, rules);
+    const enterMs = getEnterDurationMs(sentence, animation, rules);
+    queueTransitionTimer(() => setEnterPhase('idle'), enterMs || 0);
+    setCurrentIndex(safeStartIndex);
+  }, [safeStartIndex, sentences, settingsVersion, rules, clearTransitionTimers, queueTransitionTimer]);
 
   const [displayBgUrl, setDisplayBgUrl] = useState('');
   const [bgLayerOpacity, setBgLayerOpacity] = useState(0);
@@ -108,6 +147,15 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
 
   const displayIndex = sentences.length === 0 ? 0 : Math.min(currentIndex, Math.max(0, sentences.length - 1));
   const currentItem = sentencesWithSection[displayIndex];
+  const currentAnimation = useMemo(() => {
+    const sentence = sentences[displayIndex] ?? '';
+    return resolveAnimationForSentence(sentence, rules);
+  }, [sentences, displayIndex, rules]);
+  const leavingAnimation = useMemo(() => {
+    if (leavingIndex == null) return null;
+    const sentence = sentences[leavingIndex] ?? '';
+    return resolveAnimationForSentence(sentence, rules);
+  }, [leavingIndex, sentences, rules]);
   const currentSectionId = currentItem?.sectionId;
   const sentenceIndexInSection = currentItem?.sentenceIndexInSection ?? 0;
   const sectionData = currentSectionId ? sectionsData[currentSectionId] : null;
@@ -132,13 +180,45 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     setBgLayerOpacity(targetUrl ? bgOpacity : 0);
   }, [currentSectionBgUrl, displayBgUrl, bgOpacity]);
 
+  const navigateTo = useCallback((newIndex) => {
+    if (transitionLockRef.current) return;
+    if (newIndex < 0 || newIndex >= sentences.length) return;
+    if (newIndex === currentIndex) return;
+
+    transitionLockRef.current = true;
+    clearTransitionTimers();
+
+    const leavingSentence = sentences[currentIndex] ?? '';
+    const leavingAnimation = resolveAnimationForSentence(leavingSentence, rules);
+    const exitAnimation = getExitAnimation(leavingAnimation);
+    const exitMs = getExitDurationMs(exitAnimation);
+
+    setLeavingIndex(currentIndex);
+    setEnterPhase('idle');
+
+    queueTransitionTimer(() => {
+      setLeavingIndex(null);
+      setCurrentIndex(newIndex);
+      setEnterPhase('entering');
+
+      const enteringSentence = sentences[newIndex] ?? '';
+      const enterAnimation = resolveAnimationForSentence(enteringSentence, rules);
+      const enterMs = getEnterDurationMs(enteringSentence, enterAnimation, rules);
+
+      queueTransitionTimer(() => {
+        setEnterPhase('idle');
+        transitionLockRef.current = false;
+      }, enterMs || 0);
+    }, exitMs || 0);
+  }, [currentIndex, sentences, rules, clearTransitionTimers, queueTransitionTimer]);
+
   const goNext = useCallback(() => {
-    setCurrentIndex((i) => Math.min(i + 1, sentences.length - 1));
-  }, [sentences.length]);
+    navigateTo(Math.min(currentIndex + 1, sentences.length - 1));
+  }, [navigateTo, currentIndex, sentences.length]);
 
   const goPrev = useCallback(() => {
-    setCurrentIndex((i) => Math.max(i - 1, 0));
-  }, []);
+    navigateTo(Math.max(currentIndex - 1, 0));
+  }, [navigateTo, currentIndex]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -350,12 +430,25 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         />
       )}
       <div className="present-view__inner">
-        <div
-          key={displayIndex}
-          className={`present-view__sentence present-view__sentence--${textAnimation}`}
-          style={{ fontSize, lineHeight }}
-        >
-          {sentence}
+        <div className="present-view__sentence-stage">
+          {leavingIndex != null && leavingAnimation && (
+            <PresentSentence
+              key={`leave-${leavingIndex}`}
+              text={sentences[leavingIndex]}
+              animation={leavingAnimation}
+              phase="exit"
+              rules={rules}
+              style={{ fontSize, lineHeight }}
+            />
+          )}
+          <PresentSentence
+            key={`show-${displayIndex}`}
+            text={sentence}
+            animation={currentAnimation}
+            phase={enterPhase === 'entering' ? 'enter' : 'idle'}
+            rules={rules}
+            style={{ fontSize, lineHeight }}
+          />
         </div>
       </div>
       {recordScreenEnabled && (

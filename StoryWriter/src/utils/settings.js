@@ -39,8 +39,10 @@ export const LINE_HEIGHT_OPTIONS = [
   { value: '2', label: '2' },
 ];
 
-/** Text animation when advancing sentences in Present mode. */
+/** Text animation when advancing sentences in Present mode (global fallback). */
 export const TEXT_ANIMATION_OPTIONS = [
+  { value: 'drop-center', label: 'Drop to center' },
+  { value: 'fade-words', label: 'Fade in word by word' },
   { value: 'slide-up', label: 'Slide up' },
   { value: 'fade', label: 'Fade' },
   { value: 'slide-left', label: 'Slide from left' },
