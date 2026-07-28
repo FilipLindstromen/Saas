@@ -1,3 +1,5 @@
+import { isValidTargetOutcomeId } from '../constants/targetOutcomes';
+
 const STORAGE_KEY = 'storywriter_content';
 
 let cached = null;
@@ -15,6 +17,7 @@ function loadRaw() {
 }
 
 const DEFAULT_FRAMEWORK_ID = 'heros_arc';
+const DEFAULT_TARGET_OUTCOME_ID = 'general';
 
 /** Normalize raw story data; validates and merges with defaults. */
 export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySections) {
@@ -28,6 +31,7 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
     sectionOrder: validOrder,
     sectionsData: empty,
     storyLength: 'medium',
+    targetOutcome: DEFAULT_TARGET_OUTCOME_ID,
   };
   if (!raw || typeof raw !== 'object') return defaults;
   const sectionOrder = Array.isArray(raw.sectionOrder) ? raw.sectionOrder : null;
@@ -69,6 +73,10 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
       raw.storyLength === 'micro' || raw.storyLength === 'short' || raw.storyLength === 'medium' || raw.storyLength === 'long'
         ? raw.storyLength
         : 'medium',
+    targetOutcome:
+      typeof raw.targetOutcome === 'string' && isValidTargetOutcomeId(raw.targetOutcome)
+        ? raw.targetOutcome
+        : DEFAULT_TARGET_OUTCOME_ID,
   };
 }
 
@@ -102,6 +110,7 @@ export function saveContent(payload) {
       sectionOrder: payload.sectionOrder ?? [],
       sectionsData,
       storyLength: payload.storyLength ?? 'medium',
+      targetOutcome: payload.targetOutcome ?? DEFAULT_TARGET_OUTCOME_ID,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch (_) {}

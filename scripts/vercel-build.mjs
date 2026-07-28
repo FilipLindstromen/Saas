@@ -98,25 +98,14 @@ mkdirSync(path.join(DEPLOY, "MetaConnect"), { recursive: true });
 writeFileSync(path.join(DEPLOY, "MetaConnect", "index.html"), mcLanding);
 console.log("MetaConnect landing written (Open MetaConnect →", metaconnectUrl || "(set METACONNECT_APP_URL)", ")");
 
-// TypoAnimation (Next.js static export — script → scenes → live preview; upload/transcribe/
-// render/b-roll need a local server and are excluded from this build)
-const typoAnimationPath = path.join(ROOT, "TypoAnimation");
-if (existsSync(path.join(typoAnimationPath, "package.json"))) {
-  console.log("Building TypoAnimation (static preview) with base /TypoAnimation/");
-  run("npm install", typoAnimationPath);
-  run("node scripts/static-build.mjs", typoAnimationPath, {
-    NEXT_PUBLIC_BASE_PATH: "/TypoAnimation",
-    NEXT_PUBLIC_STATIC_EXPORT: "true",
-    STATIC_EXPORT: "true",
-  });
-  const outDirTa = path.join(typoAnimationPath, "out");
-  if (existsSync(outDirTa)) {
-    copyRecursive(outDirTa, path.join(DEPLOY, "TypoAnimation"));
-    console.log("  →", path.join(DEPLOY, "TypoAnimation"));
-  } else {
-    console.warn("No out folder after TypoAnimation build");
-  }
-}
+// TypoAnimation landing (server-side Next.js app — ffmpeg/whisper.cpp/video rendering,
+// needs its own deployment; links out once TYPOANIMATION_APP_URL is set)
+const typoAnimationUrl = process.env.TYPOANIMATION_APP_URL || "";
+let taLanding = readFileSync(path.join(docs, "typo-animation-landing.html"), "utf8");
+taLanding = taLanding.replace(/__TYPOANIMATION_APP_URL__/g, typoAnimationUrl || "#");
+mkdirSync(path.join(DEPLOY, "TypoAnimation"), { recursive: true });
+writeFileSync(path.join(DEPLOY, "TypoAnimation", "index.html"), taLanding);
+console.log("TypoAnimation landing written (Open TypoAnimation →", typoAnimationUrl || "(set TYPOANIMATION_APP_URL)", ")");
 
 // Build each Vite app with base path and copy dist to deploy
 for (const [projectPath, basePath] of VITE_APPS) {

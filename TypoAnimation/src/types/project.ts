@@ -1,8 +1,10 @@
-export type SceneStyle = 'plain' | 'poster' | 'bignumber' | 'compare' | 'chips' | 'falling';
+export type SceneStyle = 'plain' | 'poster' | 'bignumber' | 'compare' | 'chips' | 'falling' | 'videotext' | 'rotate' | 'typewriter';
 
 export interface SceneLine {
   text: string;
   accent?: boolean;
+  /** accent treatment: a solid-fill pill (default) or an animated highlighter-marker sweep */
+  emphasis?: 'chip' | 'marker';
 }
 
 export interface CompareRow {
@@ -52,6 +54,10 @@ export interface Scene {
   wordTimings?: CaptionWord[];
   /** stock b-roll video behind this scene's content, from Pexels/Pixabay */
   broll?: BrollAsset;
+  /** 'rotate' style: words/phrases that cycle in the rotating slot after `lines` */
+  rotatingWords?: string[];
+  /** brief RGB-split/jitter treatment over the scene's first ~0.18s */
+  glitchIntro?: boolean;
 }
 
 export interface ProjectTheme {
@@ -60,6 +66,8 @@ export interface ProjectTheme {
   accent: string;
   /** key into FONT_PAIRINGS */
   fontPairing: string;
+  /** how scenes hand off to each other; defaults to a hard cut */
+  transition?: 'cut' | 'fade' | 'slide' | 'wipe';
 }
 
 export interface VideoAsset {
@@ -124,6 +132,12 @@ export function defaultDurationForStyle(style: SceneStyle): number {
       return 3.4;
     case 'falling':
       return 4.5;
+    case 'videotext':
+      return 3.4;
+    case 'rotate':
+      return 4.2;
+    case 'typewriter':
+      return 4.8;
     case 'plain':
     default:
       return 2.6;

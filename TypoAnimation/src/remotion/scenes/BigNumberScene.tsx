@@ -69,7 +69,8 @@ export function BigNumberScene({ scene, theme, t, dur, label, showCaptions, show
             align="center"
             marginTop={i === 0 ? 16 : undefined}
             color={theme.ink}
-            chip={!!ln.accent}
+            chip={!!ln.accent && ln.emphasis !== 'marker'}
+            marker={!!ln.accent && ln.emphasis === 'marker'}
             theme={theme}
           />
         ))}

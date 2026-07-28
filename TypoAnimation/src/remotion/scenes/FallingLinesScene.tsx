@@ -97,7 +97,8 @@ export function FallingLinesScene({ scene, theme, t, dur, label, showCaptions, s
                 start={-Infinity}
                 end={Infinity}
                 size={66 * (ln.accent ? 1.08 : 1)}
-                chip={!!ln.accent}
+                chip={!!ln.accent && ln.emphasis !== 'marker'}
+                marker={!!ln.accent && ln.emphasis === 'marker'}
                 align="center"
                 maxWidth={980}
                 color={theme.ink}

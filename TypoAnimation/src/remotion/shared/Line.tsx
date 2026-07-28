@@ -1,5 +1,6 @@
 import React from 'react';
-import { enter } from './motion';
+import { enter, draw, Easing } from './motion';
+import { hexToRgba } from '@/lib/colors';
 import type { ResolvedSceneTheme } from './theme';
 
 export interface LineProps {
@@ -17,6 +18,8 @@ export interface LineProps {
   letterSpacing?: string;
   /** render each word as a solid-color chip (the "Nike poster" emphasis treatment) */
   chip?: boolean;
+  /** render each word with an animated highlighter-marker sweep behind it instead of a chip */
+  marker?: boolean;
   theme: ResolvedSceneTheme;
   /**
    * Per-word entrance start times (seconds, scene-local), one per word — when provided
@@ -42,6 +45,7 @@ export function Line({
   marginBottom,
   letterSpacing = '-0.02em',
   chip = false,
+  marker = false,
   theme,
   wordStartsSec,
 }: LineProps) {
@@ -49,6 +53,7 @@ export function Line({
   const centered = align === 'center';
   const chipBg = theme.dark ? theme.bg : theme.accent;
   const chipColor = theme.dark ? theme.accent : theme.bg;
+  const markerColor = theme.dark ? hexToRgba(theme.bg, 0.55) : hexToRgba(theme.accent, 0.55);
   return (
     <div
       style={{
@@ -71,10 +76,12 @@ export function Line({
       {words.map((w, i) => {
         const wordStart = wordStartsSec && wordStartsSec[i] != null ? wordStartsSec[i] : start + i * 0.055;
         const m = enter(t, { start: wordStart, end, inDur: 0.26, outDur: 0.16, rise: 60, rot: 11, blur: 10 });
+        const sweepP = marker ? draw(t, wordStart + 0.1, wordStart + 0.34, Easing.easeOutCubic) : 0;
         return (
           <span
             key={i}
             style={{
+              position: marker ? 'relative' : undefined,
               display: 'inline-block',
               opacity: m.opacity,
               transform: m.transform,
@@ -85,7 +92,21 @@ export function Line({
               padding: chip ? '0.03em 0.16em' : undefined,
             }}
           >
-            {w}
+            {marker && (
+              <span
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: `${(1 - sweepP) * 100}%`,
+                  top: '14%',
+                  bottom: '8%',
+                  background: markerColor,
+                  transform: 'skewX(-8deg)',
+                  zIndex: 0,
+                }}
+              />
+            )}
+            <span style={{ position: marker ? 'relative' : undefined, zIndex: marker ? 1 : undefined }}>{w}</span>
           </span>
         );
       })}

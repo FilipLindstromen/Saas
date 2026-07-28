@@ -33,7 +33,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Conversation Funnel Builder | `/ConversationFunnelBuilder` | Visual conversation funnel editor with HTML export for Systeme.io |
 | BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
 | MetaConnect | `/MetaConnect` | Meta (FB/IG) comment-to-DM automation + lead form sync to Systeme.io (requires server; deploy to Vercel or run locally) |
-| TypoAnimation | `/TypoAnimation` | Kinetic-typography VSL generator: script → styled animated scenes and live preview on GitHub Pages; webcam sync, b-roll, and MP4 export need the full app run locally |
+| TypoAnimation | `/TypoAnimation` | Kinetic-typography VSL video generator: script → styled animated scenes, webcam voice sync, MP4 export (requires server; deploy to Vercel or run locally) |
 
 ## Deploying to GitHub Pages (optional)
 

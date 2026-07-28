@@ -110,6 +110,20 @@ export function pop(sceneT: number, at: number, opts: { dur?: number; amount?: n
   return 1 + amount * Math.sin(p * Math.PI);
 }
 
+// Deterministic pseudo-random value in [-1, 1] from an integer seed (sine-hash). For glitch
+// jitter, where each frame needs a different-looking offset but must stay 100% reproducible
+// under Remotion's per-frame seek-and-capture render model — `Math.random()` would desync
+// between preview and render.
+export function noise1D(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return (x - Math.floor(x)) * 2 - 1;
+}
+
+// A hard on/off square wave (unlike `pulse`'s smooth cosine) for a blinking text cursor.
+export function blink(elapsedSec: number, periodSec = 0.9): number {
+  return Math.floor(elapsedSec / (periodSec / 2)) % 2 === 0 ? 1 : 0;
+}
+
 // Deterministic stand-in for the reference's CSS `vslPulse` keyframe animation (opacity
 // 1->0.35, scale 1->0.7, 1.1s loop) — CSS wall-clock animations don't stay in sync with
 // Remotion's per-frame seek-and-capture render model, so this drives the same visual off

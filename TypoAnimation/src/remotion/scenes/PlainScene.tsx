@@ -54,7 +54,8 @@ export function PlainScene({ scene, theme, t, dur, label, showCaptions, showTime
             start={kickerDelay + i * 0.12}
             end={dur}
             size={66 * (ln.accent ? 1.08 : 1)}
-            chip={!!ln.accent}
+            chip={!!ln.accent && ln.emphasis !== 'marker'}
+            marker={!!ln.accent && ln.emphasis === 'marker'}
             align="center"
             maxWidth={980}
             color={theme.ink}

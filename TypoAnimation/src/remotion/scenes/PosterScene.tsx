@@ -53,7 +53,8 @@ export function PosterScene({ scene, theme, t, dur, label, showCaptions, showTim
             end={dur}
             size={84 * (ln.accent ? 0.42 : 1)}
             weight={ln.accent ? 700 : theme.headingWeight}
-            chip={!!ln.accent}
+            chip={!!ln.accent && ln.emphasis !== 'marker'}
+            marker={!!ln.accent && ln.emphasis === 'marker'}
             align="center"
             maxWidth={980}
             color={theme.ink}

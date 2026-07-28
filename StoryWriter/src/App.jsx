@@ -10,6 +10,7 @@ import {
   getSectionDefs,
   FRAMEWORKS,
 } from './constants/frameworks';
+import { TARGET_OUTCOMES, DEFAULT_TARGET_OUTCOME_ID, getTargetOutcome } from './constants/targetOutcomes';
 import { getSentenceStarts } from './utils/sentences';
 import { generateFullStory } from './services/openai';
 import { searchUnsplashFirst } from '@shared/stockMedia/unsplash';
@@ -37,12 +38,13 @@ const DEFAULT_STORY = {
   sectionOrder: [],
   sectionsData: {},
   storyLength: 'medium',
+  targetOutcome: DEFAULT_TARGET_OUTCOME_ID,
 };
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [persisted, setPersisted] = useState(DEFAULT_STORY);
-  const { storyAbout, frameworkId, sectionOrder, sectionsData, storyLength } = persisted;
+  const { storyAbout, frameworkId, sectionOrder, sectionsData, storyLength, targetOutcome } = persisted;
   const sectionDefs = getSectionDefs(frameworkId);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -75,6 +77,7 @@ function App() {
       sectionOrder: getDefaultSectionOrder(fid),
       sectionsData: createEmptySections(fid),
       storyLength: 'medium',
+      targetOutcome: DEFAULT_TARGET_OUTCOME_ID,
     };
   }, []);
 
@@ -420,6 +423,7 @@ function App() {
         sectionsData,
         sectionOrder,
         sectionDefs,
+        targetOutcomeInstruction: getTargetOutcome(targetOutcome).promptInstruction,
       });
       setPersisted((prev) => {
         const next = { ...prev.sectionsData };
@@ -618,6 +622,22 @@ function App() {
             <p className="sections-header__desc">
               Below are the sections your story will contain. Write the story, then drag sections to reorder and edit the text as needed.
             </p>
+            <label className="story-framework-label" htmlFor="story-target-outcome">
+              Target outcome
+            </label>
+            <select
+              id="story-target-outcome"
+              className="story-outcome-select"
+              value={targetOutcome}
+              onChange={(e) => setPersisted((prev) => ({ ...prev, targetOutcome: e.target.value }))}
+              disabled={isGenerating}
+            >
+              {TARGET_OUTCOMES.map((outcome) => (
+                <option key={outcome.id} value={outcome.id} title={outcome.description}>
+                  {outcome.name}
+                </option>
+              ))}
+            </select>
             <label className="story-framework-label" htmlFor="story-framework">
               Story framework
             </label>

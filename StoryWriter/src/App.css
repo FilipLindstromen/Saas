@@ -296,7 +296,8 @@
 }
 
 .story-framework-label,
-.story-length-label {
+.story-length-label,
+.story-outcome-label {
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
@@ -304,6 +305,7 @@
   margin-bottom: 0.375rem;
 }
 
+.story-outcome-select,
 .story-framework-select {
   display: block;
   width: 100%;
@@ -324,11 +326,13 @@
   padding-right: 2rem;
 }
 
+.story-outcome-select:focus,
 .story-framework-select:focus {
   background: var(--focus-bg);
   border-color: var(--focus-border);
 }
 
+.story-outcome-select:disabled,
 .story-framework-select:disabled {
   opacity: 0.85;
   cursor: not-allowed;
