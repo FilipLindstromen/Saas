@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { createEmptyProject, createScene, type Project, type Scene, type SceneStyle } from '@/types/project';
-import { parseScript } from '@/lib/parseScript';
+import { parseScript, pickSceneStyle, extractBigNumber, estimateDuration } from '@/lib/parseScript';
 import { PreviewPlayer } from '@/components/PreviewPlayer';
 import { ScriptEditor } from '@/components/ScriptEditor';
 import { SceneList } from '@/components/SceneList';
 import { SceneStylePanel } from '@/components/SceneStylePanel';
+import { BulkEditPanel } from '@/components/BulkEditPanel';
 import { ThemePanel } from '@/components/ThemePanel';
 import { SettingsOverlay } from '@/components/SettingsOverlay';
 import { VideoSyncPanel } from '@/components/VideoSyncPanel';
@@ -39,6 +40,10 @@ export default function Home() {
   const [project, setProject] = useState<Project>(() => createEmptyProject());
   const [scriptText, setScriptText] = useState(SAMPLE_SCRIPT);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  // Every id currently in the multi-select; selectedSceneId is the "primary" one (drives the
+  // playhead + is last-clicked, for shift-range-select) and stays included whenever this is
+  // non-empty. Plain clicks collapse this back down to a single id.
+  const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
   const [savedProjects, setSavedProjects] = useState<ProjectSummary[]>([]);
   const [status, setStatus] = useState<string>('');
   const [brollStatus, setBrollStatus] = useState<string>('');
@@ -64,17 +69,96 @@ export default function Home() {
   const patchProject = (patch: Partial<Project>) =>
     setProject((p) => ({ ...p, ...patch, updatedAt: new Date().toISOString() }));
 
+  // Sets a single "primary" selection, collapsing any multi-select — used everywhere scenes
+  // get selected programmatically (generate, add, load, duplicate), as opposed to the
+  // click-driven handleSelectScene below which also handles shift/ctrl multi-select.
+  const selectOne = (id: string | null) => {
+    setSelectedSceneId(id);
+    setMultiSelectedIds(id ? [id] : []);
+  };
+
+  const handleSelectScene = (id: string, opts: { shift?: boolean; toggle?: boolean }) => {
+    if (opts.toggle) {
+      setMultiSelectedIds((prev) => {
+        const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+        setSelectedSceneId(next.length ? id : null);
+        return next;
+      });
+      return;
+    }
+    if (opts.shift && selectedSceneId) {
+      const ids = project.scenes.map((s) => s.id);
+      const a = ids.indexOf(selectedSceneId);
+      const b = ids.indexOf(id);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        const range = ids.slice(lo, hi + 1);
+        setMultiSelectedIds((prev) => Array.from(new Set([...prev, ...range])));
+        setSelectedSceneId(id);
+        return;
+      }
+    }
+    selectOne(id);
+  };
+
+  // Applies one field at a time to every scene in the multi-select (BulkEditPanel calls this
+  // once per control the user touches). Skips the content-driven duration re-fit patchScene
+  // does — bulk edits are about style/settings, not text, so a scene's duration shouldn't move
+  // just because its style changed.
+  const handleBulkPatch = (patch: Partial<Scene>) =>
+    setProject((p) => ({
+      ...p,
+      scenes: p.scenes.map((s) => (multiSelectedIds.includes(s.id) ? { ...s, ...patch } : s)),
+      updatedAt: new Date().toISOString(),
+    }));
+
   const patchScene = (id: string, patch: Partial<Scene>) =>
     setProject((p) => ({
       ...p,
-      scenes: p.scenes.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      scenes: p.scenes.map((s) => {
+        if (s.id !== id) return s;
+        const next = { ...s, ...patch };
+        // Content edits re-fit the duration to the new word count, unless this scene is
+        // voiceover-synced (wordTimings set) — that duration must stay locked to the audio
+        // track regardless of text edits. An explicit edit to durationSec itself (the manual
+        // "Duration (sec)" field) always wins and isn't immediately overwritten.
+        const contentChanged = ('lines' in patch || 'kicker' in patch) && !('durationSec' in patch);
+        if (contentChanged && !next.wordTimings) {
+          next.durationSec = estimateDuration(next.kicker, next.lines);
+        }
+        return next;
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+
+  // Re-runs the content classifier against every existing scene's current lines/kicker,
+  // overwriting style (and, for scenes that read as a stat callout, number/numberSuffix) —
+  // an explicit bulk action, so unlike the live per-edit duration fit above it's fine to
+  // clobber styles the user picked manually, same as "Auto-select b-roll for all scenes" does.
+  const handleAutoSetStyles = () =>
+    setProject((p) => ({
+      ...p,
+      scenes: p.scenes.map((s) => {
+        const style = pickSceneStyle(s.kicker, s.lines);
+        const big = style === 'bignumber' ? extractBigNumber(s.lines) : null;
+        const lines = big ? big.rest : s.lines;
+        return {
+          ...s,
+          style,
+          lines,
+          number: big ? big.number : s.style === 'bignumber' ? s.number : undefined,
+          numberSuffix: big ? big.suffix : s.style === 'bignumber' ? s.numberSuffix : undefined,
+          dark: style === 'poster' ? true : s.dark,
+          durationSec: s.wordTimings ? s.durationSec : estimateDuration(s.kicker, lines),
+        };
+      }),
       updatedAt: new Date().toISOString(),
     }));
 
   const handleGenerate = () => {
     const scenes = parseScript(scriptText);
     setProject((p) => ({ ...p, scenes, updatedAt: new Date().toISOString() }));
-    setSelectedSceneId(scenes[0]?.id ?? null);
+    selectOne(scenes[0]?.id ?? null);
     setMode('edit');
   };
 
@@ -86,8 +170,11 @@ export default function Home() {
       return { ...p, scenes, updatedAt: new Date().toISOString() };
     });
 
-  const handleRemove = (id: string) =>
+  const handleRemove = (id: string) => {
     setProject((p) => ({ ...p, scenes: p.scenes.filter((s) => s.id !== id), updatedAt: new Date().toISOString() }));
+    setMultiSelectedIds((prev) => prev.filter((x) => x !== id));
+    setSelectedSceneId((prev) => (prev === id ? null : prev));
+  };
 
   const handleDuplicate = (id: string) =>
     setProject((p) => {
@@ -116,7 +203,7 @@ export default function Home() {
             : undefined,
         number: style === 'bignumber' ? 90 : undefined,
       });
-      setSelectedSceneId(scene.id);
+      selectOne(scene.id);
       return { ...p, scenes: [...p.scenes, scene], updatedAt: new Date().toISOString() };
     });
 
@@ -142,7 +229,7 @@ export default function Home() {
       const loaded = loadLocalProject(id);
       if (!loaded) return;
       setProject(loaded);
-      setSelectedSceneId(loaded.scenes[0]?.id ?? null);
+      selectOne(loaded.scenes[0]?.id ?? null);
       setMode('edit');
       return;
     }
@@ -200,7 +287,7 @@ export default function Home() {
 
   const handleNew = () => {
     setProject(createEmptyProject());
-    setSelectedSceneId(null);
+    selectOne(null);
     setScriptText('');
     setMode('plan');
   };
@@ -254,6 +341,14 @@ export default function Home() {
           >
             New
           </button>
+          <button
+            onClick={handleAutoSetStyles}
+            disabled={project.scenes.length === 0}
+            title="Re-picks each scene's style (Poster, Big number, Chips, Plain) from its current text"
+            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15 disabled:opacity-40"
+          >
+            Auto-set scene types
+          </button>
           {!IS_STATIC && (
             <div className="ml-2 border-l border-white/10 pl-3">
               <ExportPanel project={project} />
@@ -275,8 +370,10 @@ export default function Home() {
           <div className="flex flex-col gap-4 overflow-y-auto">
             <SceneList
               scenes={project.scenes}
+              theme={project.theme}
               selectedId={selectedSceneId}
-              onSelect={setSelectedSceneId}
+              multiSelectedIds={multiSelectedIds}
+              onSelect={handleSelectScene}
               onReorder={handleReorder}
               onRemove={handleRemove}
               onDuplicate={handleDuplicate}
@@ -325,7 +422,11 @@ export default function Home() {
               <span className="text-xs text-white/45">Colors, fonts, captions →</span>
             </button>
             <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-              <SceneStylePanel scene={selectedScene} onChange={patchScene} hideBroll={IS_STATIC} />
+              {multiSelectedIds.length > 1 ? (
+                <BulkEditPanel sceneIds={multiSelectedIds} onApply={handleBulkPatch} />
+              ) : (
+                <SceneStylePanel scene={selectedScene} onChange={patchScene} hideBroll={IS_STATIC} />
+              )}
             </div>
           </div>
         </div>

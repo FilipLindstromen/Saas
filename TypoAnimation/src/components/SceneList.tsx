@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { Scene, SceneStyle } from '@/types/project';
+import type { ProjectTheme, Scene, SceneStyle } from '@/types/project';
+import { resolveSceneTheme } from '@/remotion/shared/theme';
 
 const STYLE_LABELS: Record<SceneStyle, string> = {
   plain: 'Plain',
@@ -28,6 +29,42 @@ const STYLE_GLYPHS: Record<SceneStyle, string> = {
   typewriter: '_',
 };
 
+// A small preview swatch using the scene's actual resolved colors (respecting its own
+// dark/accent overrides, same as the real render), its b-roll thumbnail as a background image
+// when it has one, and a snippet of its actual copy — so the list reads as a rough storyboard
+// instead of a wall of identical gray boxes with a style glyph.
+function SceneThumb({ theme, scene }: { theme: ProjectTheme; scene: Scene }) {
+  const resolved = resolveSceneTheme(theme, scene);
+  const snippet =
+    scene.style === 'bignumber' && scene.number != null
+      ? `${scene.number}${scene.numberSuffix || ''}`
+      : scene.kicker || scene.lines[0]?.text || '';
+  const bgStyle: React.CSSProperties = scene.broll?.thumbnail
+    ? {
+        backgroundImage: `linear-gradient(rgba(0,0,0,${scene.broll.opacity ?? 0.45}), rgba(0,0,0,${scene.broll.opacity ?? 0.45})), url(${scene.broll.thumbnail})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : { background: resolved.bg };
+
+  return (
+    <div className="relative flex h-[45px] w-20 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 px-1" style={bgStyle}>
+      <span
+        className="line-clamp-2 text-center text-[9px] font-bold leading-[1.1]"
+        style={{ color: scene.broll?.thumbnail ? '#fff' : resolved.ink, fontFamily: resolved.fontHeading }}
+      >
+        {snippet || STYLE_GLYPHS[scene.style]}
+      </span>
+      <span
+        className="absolute bottom-0 right-0.5 text-[8px] opacity-70"
+        style={{ color: scene.broll?.thumbnail ? '#fff' : resolved.ink }}
+      >
+        {STYLE_GLYPHS[scene.style]}
+      </span>
+    </div>
+  );
+}
+
 function DuplicateIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -39,7 +76,9 @@ function DuplicateIcon() {
 
 export function SceneList({
   scenes,
+  theme,
   selectedId,
+  multiSelectedIds,
   onSelect,
   onReorder,
   onRemove,
@@ -47,8 +86,11 @@ export function SceneList({
   onAdd,
 }: {
   scenes: Scene[];
+  theme: ProjectTheme;
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  /** every id currently part of the multi-select (includes selectedId when non-empty) */
+  multiSelectedIds: string[];
+  onSelect: (id: string, opts: { shift?: boolean; toggle?: boolean }) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
   onRemove: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -70,7 +112,9 @@ export function SceneList({
   return (
     <div className="flex flex-col rounded-2xl bg-[#1a1a1a]">
       <div className="flex items-center justify-between border-b border-white/[0.06] p-4">
-        <h2 className="text-[0.95rem] font-semibold text-white">Scenes ({scenes.length})</h2>
+        <h2 className="text-[0.95rem] font-semibold text-white">
+          Scenes ({scenes.length}){multiSelectedIds.length > 1 && ` · ${multiSelectedIds.length} selected`}
+        </h2>
         <select
           defaultValue=""
           onChange={(e) => {
@@ -97,7 +141,8 @@ export function SceneList({
           </div>
         )}
         {scenes.map((scene, i) => {
-          const active = scene.id === selectedId;
+          const primary = scene.id === selectedId;
+          const inMultiSelect = multiSelectedIds.includes(scene.id);
           const dragging = draggedId === scene.id;
           const dragOver = dragOverId === scene.id && draggedId !== scene.id;
           return (
@@ -119,25 +164,34 @@ export function SceneList({
             >
               <span className="w-6 shrink-0 text-right text-[0.85rem] font-semibold text-white/65">{i + 1}</span>
 
+              <input
+                type="checkbox"
+                checked={inMultiSelect}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => onSelect(scene.id, { toggle: true })}
+                title="Add to multi-select"
+                className="shrink-0"
+              />
+
               <div
-                onClick={() => onSelect(scene.id)}
+                onClick={(e) => onSelect(scene.id, { shift: e.shiftKey, toggle: e.metaKey || e.ctrlKey })}
                 className={`relative min-w-0 flex-1 cursor-move overflow-hidden rounded-2xl border p-[0.875rem] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-200 ${
-                  active
+                  primary
                     ? 'border-[#ff6b35] bg-[#1f1f1f] shadow-[0_0_0_2px_rgba(255,107,53,0.2),0_4px_16px_rgba(0,0,0,0.5)]'
-                    : dragOver
-                      ? 'border-[#ff6b35] bg-[#252525]'
-                      : 'border-white/[0.06] bg-[#1f1f1f] hover:-translate-y-0.5 hover:border-white/10 hover:bg-[#252525] hover:shadow-[0_4px_16px_rgba(0,0,0,0.5)]'
+                    : inMultiSelect
+                      ? 'border-[#ff6b35]/50 bg-[#212121]'
+                      : dragOver
+                        ? 'border-[#ff6b35] bg-[#252525]'
+                        : 'border-white/[0.06] bg-[#1f1f1f] hover:-translate-y-0.5 hover:border-white/10 hover:bg-[#252525] hover:shadow-[0_4px_16px_rgba(0,0,0,0.5)]'
                 }`}
               >
                 <span
                   className={`absolute left-0 top-0 h-full w-[3px] bg-gradient-to-b from-[#ff6b35] to-[#ff4757] transition-transform duration-200 ${
-                    active ? 'scale-y-100' : 'scale-y-0'
+                    primary || inMultiSelect ? 'scale-y-100' : 'scale-y-0'
                   }`}
                 />
                 <div className="flex items-center gap-3">
-                  <div className="flex h-[45px] w-20 shrink-0 items-center justify-center rounded border border-white/10 bg-[#141414] text-lg font-bold text-white/45">
-                    {STYLE_GLYPHS[scene.style]}
-                  </div>
+                  <SceneThumb theme={theme} scene={scene} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-white">{scene.name}</div>
                     <div className="truncate text-xs text-white/45">

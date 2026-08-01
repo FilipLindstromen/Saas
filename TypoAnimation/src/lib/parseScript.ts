@@ -38,13 +38,15 @@ export function parseStructuredScript(text: string): ParsedBlock[] {
   return out;
 }
 
-function wordCount(s: string): number {
+export function wordCount(s: string): number {
   return s.trim() ? s.trim().split(/\s+/).length : 0;
 }
 
 // A comfortable on-screen duration for a scene given how much text it has to reveal
-// word-by-word (0.055s/word stagger inside Line) plus a reading-along buffer.
-function estimateDuration(kicker: string | null | undefined, lines: { text: string }[]): number {
+// word-by-word (0.055s/word stagger inside Line) plus a reading-along buffer. Exported so the
+// editor can re-fit a scene's duration to its content live, whenever it's edited after the
+// initial generation (see patchScene in page.tsx) — not just at parse time.
+export function estimateDuration(kicker: string | null | undefined, lines: { text: string }[]): number {
   const words = (kicker ? wordCount(kicker) : 0) + lines.reduce((n, l) => n + wordCount(l.text), 0);
   return Math.min(6.5, Math.max(2.2, 1.6 + words * 0.22));
 }
@@ -54,7 +56,7 @@ function estimateDuration(kicker: string | null | undefined, lines: { text: stri
 // callouts, not any line that happens to contain a number ("90 seconds later" doesn't match).
 const BIG_NUMBER_LINE = /^(\d+(?:\.\d+)?)([%xX+]?)$/;
 
-function extractBigNumber(lines: SceneLine[]): { number: number; suffix?: string; rest: SceneLine[] } | null {
+export function extractBigNumber(lines: SceneLine[]): { number: number; suffix?: string; rest: SceneLine[] } | null {
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].text.trim().match(BIG_NUMBER_LINE);
     if (!m) continue;
@@ -70,7 +72,7 @@ function extractBigNumber(lines: SceneLine[]): { number: number; suffix?: string
 // a punchy poster statement — anything longer/more prose-like stays the general-purpose
 // word-by-word default. Styles that need data this parser can't infer from plain text
 // (comparison rows, rotating words, b-roll footage) are left for manual selection afterward.
-function pickSceneStyle(kicker: string | null | undefined, lines: SceneLine[]): SceneStyle {
+export function pickSceneStyle(kicker: string | null | undefined, lines: SceneLine[]): SceneStyle {
   if (extractBigNumber(lines)) return 'bignumber';
   if (lines.length >= 3 && lines.every((l) => wordCount(l.text) <= 3)) return 'chips';
   const totalWords = (kicker ? wordCount(kicker) : 0) + lines.reduce((n, l) => n + wordCount(l.text), 0);

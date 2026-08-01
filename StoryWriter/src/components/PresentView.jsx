@@ -87,8 +87,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   }, [sentences.length, initialIndex]);
 
   const [currentIndex, setCurrentIndex] = useState(safeStartIndex);
-  const [leavingIndex, setLeavingIndex] = useState(null);
-  const [enterPhase, setEnterPhase] = useState('entering');
+  const [sentencePhase, setSentencePhase] = useState('enter');
   const transitionLockRef = useRef(false);
   const transitionTimersRef = useRef([]);
 
@@ -112,14 +111,13 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
 
   useEffect(() => {
     if (sentences.length === 0) return;
-    setLeavingIndex(null);
-    setEnterPhase('entering');
+    setSentencePhase('enter');
     clearTransitionTimers();
     transitionLockRef.current = false;
     const sentence = sentences[safeStartIndex] ?? '';
     const animation = resolveAnimationForSentence(sentence, rules);
     const enterMs = getEnterDurationMs(sentence, animation, rules);
-    queueTransitionTimer(() => setEnterPhase('idle'), enterMs || 0);
+    queueTransitionTimer(() => setSentencePhase('idle'), enterMs || 0);
     setCurrentIndex(safeStartIndex);
   }, [safeStartIndex, sentences, settingsVersion, rules, clearTransitionTimers, queueTransitionTimer]);
 
@@ -151,11 +149,6 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     const sentence = sentences[displayIndex] ?? '';
     return resolveAnimationForSentence(sentence, rules);
   }, [sentences, displayIndex, rules]);
-  const leavingAnimation = useMemo(() => {
-    if (leavingIndex == null) return null;
-    const sentence = sentences[leavingIndex] ?? '';
-    return resolveAnimationForSentence(sentence, rules);
-  }, [leavingIndex, sentences, rules]);
   const currentSectionId = currentItem?.sectionId;
   const sentenceIndexInSection = currentItem?.sentenceIndexInSection ?? 0;
   const sectionData = currentSectionId ? sectionsData[currentSectionId] : null;
@@ -191,22 +184,20 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     const leavingSentence = sentences[currentIndex] ?? '';
     const leavingAnimation = resolveAnimationForSentence(leavingSentence, rules);
     const exitAnimation = getExitAnimation(leavingAnimation);
-    const exitMs = getExitDurationMs(exitAnimation);
+    const exitMs = getExitDurationMs(exitAnimation, leavingSentence, rules);
 
-    setLeavingIndex(currentIndex);
-    setEnterPhase('idle');
+    setSentencePhase('exit');
 
     queueTransitionTimer(() => {
-      setLeavingIndex(null);
       setCurrentIndex(newIndex);
-      setEnterPhase('entering');
+      setSentencePhase('enter');
 
       const enteringSentence = sentences[newIndex] ?? '';
       const enterAnimation = resolveAnimationForSentence(enteringSentence, rules);
       const enterMs = getEnterDurationMs(enteringSentence, enterAnimation, rules);
 
       queueTransitionTimer(() => {
-        setEnterPhase('idle');
+        setSentencePhase('idle');
         transitionLockRef.current = false;
       }, enterMs || 0);
     }, exitMs || 0);
@@ -431,21 +422,10 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
       )}
       <div className="present-view__inner">
         <div className="present-view__sentence-stage">
-          {leavingIndex != null && leavingAnimation && (
-            <PresentSentence
-              key={`leave-${leavingIndex}`}
-              text={sentences[leavingIndex]}
-              animation={leavingAnimation}
-              phase="exit"
-              rules={rules}
-              style={{ fontSize, lineHeight }}
-            />
-          )}
           <PresentSentence
-            key={`show-${displayIndex}`}
             text={sentence}
             animation={currentAnimation}
-            phase={enterPhase === 'entering' ? 'enter' : 'idle'}
+            phase={sentencePhase}
             rules={rules}
             style={{ fontSize, lineHeight }}
           />

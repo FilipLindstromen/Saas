@@ -35,7 +35,7 @@ export function BigNumberScene({ scene, theme, t, dur, label, showCaptions, show
             filter: m.filter,
             fontFamily: theme.fontHeading,
             fontWeight: theme.headingWeight,
-            fontSize: 340,
+            fontSize: 340 * theme.fontScale,
             lineHeight: 0.9,
             color: theme.accent,
           }}

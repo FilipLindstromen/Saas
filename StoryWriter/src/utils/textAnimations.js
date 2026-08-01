@@ -81,13 +81,13 @@ export function resolveAnimationForSentence(sentence, rules, globalFallback = 's
   return normalized.longAnimation;
 }
 
-/** Exit animation mirrors enter — drop-center drops down on exit. */
+/** Exit animation mirrors enter — drop-center drops down on exit; fade-words exits per word. */
 export function getExitAnimation(enterAnimation) {
   switch (enterAnimation) {
     case 'drop-center':
       return 'drop-center';
     case 'fade-words':
-      return 'fade-words-exit';
+      return 'fade-words';
     case 'slide-up':
       return 'slide-down';
     case 'slide-left':
@@ -119,9 +119,13 @@ export function getEnterDurationMs(sentence, animation, rules) {
   return BASE_ENTER_MS;
 }
 
-export function getExitDurationMs(animation) {
-  if (animation === 'none') return 0;
-  if (animation === 'drop-center') return 480;
-  if (animation === 'fade-words-exit') return 380;
+export function getExitDurationMs(exitAnimation, sentence = '', rules) {
+  if (exitAnimation === 'none') return 0;
+  if (exitAnimation === 'drop-center') return 480;
+  if (exitAnimation === 'fade-words') {
+    const normalized = normalizePresentationAnimationRules(rules);
+    const words = countWords(sentence);
+    return 300 + Math.max(0, words - 1) * normalized.wordStaggerMs;
+  }
   return BASE_EXIT_MS;
 }

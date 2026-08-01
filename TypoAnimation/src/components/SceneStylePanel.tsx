@@ -6,7 +6,7 @@ import { COLOR_PRESETS } from '@/lib/colors';
 import { FONT_PAIRING_OPTIONS } from '@/lib/fontPairings';
 import { BrollPanel } from './BrollPanel';
 
-const STYLE_OPTIONS: { value: SceneStyle; label: string }[] = [
+export const STYLE_OPTIONS: { value: SceneStyle; label: string }[] = [
   { value: 'plain', label: 'Plain — word-by-word text' },
   { value: 'poster', label: 'Poster — full-bleed statement' },
   { value: 'bignumber', label: 'Big number — animated counter' },

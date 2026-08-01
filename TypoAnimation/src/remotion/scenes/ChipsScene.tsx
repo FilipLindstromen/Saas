@@ -43,7 +43,7 @@ export function ChipsScene({ scene, theme, t, dur, label, showCaptions, showTime
                   padding: '14px 24px',
                   fontFamily: theme.fontHeading,
                   fontWeight: theme.headingWeight,
-                  fontSize: 30,
+                  fontSize: 30 * theme.fontScale,
                   color: theme.accentDeep,
                 }}
               >

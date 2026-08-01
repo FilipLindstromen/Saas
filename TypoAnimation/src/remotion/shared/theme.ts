@@ -12,6 +12,9 @@ export interface ResolvedSceneTheme {
   headingWeight: number;
   kickerWeight: number;
   dark: boolean;
+  /** global text-size multiplier (project.theme.fontScale, defaults to 1) — every scene
+   * component multiplies its own hardcoded pixel sizes by this. */
+  fontScale: number;
 }
 
 // Merges the project-wide theme with a scene's own overrides (dark mode, accent color,
@@ -32,5 +35,6 @@ export function resolveSceneTheme(theme: ProjectTheme, scene: Scene): ResolvedSc
     headingWeight: pairing.headingWeight,
     kickerWeight: pairing.kickerWeight,
     dark,
+    fontScale: theme.fontScale ?? 1,
   };
 }

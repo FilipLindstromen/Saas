@@ -68,6 +68,8 @@ export interface ProjectTheme {
   fontPairing: string;
   /** how scenes hand off to each other; defaults to a hard cut */
   transition?: 'cut' | 'fade' | 'slide' | 'wipe';
+  /** global text-size multiplier applied on top of every scene style's base sizes; defaults to 1 */
+  fontScale?: number;
 }
 
 export interface VideoAsset {

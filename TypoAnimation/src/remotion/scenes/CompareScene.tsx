@@ -40,7 +40,7 @@ export function CompareScene({ scene, theme, t, dur, label, showCaptions, showTi
                   width: 220,
                   fontFamily: theme.fontHeading,
                   fontWeight: theme.headingWeight,
-                  fontSize: 22,
+                  fontSize: 22 * theme.fontScale,
                   textAlign: 'right',
                   color: r.accent ? theme.accentDeep : theme.ink,
                 }}
@@ -59,7 +59,7 @@ export function CompareScene({ scene, theme, t, dur, label, showCaptions, showTi
                   }}
                 />
               </div>
-              <div style={{ width: 90, fontFamily: theme.fontHeading, fontWeight: 800, fontSize: 18, color: theme.ink, opacity: 0.72 }}>{r.sub}</div>
+              <div style={{ width: 90, fontFamily: theme.fontHeading, fontWeight: 800, fontSize: 18 * theme.fontScale, color: theme.ink, opacity: 0.72 }}>{r.sub}</div>
             </div>
           );
         })}

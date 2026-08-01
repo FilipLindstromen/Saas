@@ -93,6 +93,22 @@ export function ThemePanel({
         </select>
       </label>
 
+      <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+        <span className="flex items-center justify-between">
+          Font size
+          <span className="text-white/45">{Math.round((theme.fontScale ?? 1) * 100)}%</span>
+        </span>
+        <input
+          type="range"
+          min={0.7}
+          max={1.5}
+          step={0.05}
+          value={theme.fontScale ?? 1}
+          onChange={(e) => patchTheme({ fontScale: Number(e.target.value) })}
+          className="accent-[#ff6b35]"
+        />
+      </label>
+
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-white/65">Work area / export size</span>
         <div className="flex gap-1.5">

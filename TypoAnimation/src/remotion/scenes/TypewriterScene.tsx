@@ -54,7 +54,7 @@ export function TypewriterScene({ scene, theme, t, dur, label, showCaptions, sho
               style={{
                 fontFamily: theme.fontHeading,
                 fontWeight: theme.kickerWeight,
-                fontSize: 20,
+                fontSize: 20 * theme.fontScale,
                 letterSpacing: '0.14em',
                 color: theme.accentDeep,
                 opacity: t > 0 ? 1 : 0,
@@ -75,7 +75,7 @@ export function TypewriterScene({ scene, theme, t, dur, label, showCaptions, sho
                 style={{
                   fontFamily: theme.fontHeading,
                   fontWeight: ln.accent ? 700 : theme.headingWeight,
-                  fontSize: 48,
+                  fontSize: 48 * theme.fontScale,
                   letterSpacing: '-0.01em',
                   color: ln.accent ? theme.accent : theme.ink,
                 }}

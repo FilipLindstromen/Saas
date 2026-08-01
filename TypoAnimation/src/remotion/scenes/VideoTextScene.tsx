@@ -42,10 +42,11 @@ function VideoMaskedLine({
   broll?: BrollAsset;
 }) {
   const m = enter(t, { start, end, inDur: 0.32, outDur: 0.2, rise: 46 });
+  const scaledSize = size * theme.fontScale;
   const textStyle: React.CSSProperties = {
     fontFamily: theme.fontHeading,
     fontWeight: theme.headingWeight,
-    fontSize: size,
+    fontSize: scaledSize,
     lineHeight: 0.98,
     letterSpacing: '-0.02em',
     textAlign: 'center',
@@ -60,11 +61,11 @@ function VideoMaskedLine({
     );
   }
 
-  const maskHeight = Math.round(size * 1.3);
+  const maskHeight = Math.round(scaledSize * 1.3);
   const svg =
     `<svg xmlns='http://www.w3.org/2000/svg' width='${MASK_W}' height='${maskHeight}'>` +
     `<text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' ` +
-    `font-family='${theme.fontHeading}' font-weight='${theme.headingWeight}' font-size='${size}' ` +
+    `font-family='${theme.fontHeading}' font-weight='${theme.headingWeight}' font-size='${scaledSize}' ` +
     `letter-spacing='-2' fill='white'>${escapeXml(text)}</text></svg>`;
   const maskImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   const maskProps: React.CSSProperties = {

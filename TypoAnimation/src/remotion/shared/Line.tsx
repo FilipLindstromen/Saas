@@ -64,7 +64,7 @@ export function Line({
         rowGap: chip ? 8 : 2,
         fontFamily: theme.fontHeading,
         fontWeight: weight ?? theme.headingWeight,
-        fontSize: size,
+        fontSize: size * theme.fontScale,
         lineHeight: 1.02,
         letterSpacing,
         color: color || theme.ink,

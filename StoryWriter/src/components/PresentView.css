@@ -85,7 +85,7 @@
 /* Word-by-word: use normal text flow so line breaks match final layout from frame one */
 .present-view__sentence--fade-words.present-view__sentence--enter,
 .present-view__sentence--fade-words.present-view__sentence--idle,
-.present-view__sentence--fade-words-exit.present-view__sentence--exit {
+.present-view__sentence--fade-words.present-view__sentence--exit {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -122,8 +122,11 @@
 
 .present-view__word--visible {
   opacity: 1;
-  transform: none;
   animation: none;
+}
+
+.present-view__word--out {
+  animation: present-word-fade-out 0.34s ease-in forwards;
 }
 
 /* Drop from above into center, exit downward off screen */
@@ -133,16 +136,21 @@
 
 .present-view__sentence--drop-center.present-view__sentence--exit {
   animation: present-drop-out 0.48s cubic-bezier(0.55, 0, 0.9, 0.38) forwards;
+  will-change: transform, opacity;
 }
 
 .present-view__sentence--drop-center.present-view__sentence--idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 1;
   transform: none;
 }
 
-/* Word-by-word exit: whole block fades and drops */
-.present-view__sentence--fade-words-exit.present-view__sentence--exit {
-  animation: present-words-block-out 0.38s ease-in forwards;
+.present-view__sentence--fade-words.present-view__sentence--exit {
+  animation: none;
 }
 
 .present-view__sentence--slide-up.present-view__sentence--enter {
@@ -199,6 +207,17 @@
   }
 }
 
+@keyframes present-word-fade-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
 @keyframes present-drop-in {
   from {
     opacity: 0;
@@ -213,11 +232,11 @@
 @keyframes present-drop-out {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
   to {
     opacity: 0;
-    transform: translateY(42vh);
+    transform: translateY(40vh) scale(0.97);
   }
 }
 
@@ -255,9 +274,11 @@
 @keyframes present-sentence-fade-out {
   from {
     opacity: 1;
+    transform: translateY(0);
   }
   to {
     opacity: 0;
+    transform: translateY(12px);
   }
 }
 
@@ -334,7 +355,7 @@
   }
   to {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(32px);
   }
 }
 
