@@ -59,6 +59,7 @@ export type Recording = {
 export type ReferenceMaterialSummary = {
   uploadedAt: string;
   sourceFileName: string;
+  sourceNames?: string[];
   files: { path: string; charCount: number }[];
   totalChars: number;
   skippedBinary?: number;

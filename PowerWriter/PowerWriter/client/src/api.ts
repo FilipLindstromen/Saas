@@ -22,11 +22,14 @@ import {
   storageSaveFolderInstructions,
   storageSaveReferenceMaterial,
   storageClearReferenceMaterial,
-  storageGetReferenceFiles
+  storageGetReferenceFiles,
+  storageGetReferenceSummary
 } from "./storage";
 import {
+  buildReferenceManifest,
   buildReferencePromptContext,
-  extractReferenceFromZipFile
+  extractReferenceFromUploadFiles,
+  mergeReferenceFiles
 } from "./lib/referenceMaterial";
 import type { ReferenceMaterialSummary } from "./types";
 
@@ -155,19 +158,35 @@ export async function saveDocument(
   return handleResponse<{ success: true }>(response);
 }
 
-export async function uploadDocumentReferenceZip(
+export async function uploadDocumentReferenceFiles(
   path: string,
-  file: File
+  files: File[]
 ): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  if (files.length === 0) {
+    throw new Error("Select at least one file to upload.");
+  }
+
   if (await shouldUseStorage()) {
-    const extracted = await extractReferenceFromZipFile(file);
-    storageSaveReferenceMaterial(path, extracted.manifest, extracted.files);
-    return { referenceMaterial: extracted.manifest };
+    const previousManifest = storageGetReferenceSummary(path);
+    const existingFiles = storageGetReferenceFiles(path);
+    const extracted = await extractReferenceFromUploadFiles(files);
+    const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+    const manifest = buildReferenceManifest({
+      sourceNames: extracted.sourceNames,
+      files: mergedFiles,
+      skippedBinary: extracted.skippedBinary,
+      previousManifest
+    });
+    storageSaveReferenceMaterial(path, manifest, mergedFiles);
+    return { referenceMaterial: manifest };
   }
 
   const formData = new FormData();
   formData.append("path", path);
-  formData.append("zip", file);
+  formData.append("append", "true");
+  for (const file of files) {
+    formData.append("files", file);
+  }
 
   const response = await fetch("/api/document/reference", {
     method: "POST",
@@ -178,6 +197,14 @@ export async function uploadDocumentReferenceZip(
     referenceMaterial: ReferenceMaterialSummary;
   }>(response);
   return { referenceMaterial: data.referenceMaterial };
+}
+
+/** @deprecated use uploadDocumentReferenceFiles */
+export async function uploadDocumentReferenceZip(
+  path: string,
+  file: File
+): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  return uploadDocumentReferenceFiles(path, [file]);
 }
 
 export async function clearDocumentReferenceMaterial(path: string) {

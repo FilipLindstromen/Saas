@@ -22,7 +22,7 @@ import {
   deleteDocument,
   deleteFolder,
   uploadDocumentAudio,
-  uploadDocumentReferenceZip,
+  uploadDocumentReferenceFiles,
   clearDocumentReferenceMaterial
 } from "./api";
 import { AudioEditor } from "./AudioEditor";
@@ -952,7 +952,7 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocGenerating, setIsDocGenerating] = useState(false);
   const [isReferenceUploading, setIsReferenceUploading] = useState(false);
-  const referenceZipInputRef = useRef<HTMLInputElement | null>(null);
+  const referenceFilesInputRef = useRef<HTMLInputElement | null>(null);
   const [draggedItem, setDraggedItem] = useState<Selection | null>(null);
   const [selectionMenu, setSelectionMenu] =
     useState<SelectionMenuState | null>(null);
@@ -2732,31 +2732,32 @@ export default function App() {
     }
   };
 
-  const handleReferenceZipSelected = async (
+  const handleReferenceFilesSelected = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = event.target.files?.[0];
+    const fileList = event.target.files;
     event.target.value = "";
-    if (!file || selected?.type !== "document") return;
+    if (!fileList?.length || selected?.type !== "document") return;
+    const files = Array.from(fileList);
 
     setIsReferenceUploading(true);
     try {
-      const { referenceMaterial } = await uploadDocumentReferenceZip(
+      const { referenceMaterial } = await uploadDocumentReferenceFiles(
         selected.path,
-        file
+        files
       );
       setDocumentDetails((prev) =>
         prev ? { ...prev, referenceMaterial } : prev
       );
       setStatus({
         type: "success",
-        message: `Reference material loaded (${referenceMaterial.files.length} files)`
+        message: `Reference material updated (${referenceMaterial.files.length} files total)`
       });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Unable to import reference zip";
+          : "Unable to import reference files";
       setStatus({ type: "error", message });
     } finally {
       setIsReferenceUploading(false);
@@ -4352,11 +4353,14 @@ export default function App() {
                   <div className="document-generate-row">
                     <div className="document-reference-controls">
                       <input
-                        ref={referenceZipInputRef}
+                        ref={referenceFilesInputRef}
                         type="file"
-                        accept=".zip,application/zip"
+                        accept=".zip,.pdf,.txt,.md,.markdown,.json,.html,.htm,.yaml,.yml,application/pdf,application/zip,text/plain,text/markdown"
+                        multiple
                         className="sr-only"
-                        onChange={(event) => void handleReferenceZipSelected(event)}
+                        onChange={(event) =>
+                          void handleReferenceFilesSelected(event)
+                        }
                       />
                       <button
                         type="button"
@@ -4366,13 +4370,13 @@ export default function App() {
                           isReferenceUploading ||
                           isDocGenerating
                         }
-                        onClick={() => referenceZipInputRef.current?.click()}
+                        onClick={() => referenceFilesInputRef.current?.click()}
                       >
                         {isReferenceUploading
                           ? "Importing…"
                           : documentDetails.referenceMaterial
-                          ? "Replace reference (.zip)"
-                          : "Upload reference (.zip)"}
+                          ? "Add more reference files"
+                          : "Upload reference files"}
                       </button>
                       {documentDetails.referenceMaterial ? (
                         <div className="document-reference-summary">
@@ -4391,13 +4395,14 @@ export default function App() {
                             disabled={isReferenceUploading}
                             onClick={() => void handleClearReferenceMaterial()}
                           >
-                            Remove
+                            Remove all
                           </button>
                         </div>
                       ) : (
                         <p className="document-reference-hint">
-                          Add examples, instructions, or an ebook (.txt/.md in a
-                          zip) to steer generation for this document.
+                          Add one or more files (.pdf, .txt, .md) or zip
+                          archives. New uploads are merged into this document’s
+                          reference library.
                         </p>
                       )}
                     </div>

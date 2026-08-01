@@ -32,9 +32,12 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import {
   REFERENCE_MANIFEST,
+  MAX_REFERENCE_FILES_PER_REQUEST,
+  buildReferenceManifest,
   buildReferencePromptContext,
-  extractReferenceFromZipBuffer,
-  getReferenceDirAbsolute
+  extractReferenceFromUploads,
+  getReferenceDirAbsolute,
+  mergeReferenceFiles
 } from "./referenceMaterial.js";
 
 const execAsync = promisify(exec);
@@ -809,7 +812,7 @@ app.get("/api/document", async (req, res) => {
 
 app.post(
   "/api/document/reference",
-  referenceUpload.single("zip"),
+  referenceUpload.array("files", MAX_REFERENCE_FILES_PER_REQUEST),
   async (req, res) => {
     try {
       const relative =
@@ -821,8 +824,13 @@ app.post(
       if (!relative.endsWith(".txt")) {
         return res.status(400).send("Missing or invalid document path");
       }
-      if (!req.file?.buffer?.length) {
-        return res.status(400).send("Missing zip file (field name: zip)");
+
+      const uploads = Array.isArray(req.files) ? req.files : [];
+      if (uploads.length === 0 && req.file?.buffer?.length) {
+        uploads.push(req.file);
+      }
+      if (uploads.length === 0) {
+        return res.status(400).send("Missing files (field name: files)");
       }
 
       const documentPath = resolveMeditationPath(relative);
@@ -831,15 +839,31 @@ app.post(
         return res.status(400).send("Path is not a document file");
       }
 
-      const extracted = extractReferenceFromZipBuffer(
-        req.file.buffer,
-        req.file.originalname || "reference.zip"
-      );
-      await writeReferenceMaterial(documentPath, extracted);
+      const append = req.body?.append !== "false";
+      const previousManifest = append
+        ? await readReferenceSummary(documentPath)
+        : null;
+      const existingFiles = append
+        ? await loadReferenceFilesForPrompt(documentPath)
+        : [];
+
+      const extracted = await extractReferenceFromUploads(uploads);
+      const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+      const manifest = buildReferenceManifest({
+        sourceNames: extracted.sourceNames,
+        files: mergedFiles,
+        skippedBinary: extracted.skippedBinary,
+        previousManifest
+      });
+
+      await writeReferenceMaterial(documentPath, {
+        manifest,
+        files: mergedFiles
+      });
 
       res.json({
         success: true,
-        referenceMaterial: extracted.manifest
+        referenceMaterial: manifest
       });
     } catch (error) {
       res.status(500).send(
