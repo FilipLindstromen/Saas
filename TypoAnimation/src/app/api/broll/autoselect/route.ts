@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Scene, BrollAsset } from '@/types/project';
 import { generateBrollSearchQuery } from '@/lib/keywords';
 import { searchStockVideos } from '@/lib/stockVideo';
-import { downloadBrollVideo } from '@/lib/downloadBroll';
+import { downloadBrollMedia } from '@/lib/downloadBroll';
 
 export const runtime = 'nodejs';
 export const maxDuration = 600;
@@ -27,13 +27,14 @@ export async function POST(request: NextRequest) {
         skipped.push({ id: scene.id, reason: `no results for "${query}"` });
         continue;
       }
-      const { path } = await downloadBrollVideo(top.downloadUrl, top.id, top.provider);
+      const { path } = await downloadBrollMedia(top.downloadUrl, top.id, top.provider, top.kind);
       updates.push({
         id: scene.id,
         patch: {
           broll: {
             path,
             provider: top.provider,
+            kind: top.kind,
             sourceId: top.id,
             thumbnail: top.thumbnail,
             credit: top.credit,

@@ -56,12 +56,21 @@ export type Recording = {
   color?: string; // Color for word backgrounds from this recording
 };
 
+export type ReferenceMaterialSummary = {
+  uploadedAt: string;
+  sourceFileName: string;
+  files: { path: string; charCount: number }[];
+  totalChars: number;
+  skippedBinary?: number;
+};
+
 export type DocumentDetails = {
   path: string;
   name: string;
   content: string;
   instructions: string;
   aggregatedInstructions: string;
+  referenceMaterial?: ReferenceMaterialSummary | null;
   completed: boolean;
   audioUrl: string | null; // Legacy - for backward compatibility
   audioFileName: string | null; // Legacy

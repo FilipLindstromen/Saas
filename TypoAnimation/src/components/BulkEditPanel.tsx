@@ -56,30 +56,15 @@ export function BulkEditPanel({
         </select>
       </Field>
 
-      <Field label="Set duration (sec)">
-        <input
-          type="number"
-          step={0.1}
-          min={0.5}
-          max={30}
-          placeholder="Leave unchanged"
-          className={`w-32 ${inputClass}`}
-          onBlur={(e) => {
-            const v = Number(e.target.value);
-            if (e.target.value && v > 0) onApply({ durationSec: v });
-            e.target.value = '';
-          }}
-        />
-      </Field>
-
-      <div className="flex flex-wrap gap-4">
-        <label className="flex items-center gap-1.5 text-xs font-medium text-white/65">
-          <input type="checkbox" onChange={(e) => onApply({ dark: e.target.checked })} />
-          Set dark / full-bleed field
+      <div className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-[#141414] px-3 py-2.5">
+        <span className="text-xs font-semibold text-white/80">Background</span>
+        <label className="flex items-center gap-2 text-xs font-medium text-white/65">
+          <input type="checkbox" onChange={(e) => onApply({ dark: e.target.checked, ...(e.target.checked ? { secondaryBg: false } : {}) })} />
+          Accent background
         </label>
-        <label className="flex items-center gap-1.5 text-xs font-medium text-white/65">
-          <input type="checkbox" onChange={(e) => onApply({ glitchIntro: e.target.checked })} />
-          Set glitch intro
+        <label className="flex items-center gap-2 text-xs font-medium text-white/65">
+          <input type="checkbox" onChange={(e) => onApply({ secondaryBg: e.target.checked })} />
+          Alternate background
         </label>
       </div>
 

@@ -19,8 +19,16 @@ import {
   storageRenameFolder,
   storageSaveDocument,
   storageSaveDocumentTranscription,
-  storageSaveFolderInstructions
+  storageSaveFolderInstructions,
+  storageSaveReferenceMaterial,
+  storageClearReferenceMaterial,
+  storageGetReferenceFiles
 } from "./storage";
+import {
+  buildReferencePromptContext,
+  extractReferenceFromZipFile
+} from "./lib/referenceMaterial";
+import type { ReferenceMaterialSummary } from "./types";
 
 const VARIANT_MODE_INSTRUCTIONS: Record<string, string> = {
   simplify:
@@ -144,6 +152,43 @@ export async function saveDocument(
       completed: options?.completed
     })
   });
+  return handleResponse<{ success: true }>(response);
+}
+
+export async function uploadDocumentReferenceZip(
+  path: string,
+  file: File
+): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  if (await shouldUseStorage()) {
+    const extracted = await extractReferenceFromZipFile(file);
+    storageSaveReferenceMaterial(path, extracted.manifest, extracted.files);
+    return { referenceMaterial: extracted.manifest };
+  }
+
+  const formData = new FormData();
+  formData.append("path", path);
+  formData.append("zip", file);
+
+  const response = await fetch("/api/document/reference", {
+    method: "POST",
+    body: formData
+  });
+  const data = await handleResponse<{
+    success: true;
+    referenceMaterial: ReferenceMaterialSummary;
+  }>(response);
+  return { referenceMaterial: data.referenceMaterial };
+}
+
+export async function clearDocumentReferenceMaterial(path: string) {
+  if (await shouldUseStorage()) {
+    storageClearReferenceMaterial(path);
+    return { success: true as const };
+  }
+  const response = await fetch(
+    `/api/document/reference?path=${encodeURIComponent(path)}`,
+    { method: "DELETE" }
+  );
   return handleResponse<{ success: true }>(response);
 }
 
@@ -292,11 +337,15 @@ export async function generateAnswer(params: {
   const pathString = typeof params.path === "string" ? params.path : "";
   let aggregated = "";
   let documentContent = "";
+  let referenceContext = "";
   if (pathString) {
     if (pathString.endsWith(".txt")) {
       const doc = storageGetDocumentDetails(pathString);
       aggregated = doc.aggregatedInstructions || "";
       documentContent = doc.content || "";
+      referenceContext = buildReferencePromptContext(
+        storageGetReferenceFiles(pathString)
+      );
     } else {
       const folder = storageGetFolderDetails(pathString);
       aggregated = folder.aggregatedInstructions || "";
@@ -309,6 +358,7 @@ export async function generateAnswer(params: {
     "You are a writing assistant that helps create calm, mindful meditations.";
   const userContent = [
     params.prompt.trim(),
+    referenceContext || null,
     documentContent ? `\nCurrent document:\n${documentContent}`.trim() : null
   ]
     .filter(Boolean)
@@ -374,10 +424,14 @@ export async function generateVariants(params: {
 
   const pathString = typeof params.path === "string" ? params.path : "";
   let aggregated = "";
+  let referenceContext = "";
   if (pathString) {
     if (pathString.endsWith(".txt")) {
       const doc = storageGetDocumentDetails(pathString);
       aggregated = doc.aggregatedInstructions || "";
+      referenceContext = buildReferencePromptContext(
+        storageGetReferenceFiles(pathString)
+      );
     } else {
       const folder = storageGetFolderDetails(pathString);
       aggregated = folder.aggregatedInstructions || "";
@@ -389,6 +443,7 @@ export async function generateVariants(params: {
     "You are a helpful writing assistant that rewrites user-provided passages.";
   const userPrompt = [
     `Task: ${taskInstruction}`,
+    referenceContext || null,
     "Original text:",
     params.text.trim(),
     "",
@@ -396,7 +451,9 @@ export async function generateVariants(params: {
     "Respond strictly as JSON in the format:",
     '["Variant 1", "Variant 2", "Variant 3"]',
     "Do not include any additional commentary."
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const openai = new OpenAI({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
   const completion = await openai.chat.completions.create({

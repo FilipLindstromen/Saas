@@ -76,6 +76,54 @@ export function ThemePanel({
           Ink
           <input type="color" value={theme.ink} onChange={(e) => patchTheme({ ink: e.target.value })} className="h-8 w-14 cursor-pointer rounded-lg border border-white/10" />
         </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+          Inline highlight
+          <input
+            type="color"
+            value={theme.highlightColor || theme.accent}
+            onChange={(e) => patchTheme({ highlightColor: e.target.value })}
+            className="h-8 w-14 cursor-pointer rounded-lg border border-white/10"
+          />
+        </label>
+      </div>
+      <p className="-mt-1.5 text-xs text-white/35">
+        Right-click a text selection in a scene's Lines box to set its background to this color.
+      </p>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-white/65">Secondary field (optional)</span>
+        <div className="flex gap-3">
+          <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+            Secondary bg
+            <input
+              type="color"
+              value={theme.secondaryBg || theme.bg}
+              onChange={(e) => patchTheme({ secondaryBg: e.target.value })}
+              className="h-8 w-14 cursor-pointer rounded-lg border border-white/10"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+            Secondary ink
+            <input
+              type="color"
+              value={theme.secondaryInk || theme.ink}
+              onChange={(e) => patchTheme({ secondaryInk: e.target.value })}
+              className="h-8 w-14 cursor-pointer rounded-lg border border-white/10"
+            />
+          </label>
+          {theme.secondaryBg && (
+            <button
+              type="button"
+              onClick={() => patchTheme({ secondaryBg: undefined, secondaryInk: undefined })}
+              className="mt-5 rounded-xl border border-white/10 px-2 py-1 text-xs text-white/65 hover:border-white/20"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <span className="font-normal normal-case text-white/35">
+          A second bg/ink pair a scene can switch to (per-scene "Secondary background" toggle) — the font color always follows automatically.
+        </span>
       </div>
 
       <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
@@ -107,6 +155,25 @@ export function ThemePanel({
           onChange={(e) => patchTheme({ fontScale: Number(e.target.value) })}
           className="accent-[#ff6b35]"
         />
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+        <span className="flex items-center justify-between">
+          Pacing (scene duration multiplier)
+          <span className="text-white/45">{(theme.durationMultiplier ?? 1).toFixed(2)}×</span>
+        </span>
+        <input
+          type="range"
+          min={0.5}
+          max={2}
+          step={0.05}
+          value={theme.durationMultiplier ?? 1}
+          onChange={(e) => patchTheme({ durationMultiplier: Number(e.target.value) })}
+          className="accent-[#ff6b35]"
+        />
+        <span className="font-normal normal-case text-white/35">
+          Every scene's duration is computed from its word count automatically — this scales all of them at once. There's no per-scene duration field anymore; scenes locked to a voiceover ignore this.
+        </span>
       </label>
 
       <div className="flex flex-col gap-1.5">

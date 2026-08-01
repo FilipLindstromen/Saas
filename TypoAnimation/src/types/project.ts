@@ -1,4 +1,17 @@
-export type SceneStyle = 'plain' | 'poster' | 'bignumber' | 'compare' | 'chips' | 'falling' | 'videotext' | 'rotate' | 'typewriter';
+export type SceneStyle =
+  | 'plain'
+  | 'poster'
+  | 'bignumber'
+  | 'compare'
+  | 'chips'
+  | 'falling'
+  | 'videotext'
+  | 'rotate'
+  | 'typewriter'
+  | 'mosaic'
+  | 'statement'
+  | 'badge'
+  | 'uniform';
 
 export interface SceneLine {
   text: string;
@@ -24,19 +37,31 @@ export interface CaptionWord {
 export interface BrollAsset {
   /** local /broll/... path, downloaded from the provider so rendering never depends on a live external URL */
   path: string;
-  provider: 'pexels' | 'pixabay';
+  provider: 'pexels' | 'pixabay' | 'unsplash';
+  /** 'video' (default — omitted on older saved projects, all of which were video) or 'image',
+   * e.g. an Unsplash photo */
+  kind?: 'video' | 'image';
   sourceId: string;
   thumbnail?: string;
   credit?: string;
-  /** 0..1 dark scrim over the video so text stays readable; defaults to 0.45 */
+  /** 0..1 dark scrim over the b-roll so text stays readable; defaults to 0.45 */
   opacity?: number;
+  /** 0..1 opacity of the b-roll media itself; defaults to 1 */
+  mediaOpacity?: number;
+  /** Zoom (1 = default cover); defaults to 1 */
+  scale?: number;
+  /** Horizontal focal point 0..1 for pan/zoom; defaults to 0.5 */
+  focusX?: number;
+  /** Vertical focal point 0..1 for pan/zoom; defaults to 0.5 */
+  focusY?: number;
 }
 
 export interface Scene {
   id: string;
   name: string;
   style: SceneStyle;
-  /** editable; once wordTimings is set this is derived from it and locked */
+  /** always computed, never user-entered: word count × theme.durationMultiplier, or (once
+   * wordTimings is set) the exact voiceover segment length, which ignores the multiplier */
   durationSec: number;
   kicker?: string;
   lines: SceneLine[];
@@ -56,20 +81,36 @@ export interface Scene {
   broll?: BrollAsset;
   /** 'rotate' style: words/phrases that cycle in the rotating slot after `lines` */
   rotatingWords?: string[];
-  /** brief RGB-split/jitter treatment over the scene's first ~0.18s */
-  glitchIntro?: boolean;
+  /** per-scene override of project.video.mode; unset inherits the project-wide setting */
+  videoMode?: VideoAsset['mode'];
+  /** use theme secondary background + ink for this scene; ignored when `dark` is on */
+  secondaryBg?: boolean;
+  /** 'chips' style: stack each chip on its own row instead of wrapping horizontally */
+  chipsVertical?: boolean;
 }
 
 export interface ProjectTheme {
   bg: string;
   ink: string;
   accent: string;
+  /** optional alternate field color a scene can opt into (Scene.secondaryBg) — always paired
+   * with secondaryInk as a unit, so picking it also switches the font color automatically */
+  secondaryBg?: string;
+  /** font color used whenever a scene has secondaryBg on; falls back to `ink` if unset */
+  secondaryInk?: string;
+  /** background color for inline-highlighted text spans (SceneLine.text wrapped in [[ ]]);
+   * falls back to `accent` if unset */
+  highlightColor?: string;
   /** key into FONT_PAIRINGS */
   fontPairing: string;
   /** how scenes hand off to each other; defaults to a hard cut */
   transition?: 'cut' | 'fade' | 'slide' | 'wipe';
   /** global text-size multiplier applied on top of every scene style's base sizes; defaults to 1 */
   fontScale?: number;
+  /** global pacing multiplier on top of each scene's auto-computed (word-count-based)
+   * duration; defaults to 1. Scenes locked to a voiceover (wordTimings set) ignore this —
+   * their duration is the audio track, not a computed estimate. */
+  durationMultiplier?: number;
 }
 
 export interface VideoAsset {
@@ -78,6 +119,12 @@ export interface VideoAsset {
   mode: 'background' | 'pip' | 'hidden';
   /** offset into the source video where composition frame 0 begins, set when scenes are synced to VO */
   trimStartMs?: number;
+  /** pip corner placement; defaults to bottom-right */
+  corner?: 'br' | 'bl' | 'tr' | 'tl';
+  /** pip circle diameter in px; defaults to 220 */
+  size?: number;
+  /** 0..1 dark scrim over the video in 'background' mode, so text stays readable; defaults to 0.35 */
+  scrim?: number;
 }
 
 /** work-area / export shape: 1080x1080, 1920x1080 (landscape), or 1080x1920 (portrait) */
@@ -145,6 +192,14 @@ export function defaultDurationForStyle(style: SceneStyle): number {
       return 4.2;
     case 'typewriter':
       return 4.8;
+    case 'mosaic':
+      return 3.6;
+    case 'statement':
+      return 3.0;
+    case 'badge':
+      return 3.4;
+    case 'uniform':
+      return 3.6;
     case 'plain':
     default:
       return 2.6;

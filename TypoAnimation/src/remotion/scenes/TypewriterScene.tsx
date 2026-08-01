@@ -2,8 +2,10 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { BrollBackground } from '../shared/BrollBackground';
+import { SceneVideo } from '../shared/SceneVideo';
 import { sceneCaptionText } from '../shared/caption';
 import { blink } from '../shared/motion';
+import { stripInlineHighlightMarkup } from '@/lib/inlineHighlight';
 import type { SceneComponentProps } from '../shared/sceneProps';
 
 const CHAR_SEC = 0.045;
@@ -19,23 +21,25 @@ interface TypeTiming {
 // slot). Segment length is allocated proportionally to character count, capped so a short line
 // doesn't sit there typed-and-idle for its whole segment.
 function layoutLines(lines: { text: string }[], dur: number): TypeTiming[] {
-  const weights = lines.map((l) => Math.max(1, l.text.length));
+  const weights = lines.map((l) => Math.max(1, stripInlineHighlightMarkup(l.text).length));
   const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
   let cursor = 0;
   return lines.map((l, i) => {
+    const plain = stripInlineHighlightMarkup(l.text);
     const segDur = (dur * weights[i]) / totalWeight;
-    const typeDur = Math.min(segDur, l.text.length * CHAR_SEC);
+    const typeDur = Math.min(segDur, plain.length * CHAR_SEC);
     const start = cursor;
     cursor += segDur;
     return { start, segDur, typeDur };
   });
 }
 
-export function TypewriterScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
+export function TypewriterScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
   const layout = layoutLines(scene.lines, dur);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <BrollBackground broll={scene.broll} />
+      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
       <Chrome
         theme={theme}
         label={label}
@@ -66,8 +70,9 @@ export function TypewriterScene({ scene, theme, t, dur, label, showCaptions, sho
           {scene.lines.map((ln, i) => {
             const { start, typeDur } = layout[i];
             if (t < start) return null;
+            const plain = stripInlineHighlightMarkup(ln.text);
             const local = Math.min(1, (t - start) / Math.max(0.001, typeDur));
-            const shown = ln.text.slice(0, Math.round(local * ln.text.length));
+            const shown = plain.slice(0, Math.round(local * plain.length));
             const typing = local < 1;
             return (
               <div

@@ -3,19 +3,21 @@ import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { BrollBackground } from '../shared/BrollBackground';
+import { SceneVideo } from '../shared/SceneVideo';
 import { enter, interpolateKeyframes, Easing } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
 
 // An animated counting number — port of the reference's `NinetySeconds` beat, generalized
 // to any target value/suffix (e.g. "90 SECONDS", "3 STEPS", "10X FASTER").
-export function BigNumberScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
+export function BigNumberScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
   const target = scene.number ?? 90;
   const n = Math.round(interpolateKeyframes(t, [0.1, dur * 0.55], [0, target], Easing.easeOutCubic));
   const m = enter(t, { start: 0, end: dur });
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <BrollBackground broll={scene.broll} />
+      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
       <Chrome
         theme={theme}
         label={label}

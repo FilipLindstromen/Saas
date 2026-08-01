@@ -3,6 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { BrollBackground } from '../shared/BrollBackground';
+import { SceneVideo } from '../shared/SceneVideo';
 import { sceneCaptionText } from '../shared/caption';
 import { animate, Easing } from '../shared/motion';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -38,12 +39,13 @@ function slotMotion(t: number, { start, slotDur }: SlotTiming) {
 // A static prefix line, then a single word/phrase slot that cycles through `rotatingWords` —
 // each one sliding up into place, holding long enough to read, then sliding on through as the
 // next takes over. Good for feature-list or "we are ___" beats.
-export function RotatingWordScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
+export function RotatingWordScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
   const words = scene.rotatingWords && scene.rotatingWords.length ? scene.rotatingWords : [''];
   const layout = layoutSlots(words, dur);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <BrollBackground broll={scene.broll} />
+      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
       <Chrome
         theme={theme}
         label={label}

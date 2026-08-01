@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { ProjectTheme, Scene, SceneStyle } from '@/types/project';
 import { resolveSceneTheme } from '@/remotion/shared/theme';
 
@@ -14,6 +14,10 @@ const STYLE_LABELS: Record<SceneStyle, string> = {
   videotext: 'Video text',
   rotate: 'Rotating word',
   typewriter: 'Typewriter',
+  mosaic: 'Word mosaic',
+  statement: 'Statement (auto-fit)',
+  badge: 'Badge / CTA',
+  uniform: 'Uniform lines',
 };
 
 // One glyph per style, shown in the thumbnail slot in place of a real rendered preview.
@@ -27,6 +31,10 @@ const STYLE_GLYPHS: Record<SceneStyle, string> = {
   videotext: '▶',
   rotate: '⇅',
   typewriter: '_',
+  mosaic: '▦',
+  statement: '⬛',
+  badge: '▭',
+  uniform: '≡',
 };
 
 // A small preview swatch using the scene's actual resolved colors (respecting its own
@@ -99,6 +107,34 @@ export function SceneList({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      if (document.fullscreenElement) return;
+
+      const el = document.activeElement;
+      if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
+      if (el instanceof HTMLInputElement && el.type !== 'checkbox' && el.type !== 'radio') return;
+      if (el instanceof HTMLElement && el.isContentEditable) return;
+
+      if (!selectedId || scenes.length === 0) return;
+
+      const idx = scenes.findIndex((s) => s.id === selectedId);
+      if (idx === -1) return;
+      const nextIdx = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
+      if (nextIdx < 0 || nextIdx >= scenes.length) return;
+
+      e.preventDefault();
+      const nextId = scenes[nextIdx].id;
+      onSelect(nextId, {});
+      requestAnimationFrame(() => {
+        document.querySelector(`[data-scene-list-id="${nextId}"]`)?.scrollIntoView({ block: 'nearest' });
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onSelect, scenes, selectedId]);
+
   const handleDrop = (targetId: string) => {
     if (draggedId && draggedId !== targetId) {
       const fromIndex = scenes.findIndex((s) => s.id === draggedId);
@@ -110,8 +146,8 @@ export function SceneList({
   };
 
   return (
-    <div className="flex flex-col rounded-2xl bg-[#1a1a1a]">
-      <div className="flex items-center justify-between border-b border-white/[0.06] p-4">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#1a1a1a] shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+      <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] p-4">
         <h2 className="text-[0.95rem] font-semibold text-white">
           Scenes ({scenes.length}){multiSelectedIds.length > 1 && ` · ${multiSelectedIds.length} selected`}
         </h2>
@@ -134,7 +170,7 @@ export function SceneList({
         </select>
       </div>
 
-      <div className="flex flex-col gap-3 p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
         {scenes.length === 0 && (
           <div className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/45">
             No scenes yet — paste a script and generate, or add one manually.
@@ -148,6 +184,7 @@ export function SceneList({
           return (
             <div
               key={scene.id}
+              data-scene-list-id={scene.id}
               className={`flex items-center gap-3 ${dragging ? 'opacity-50' : ''}`}
               draggable
               onDragStart={() => setDraggedId(scene.id)}

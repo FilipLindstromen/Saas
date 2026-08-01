@@ -3,6 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { BrollBackground } from '../shared/BrollBackground';
+import { SceneVideo } from '../shared/SceneVideo';
 import { draw } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -10,13 +11,14 @@ import type { SceneComponentProps } from '../shared/sceneProps';
 // A full-bleed poster statement — port of the reference's Hook/Tease/FinalCTA beats
 // (generalized): larger display type on a dark/full-bleed field, with a drawn underline
 // accent beneath the last line for a bit of CTA-like flourish.
-export function PosterScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
+export function PosterScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
   const lineStart = 0.05;
   const lastLineStart = lineStart + Math.max(0, scene.lines.length - 1) * 0.22;
   const ruleP = draw(t, lastLineStart + 0.35, dur * 0.85);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <BrollBackground broll={scene.broll} />
+      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
       <Chrome
         theme={theme}
         label={label}

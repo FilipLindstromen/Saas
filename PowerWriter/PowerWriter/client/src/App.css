@@ -2073,14 +2073,68 @@
 
 .document-generate-row {
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
+  gap: 12px;
   flex-shrink: 0;
   width: 100%;
   padding: 2px 0 16px;
 }
 
+.document-reference-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.03));
+}
+
+.document-reference-upload-btn {
+  align-self: flex-start;
+  font-size: 0.875rem;
+}
+
+.document-reference-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.document-reference-meta {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.document-reference-clear-btn {
+  font-size: 0.8125rem;
+  padding: 2px 8px;
+}
+
+.document-reference-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .document-generate-btn {
+  align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;

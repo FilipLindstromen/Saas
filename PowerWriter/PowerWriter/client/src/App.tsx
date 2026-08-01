@@ -21,7 +21,9 @@ import {
   saveFolderInstructions,
   deleteDocument,
   deleteFolder,
-  uploadDocumentAudio
+  uploadDocumentAudio,
+  uploadDocumentReferenceZip,
+  clearDocumentReferenceMaterial
 } from "./api";
 import { AudioEditor } from "./AudioEditor";
 import type { Transcription } from "./types";
@@ -949,6 +951,8 @@ export default function App() {
   >([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocGenerating, setIsDocGenerating] = useState(false);
+  const [isReferenceUploading, setIsReferenceUploading] = useState(false);
+  const referenceZipInputRef = useRef<HTMLInputElement | null>(null);
   const [draggedItem, setDraggedItem] = useState<Selection | null>(null);
   const [selectionMenu, setSelectionMenu] =
     useState<SelectionMenuState | null>(null);
@@ -2728,6 +2732,57 @@ export default function App() {
     }
   };
 
+  const handleReferenceZipSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || selected?.type !== "document") return;
+
+    setIsReferenceUploading(true);
+    try {
+      const { referenceMaterial } = await uploadDocumentReferenceZip(
+        selected.path,
+        file
+      );
+      setDocumentDetails((prev) =>
+        prev ? { ...prev, referenceMaterial } : prev
+      );
+      setStatus({
+        type: "success",
+        message: `Reference material loaded (${referenceMaterial.files.length} files)`
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to import reference zip";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
+  const handleClearReferenceMaterial = async () => {
+    if (selected?.type !== "document") return;
+    setIsReferenceUploading(true);
+    try {
+      await clearDocumentReferenceMaterial(selected.path);
+      setDocumentDetails((prev) =>
+        prev ? { ...prev, referenceMaterial: null } : prev
+      );
+      setStatus({ type: "success", message: "Reference material removed" });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to remove reference material";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
   const handleToggleCompleted = (checked: boolean) => {
     if (selected?.type !== "document" || !documentDetails) return;
     setDocumentDetails({
@@ -4295,6 +4350,57 @@ export default function App() {
               <div className="panel-body document-panel-body">
                 {documentDetails ? (
                   <div className="document-generate-row">
+                    <div className="document-reference-controls">
+                      <input
+                        ref={referenceZipInputRef}
+                        type="file"
+                        accept=".zip,application/zip"
+                        className="sr-only"
+                        onChange={(event) => void handleReferenceZipSelected(event)}
+                      />
+                      <button
+                        type="button"
+                        className="ghost document-reference-upload-btn"
+                        disabled={
+                          loadingSelection ||
+                          isReferenceUploading ||
+                          isDocGenerating
+                        }
+                        onClick={() => referenceZipInputRef.current?.click()}
+                      >
+                        {isReferenceUploading
+                          ? "Importing…"
+                          : documentDetails.referenceMaterial
+                          ? "Replace reference (.zip)"
+                          : "Upload reference (.zip)"}
+                      </button>
+                      {documentDetails.referenceMaterial ? (
+                        <div className="document-reference-summary">
+                          <span className="document-reference-meta">
+                            {documentDetails.referenceMaterial.sourceFileName} ·{" "}
+                            {documentDetails.referenceMaterial.files.length}{" "}
+                            files · ~
+                            {Math.round(
+                              documentDetails.referenceMaterial.totalChars / 1000
+                            )}
+                            k chars
+                          </span>
+                          <button
+                            type="button"
+                            className="ghost document-reference-clear-btn"
+                            disabled={isReferenceUploading}
+                            onClick={() => void handleClearReferenceMaterial()}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="document-reference-hint">
+                          Add examples, instructions, or an ebook (.txt/.md in a
+                          zip) to steer generation for this document.
+                        </p>
+                      )}
+                    </div>
                     <button
                       type="button"
                       className="primary document-generate-btn"

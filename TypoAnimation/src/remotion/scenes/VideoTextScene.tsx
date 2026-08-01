@@ -1,12 +1,15 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo } from 'remotion';
+import { AbsoluteFill, Img, OffthreadVideo } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { enter } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { ResolvedSceneTheme } from '../shared/theme';
+import { stripInlineHighlightMarkup } from '@/lib/inlineHighlight';
 import type { BrollAsset } from '@/types/project';
 import type { SceneComponentProps } from '../shared/sceneProps';
+import { resolveRemotionSrc, brollMediaKind } from '../shared/mediaSrc';
+import { brollMediaStyle } from '../shared/brollFraming';
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -66,7 +69,7 @@ function VideoMaskedLine({
     `<svg xmlns='http://www.w3.org/2000/svg' width='${MASK_W}' height='${maskHeight}'>` +
     `<text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' ` +
     `font-family='${theme.fontHeading}' font-weight='${theme.headingWeight}' font-size='${scaledSize}' ` +
-    `letter-spacing='-2' fill='white'>${escapeXml(text)}</text></svg>`;
+    `letter-spacing='-2' fill='white'>${escapeXml(stripInlineHighlightMarkup(text))}</text></svg>`;
   const maskImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   const maskProps: React.CSSProperties = {
     WebkitMaskImage: maskImage,
@@ -79,7 +82,11 @@ function VideoMaskedLine({
 
   return (
     <div style={{ opacity: m.opacity, transform: m.transform, filter: m.filter, width: MASK_W, height: maskHeight, ...maskProps }}>
-      <OffthreadVideo src={broll.path} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      {brollMediaKind(broll) === 'image' ? (
+        <Img src={resolveRemotionSrc(broll.path)} style={brollMediaStyle(broll)} />
+      ) : (
+        <OffthreadVideo src={resolveRemotionSrc(broll.path)} muted style={brollMediaStyle(broll)} />
+      )}
     </div>
   );
 }

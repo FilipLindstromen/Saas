@@ -14,6 +14,7 @@ async function deleteNode(relativePath) {
     if (fsSync.existsSync(instructionPath)) {
       await fs.unlink(instructionPath);
     }
+    await fs.rm(getReferenceDirAbsolute(target), { recursive: true, force: true });
   }
 }
 
@@ -29,6 +30,12 @@ import fsSync from "fs";
 import OpenAI from "openai";
 import { exec } from "child_process";
 import { promisify } from "util";
+import {
+  REFERENCE_MANIFEST,
+  buildReferencePromptContext,
+  extractReferenceFromZipBuffer,
+  getReferenceDirAbsolute
+} from "./referenceMaterial.js";
 
 const execAsync = promisify(exec);
 
@@ -572,6 +579,72 @@ async function gatherAggregatedInstructions(relativePath, type) {
   return collected.filter(Boolean).join("\n\n");
 }
 
+async function readReferenceSummary(documentAbsolutePath) {
+  const manifestPath = path.join(
+    getReferenceDirAbsolute(documentAbsolutePath),
+    REFERENCE_MANIFEST
+  );
+  try {
+    const raw = await fs.readFile(manifestPath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function loadReferenceFilesForPrompt(documentAbsolutePath) {
+  const referenceDir = getReferenceDirAbsolute(documentAbsolutePath);
+  const manifest = await readReferenceSummary(documentAbsolutePath);
+  if (!manifest?.files?.length) {
+    return [];
+  }
+  const files = [];
+  for (const entry of manifest.files) {
+    if (typeof entry?.path !== "string") continue;
+    const text = await readTextIfExists(path.join(referenceDir, entry.path));
+    const trimmed = text.trim();
+    if (trimmed) {
+      files.push({ path: entry.path, text: trimmed });
+    }
+  }
+  return files;
+}
+
+async function writeReferenceMaterial(documentAbsolutePath, extracted) {
+  const referenceDir = getReferenceDirAbsolute(documentAbsolutePath);
+  await fs.rm(referenceDir, { recursive: true, force: true });
+  await fs.mkdir(referenceDir, { recursive: true });
+  for (const file of extracted.files) {
+    const target = path.join(referenceDir, file.path);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, file.text, "utf8");
+  }
+  await fs.writeFile(
+    path.join(referenceDir, REFERENCE_MANIFEST),
+    JSON.stringify(extracted.manifest, null, 2),
+    "utf8"
+  );
+}
+
+async function clearReferenceMaterial(documentAbsolutePath) {
+  await fs.rm(getReferenceDirAbsolute(documentAbsolutePath), {
+    recursive: true,
+    force: true
+  });
+}
+
+async function gatherReferencePromptForPath(relativePath) {
+  if (typeof relativePath !== "string" || !relativePath.endsWith(".txt")) {
+    return "";
+  }
+  const documentPath = resolveMeditationPath(relativePath);
+  const files = await loadReferenceFilesForPrompt(documentPath);
+  return buildReferencePromptContext(files);
+}
+
 const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: "2mb" }));
@@ -579,6 +652,13 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 25 * 1024 * 1024
+  }
+});
+
+const referenceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024
   }
 });
 
@@ -680,13 +760,14 @@ app.get("/api/document", async (req, res) => {
       return res.status(400).send("Path is not a file");
     }
 
-    const [content, instructions, aggregated, meta, transcription] =
+    const [content, instructions, aggregated, meta, transcription, referenceMaterial] =
       await Promise.all([
         readTextIfExists(documentPath),
         getDocumentInstructions(relative),
         gatherAggregatedInstructions(relative, "document"),
         readDocumentMeta(documentPath),
-        readTranscription(documentPath)
+        readTranscription(documentPath),
+        readReferenceSummary(documentPath)
       ]);
 
     let audioUrl = null;
@@ -716,11 +797,75 @@ app.get("/api/document", async (req, res) => {
       audioUrl,
       audioFileName: meta.audioFileName ?? null,
       recordings: meta.recordings || null,
-      transcription: transcription || null
+      transcription: transcription || null,
+      referenceMaterial: referenceMaterial || null
     });
   } catch (error) {
     res.status(500).send(
       error instanceof Error ? error.message : "Unable to load document"
+    );
+  }
+});
+
+app.post(
+  "/api/document/reference",
+  referenceUpload.single("zip"),
+  async (req, res) => {
+    try {
+      const relative =
+        typeof req.body?.path === "string"
+          ? req.body.path
+          : typeof req.query?.path === "string"
+          ? req.query.path
+          : "";
+      if (!relative.endsWith(".txt")) {
+        return res.status(400).send("Missing or invalid document path");
+      }
+      if (!req.file?.buffer?.length) {
+        return res.status(400).send("Missing zip file (field name: zip)");
+      }
+
+      const documentPath = resolveMeditationPath(relative);
+      const stat = await fs.stat(documentPath);
+      if (!stat.isFile()) {
+        return res.status(400).send("Path is not a document file");
+      }
+
+      const extracted = extractReferenceFromZipBuffer(
+        req.file.buffer,
+        req.file.originalname || "reference.zip"
+      );
+      await writeReferenceMaterial(documentPath, extracted);
+
+      res.json({
+        success: true,
+        referenceMaterial: extracted.manifest
+      });
+    } catch (error) {
+      res.status(500).send(
+        error instanceof Error
+          ? error.message
+          : "Unable to import reference material"
+      );
+    }
+  }
+);
+
+app.delete("/api/document/reference", async (req, res) => {
+  try {
+    const relative =
+      typeof req.query?.path === "string" ? req.query.path : "";
+    if (!relative.endsWith(".txt")) {
+      return res.status(400).send("Missing or invalid document path");
+    }
+    const documentPath = resolveMeditationPath(relative);
+    await clearReferenceMaterial(documentPath);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error
+        ? error.message
+        : "Unable to remove reference material"
     );
   }
 });
@@ -1557,6 +1702,10 @@ app.post("/api/document/rename", async (req, res) => {
       getDocumentMetaPath(oldDocumentPath),
       getDocumentMetaPath(newDocumentPath)
     );
+    await renameIfExists(
+      getReferenceDirAbsolute(oldDocumentPath),
+      getReferenceDirAbsolute(newDocumentPath)
+    );
     if (meta.audioFileName) {
       const oldAudioPath = getDocumentAudioAbsolutePath(
         oldDocumentPath,
@@ -1689,6 +1838,10 @@ app.post("/api/document/move", async (req, res) => {
       getDocumentMetaPath(documentPath),
       getDocumentMetaPath(newDocumentPath)
     );
+    await renameIfExists(
+      getReferenceDirAbsolute(documentPath),
+      getReferenceDirAbsolute(newDocumentPath)
+    );
     if (meta.audioFileName) {
       await renameIfExists(
         getDocumentAudioAbsolutePath(documentPath, meta.audioFileName),
@@ -1779,8 +1932,14 @@ app.post("/api/generate-variants", async (req, res) => {
 
     const taskInstruction = VARIANT_MODE_INSTRUCTIONS[mode];
 
+    let referenceContext = "";
+    if (typeof relative === "string" && relative.endsWith(".txt")) {
+      referenceContext = await gatherReferencePromptForPath(relative);
+    }
+
     const userPrompt = [
       `Task: ${taskInstruction}`,
+      referenceContext || null,
       "Original text:",
       text.trim(),
       "",
@@ -1788,7 +1947,9 @@ app.post("/api/generate-variants", async (req, res) => {
       "Respond strictly as JSON in the format:",
       '["Variant 1", "Variant 2", "Variant 3"]',
       "Do not include any additional commentary."
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -1849,6 +2010,12 @@ app.post("/api/rename", async (req, res) => {
         await fs.mkdir(path.dirname(toInstructions), { recursive: true });
         await fs.rename(fromInstructions, toInstructions);
       }
+      const fromReference = getReferenceDirAbsolute(from);
+      const toReference = getReferenceDirAbsolute(to);
+      if (fsSync.existsSync(fromReference)) {
+        await fs.mkdir(path.dirname(toReference), { recursive: true });
+        await fs.rename(fromReference, toReference);
+      }
     } else {
       const fromInstructions = path.join(from, FOLDER_INSTRUCTIONS_FILE);
       const toInstructions = path.join(to, FOLDER_INSTRUCTIONS_FILE);
@@ -1888,6 +2055,12 @@ app.post("/api/move", async (req, res) => {
       if (fsSync.existsSync(fromInstructions)) {
         await fs.mkdir(path.dirname(toInstructions), { recursive: true });
         await fs.rename(fromInstructions, toInstructions);
+      }
+      const fromReference = getReferenceDirAbsolute(from);
+      const toReference = getReferenceDirAbsolute(to);
+      if (fsSync.existsSync(fromReference)) {
+        await fs.mkdir(path.dirname(toReference), { recursive: true });
+        await fs.rename(fromReference, toReference);
       }
     } else {
       const fromInstructions = path.join(from, FOLDER_INSTRUCTIONS_FILE);
@@ -1962,10 +2135,12 @@ app.post("/api/generate", async (req, res) => {
         : "";
 
     let documentContent = "";
+    let referenceContext = "";
     if (typeof relative === "string" && relative.endsWith(".txt")) {
       documentContent = await readTextIfExists(
         resolveMeditationPath(relative)
       );
+      referenceContext = await gatherReferencePromptForPath(relative);
     }
 
     const messages = [
@@ -1979,6 +2154,7 @@ app.post("/api/generate", async (req, res) => {
         role: "user",
         content: [
           prompt.trim(),
+          referenceContext || null,
           documentContent
             ? `\nCurrent document:\n${documentContent}`.trim()
             : null

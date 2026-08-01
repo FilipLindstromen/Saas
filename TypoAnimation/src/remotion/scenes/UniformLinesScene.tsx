@@ -1,21 +1,25 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { BrollBackground } from '../shared/BrollBackground';
 import { SceneVideo } from '../shared/SceneVideo';
 import { sceneCaptionText } from '../shared/caption';
-import { alignWordTimingsToScene } from '../shared/wordTiming';
+import { fitFontSizeToWidth } from '../shared/measureText';
 import type { SceneComponentProps } from '../shared/sceneProps';
 
-// Word-by-word kinetic text on a plain field — the generic, most-used scene style. Port of
-// the reference's generic `Beat` component: an optional small-caps kicker, then each line
-// staggered in, with `accent` lines rendered as solid-color chips. When the scene has been
-// synced to a transcribed voiceover (scene.wordTimings), each word enters at its actual
-// spoken time instead of the fixed stagger.
-export function PlainScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
-  const kickerDelay = scene.kicker ? 0.12 : 0;
-  const aligned = alignWordTimingsToScene(scene);
+// Every line's font size is solved (via real canvas text measurement, not a char-count guess)
+// so it renders at the same target width as every other line — short lines blow up big, long
+// lines shrink down, and the whole block reads as an even column instead of a ragged stack.
+const TARGET_WIDTH = 860;
+
+export function UniformLinesScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
+  const sizes = useMemo(
+    () => scene.lines.map((ln) => fitFontSizeToWidth(ln.text, TARGET_WIDTH, theme.fontHeading, theme.headingWeight)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scene.lines.map((l) => l.text).join('\n'), theme.fontHeading, theme.headingWeight]
+  );
+
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <BrollBackground broll={scene.broll} />
@@ -31,21 +35,20 @@ export function PlainScene({ scene, theme, t, dur, label, showCaptions, showTime
         elapsedSec={elapsedSec}
         totalSec={totalSec}
       />
-      <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', padding: '0 36px', gap: 16 }}>
+      <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 6 }}>
         {scene.kicker && (
           <Line
             text={scene.kicker}
             t={t}
             start={0}
             end={dur}
-            size={24}
+            size={22}
             weight={theme.kickerWeight}
             color={theme.accentDeep}
             align="center"
-            letterSpacing="0.1em"
-            marginBottom={8}
+            letterSpacing="0.14em"
+            marginBottom={10}
             theme={theme}
-            wordStartsSec={aligned?.kickerStarts}
           />
         )}
         {scene.lines.map((ln, i) => (
@@ -53,16 +56,16 @@ export function PlainScene({ scene, theme, t, dur, label, showCaptions, showTime
             key={i}
             text={ln.text}
             t={t}
-            start={kickerDelay + i * 0.12}
+            start={0.06 + i * 0.14}
             end={dur}
-            size={66 * (ln.accent ? 1.08 : 1)}
+            size={sizes[i]}
+            weight={theme.headingWeight}
             chip={!!ln.accent && ln.emphasis !== 'marker'}
             marker={!!ln.accent && ln.emphasis === 'marker'}
             align="center"
-            maxWidth={980}
+            maxWidth={TARGET_WIDTH + 60}
             color={theme.ink}
             theme={theme}
-            wordStartsSec={aligned?.lineStarts[i]}
           />
         ))}
       </AbsoluteFill>

@@ -3,6 +3,7 @@ import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { BrollBackground } from '../shared/BrollBackground';
+import { SceneVideo } from '../shared/SceneVideo';
 import { draw } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -11,11 +12,12 @@ const MAX_BAR_WIDTH = 640;
 
 // Animated horizontal comparison bars — port of the reference's `Compare` beat. Each row's
 // `value` (0..1) is scaled to a fixed max bar width, drawn in staggered 0.5s apart.
-export function CompareScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
+export function CompareScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec, video }: SceneComponentProps) {
   const rows = scene.compareRows || [];
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
       <BrollBackground broll={scene.broll} />
+      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
       <Chrome
         theme={theme}
         label={label}

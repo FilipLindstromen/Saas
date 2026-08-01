@@ -8,12 +8,14 @@ import type {
   DocumentDetails,
   FolderDetails,
   TreeNode,
-  Transcription
+  Transcription,
+  ReferenceMaterialSummary
 } from "./types";
 
 const TREE_KEY = "powerwriter_tree";
 const FOLDER_PREFIX = "powerwriter_folder::";
 const DOCUMENT_PREFIX = "powerwriter_document::";
+const REFERENCE_PREFIX = "powerwriter_reference::";
 
 function pathKey(path: string): string {
   return path.replace(/\//g, "::");
@@ -25,6 +27,10 @@ function getFolderKey(path: string): string {
 
 function getDocumentKey(path: string): string {
   return DOCUMENT_PREFIX + pathKey(path);
+}
+
+function getReferenceKey(path: string): string {
+  return REFERENCE_PREFIX + pathKey(path);
 }
 
 function getParentPath(path: string): string | null {
@@ -226,18 +232,65 @@ export function storageGetDocumentDetails(path: string): DocumentDetails {
     return r ? JSON.parse(r) : null;
   };
   const aggregated = getAggregatedInstructions(path, "document", getFolder, getDocument);
+  const referenceMaterial = storageGetReferenceSummary(path);
   return {
     path,
     name,
     content,
     instructions,
     aggregatedInstructions: aggregated,
+    referenceMaterial,
     completed,
     audioUrl: null,
     audioFileName: null,
     recordings: recordings.length > 0 ? recordings : undefined,
     transcription
   };
+}
+
+export function storageGetReferenceSummary(
+  path: string
+): ReferenceMaterialSummary | null {
+  const raw = localStorage.getItem(getReferenceKey(path));
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw) as {
+      manifest?: ReferenceMaterialSummary;
+    };
+    return data.manifest ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function storageGetReferenceFiles(
+  path: string
+): { path: string; text: string }[] {
+  const raw = localStorage.getItem(getReferenceKey(path));
+  if (!raw) return [];
+  try {
+    const data = JSON.parse(raw) as {
+      files?: { path: string; text: string }[];
+    };
+    return Array.isArray(data.files) ? data.files : [];
+  } catch {
+    return [];
+  }
+}
+
+export function storageSaveReferenceMaterial(
+  path: string,
+  manifest: ReferenceMaterialSummary,
+  files: { path: string; text: string }[]
+): void {
+  localStorage.setItem(
+    getReferenceKey(path),
+    JSON.stringify({ manifest, files })
+  );
+}
+
+export function storageClearReferenceMaterial(path: string): void {
+  localStorage.removeItem(getReferenceKey(path));
 }
 
 export function storageSaveDocument(
@@ -323,6 +376,13 @@ export function storageRenameDocument(path: string, newName: string): { path: st
     localStorage.setItem(newKey, raw);
     localStorage.removeItem(oldKey);
   }
+  const oldRef = getReferenceKey(path);
+  const newRef = getReferenceKey(newPath);
+  const refRaw = localStorage.getItem(oldRef);
+  if (refRaw) {
+    localStorage.setItem(newRef, refRaw);
+    localStorage.removeItem(oldRef);
+  }
   return { path: newPath };
 }
 
@@ -346,6 +406,7 @@ export function storageDeleteDocument(path: string): void {
   const tree = loadTree();
   removeFromTree(tree, path);
   localStorage.removeItem(getDocumentKey(path));
+  storageClearReferenceMaterial(path);
 }
 
 export function storageSaveDocumentTranscription(path: string, transcription: Transcription): void {

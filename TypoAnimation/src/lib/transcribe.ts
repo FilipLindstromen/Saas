@@ -16,6 +16,31 @@ const MODEL = 'base.en' as const;
 const WHISPER_DIR = path.join(process.cwd(), 'data', 'whisper');
 const WHISPER_BIN_DIR = path.join(WHISPER_DIR, 'whisper.cpp');
 const WHISPER_MODEL_DIR = path.join(WHISPER_DIR, 'models');
+const WHISPER_MODEL_FILE = path.join(WHISPER_MODEL_DIR, `ggml-${MODEL}.bin`);
+
+/** Overall job progress streamed to the UI during transcribe. */
+export type TranscribeProgressEvent = {
+  phase: 'install_whisper' | 'download_model' | 'extract_audio' | 'transcribe' | 'done';
+  message: string;
+  /** 0–100 */
+  progress: number;
+};
+
+const PROGRESS = {
+  install: [0, 8] as const,
+  model: [8, 42] as const,
+  extract: [42, 48] as const,
+  transcribe: [48, 99] as const,
+};
+
+function segmentProgress(range: readonly [number, number], t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return Math.round(range[0] + (range[1] - range[0]) * clamped);
+}
+
+function report(onProgress: ((e: TranscribeProgressEvent) => void) | undefined, event: TranscribeProgressEvent) {
+  onProgress?.(event);
+}
 
 function run(bin: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -99,35 +124,100 @@ async function installWhisperCppWindows(to: string): Promise<void> {
   await fs.unlink(zipPath).catch(() => {});
 }
 
-async function ensureWhisperReady(onProgress?: (msg: string) => void): Promise<void> {
+async function ensureWhisperReady(onProgress?: (e: TranscribeProgressEvent) => void): Promise<void> {
   await fs.mkdir(WHISPER_DIR, { recursive: true });
-  onProgress?.('Installing whisper.cpp (one-time, downloads a small binary)…');
+
+  const whisperExe =
+    os.platform() === 'win32' ? path.join(WHISPER_BIN_DIR, 'main.exe') : path.join(WHISPER_BIN_DIR, 'main');
+  const needsWhisper = !existsSync(whisperExe);
+
+  if (needsWhisper) {
+    report(onProgress, {
+      phase: 'install_whisper',
+      message: 'Installing whisper.cpp (one-time download)…',
+      progress: PROGRESS.install[0],
+    });
+  }
+
   if (os.platform() === 'win32') {
     await installWhisperCppWindows(WHISPER_BIN_DIR);
   } else {
     await installWhisperCpp({ version: WHISPER_VERSION, to: WHISPER_BIN_DIR, printOutput: false });
   }
-  onProgress?.('Downloading speech-to-text model (one-time, ~150MB)…');
-  // downloadWhisperModel() opens its write stream without first creating the destination
-  // folder; on a missing directory the stream's own 'error' event goes unlistened-for while
-  // the download loop still reads the response to completion and resolves normally — so it
-  // silently "succeeds" without ever having written the model file. Pre-create the folder to
-  // avoid that path entirely.
+
+  if (needsWhisper) {
+    report(onProgress, {
+      phase: 'install_whisper',
+      message: 'whisper.cpp ready',
+      progress: PROGRESS.install[1],
+    });
+  }
+
+  const needsModel = !existsSync(WHISPER_MODEL_FILE);
+  if (needsModel) {
+    report(onProgress, {
+      phase: 'download_model',
+      message: 'Downloading speech model (one-time, ~148 MB)…',
+      progress: PROGRESS.model[0],
+    });
+  }
+
   await fs.mkdir(WHISPER_MODEL_DIR, { recursive: true });
-  await downloadWhisperModel({ model: MODEL, folder: WHISPER_MODEL_DIR, printOutput: false });
+  await downloadWhisperModel({
+    model: MODEL,
+    folder: WHISPER_MODEL_DIR,
+    printOutput: false,
+    onProgress: needsModel
+      ? (downloaded, total) => {
+          const pct = total > 0 ? downloaded / total : 0;
+          const mbDone = (downloaded / (1024 * 1024)).toFixed(0);
+          const mbTotal = (total / (1024 * 1024)).toFixed(0);
+          report(onProgress, {
+            phase: 'download_model',
+            message: `Downloading speech model… ${Math.round(pct * 100)}% (${mbDone} / ${mbTotal} MB)`,
+            progress: segmentProgress(PROGRESS.model, pct),
+          });
+        }
+      : undefined,
+  });
+
+  if (needsModel) {
+    report(onProgress, {
+      phase: 'download_model',
+      message: 'Speech model ready',
+      progress: PROGRESS.model[1],
+    });
+  }
 }
 
 // Full local pipeline: extract mono 16kHz audio via ffmpeg, run it through a locally
 // installed whisper.cpp (no API key, no network calls beyond the one-time binary/model
 // download), and convert the word-level tokens into Caption[] (startMs/endMs per word).
-export async function transcribeVideo(videoPath: string, onProgress?: (msg: string) => void): Promise<Caption[]> {
+export async function transcribeVideo(
+  videoPath: string,
+  onProgress?: (e: TranscribeProgressEvent) => void
+): Promise<Caption[]> {
   await ensureWhisperReady(onProgress);
 
   const wavPath = path.join(path.dirname(videoPath), `${path.basename(videoPath, path.extname(videoPath))}.wav`);
-  onProgress?.('Extracting audio…');
+  report(onProgress, {
+    phase: 'extract_audio',
+    message: 'Extracting audio from video…',
+    progress: PROGRESS.extract[0],
+  });
   await extractWav(videoPath, wavPath);
+  report(onProgress, {
+    phase: 'extract_audio',
+    message: 'Audio extracted',
+    progress: PROGRESS.extract[1],
+  });
 
-  onProgress?.('Transcribing (this can take a while on the first run)…');
+  report(onProgress, {
+    phase: 'transcribe',
+    message: 'Transcribing speech (local whisper.cpp)…',
+    progress: PROGRESS.transcribe[0],
+  });
+
   const json = await whisperTranscribe({
     inputPath: wavPath,
     whisperPath: WHISPER_BIN_DIR,
@@ -136,8 +226,20 @@ export async function transcribeVideo(videoPath: string, onProgress?: (msg: stri
     modelFolder: WHISPER_MODEL_DIR,
     tokenLevelTimestamps: true,
     printOutput: false,
+    onProgress: (t) => {
+      report(onProgress, {
+        phase: 'transcribe',
+        message: `Transcribing… ${Math.round(t * 100)}%`,
+        progress: segmentProgress(PROGRESS.transcribe, t),
+      });
+    },
   });
 
   const { captions } = toCaptions({ whisperCppOutput: json });
+  report(onProgress, {
+    phase: 'done',
+    message: `Done — ${captions.length} words transcribed`,
+    progress: 100,
+  });
   return captions;
 }

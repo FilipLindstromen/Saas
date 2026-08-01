@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createEmptyProject, createScene, type Project, type Scene, type SceneStyle } from '@/types/project';
-import { parseScript, pickSceneStyle, extractBigNumber, estimateDuration } from '@/lib/parseScript';
+import { createEmptyProject, createScene, defaultDurationForStyle, type Project, type Scene, type SceneStyle } from '@/types/project';
+import { parseScript, parseStructuredScript, serializeScript, pickSceneStyle, estimateDuration, assignSceneStylesWithVariety, scenePatchForStyle } from '@/lib/parseScript';
 import { PreviewPlayer } from '@/components/PreviewPlayer';
 import { ScriptEditor } from '@/components/ScriptEditor';
 import { SceneList } from '@/components/SceneList';
@@ -12,6 +12,7 @@ import { ThemePanel } from '@/components/ThemePanel';
 import { SettingsOverlay } from '@/components/SettingsOverlay';
 import { VideoSyncPanel } from '@/components/VideoSyncPanel';
 import { ExportPanel } from '@/components/ExportPanel';
+import { PresentView } from '@/components/PresentView';
 import { listLocalProjects, loadLocalProject, saveLocalProject } from '@/lib/localProjectStore';
 import type { ProjectSummary } from '@/lib/projectStore';
 
@@ -48,8 +49,13 @@ export default function Home() {
   const [status, setStatus] = useState<string>('');
   const [brollStatus, setBrollStatus] = useState<string>('');
   const [brollBusy, setBrollBusy] = useState(false);
-  const [mode, setMode] = useState<'plan' | 'edit'>('plan');
+  const [brollPanMode, setBrollPanMode] = useState(false);
+  // 'import' is an optional first step (upload + transcribe a video, then generate scenes
+  // straight from the transcript with correct timing) — never required, always reachable via
+  // the header toggle, just the thing shown first for a fresh project.
+  const [mode, setMode] = useState<'import' | 'plan' | 'edit'>('import');
   const [themeOverlayOpen, setThemeOverlayOpen] = useState(false);
+  const [presentOpen, setPresentOpen] = useState(false);
 
   const refreshProjectList = () => {
     if (IS_STATIC) {
@@ -67,7 +73,20 @@ export default function Home() {
   }, []);
 
   const patchProject = (patch: Partial<Project>) =>
-    setProject((p) => ({ ...p, ...patch, updatedAt: new Date().toISOString() }));
+    setProject((p) => {
+      const next = { ...p, ...patch, updatedAt: new Date().toISOString() };
+      // Changing the pacing multiplier re-fits every non-voiceover-locked scene's duration
+      // immediately, not just future edits — "automatic" means the multiplier is the only
+      // duration control, so it has to actually move existing scenes too.
+      const prevMult = p.theme.durationMultiplier ?? 1;
+      const nextMult = next.theme.durationMultiplier ?? 1;
+      if (nextMult !== prevMult) {
+        next.scenes = next.scenes.map((s) =>
+          s.wordTimings ? s : { ...s, durationSec: estimateDuration(s.kicker, s.lines) * nextMult }
+        );
+      }
+      return next;
+    });
 
   // Sets a single "primary" selection, collapsing any multi-select — used everywhere scenes
   // get selected programmatically (generate, add, load, duplicate), as opposed to the
@@ -118,13 +137,12 @@ export default function Home() {
       scenes: p.scenes.map((s) => {
         if (s.id !== id) return s;
         const next = { ...s, ...patch };
-        // Content edits re-fit the duration to the new word count, unless this scene is
-        // voiceover-synced (wordTimings set) — that duration must stay locked to the audio
-        // track regardless of text edits. An explicit edit to durationSec itself (the manual
-        // "Duration (sec)" field) always wins and isn't immediately overwritten.
-        const contentChanged = ('lines' in patch || 'kicker' in patch) && !('durationSec' in patch);
-        if (contentChanged && !next.wordTimings) {
-          next.durationSec = estimateDuration(next.kicker, next.lines);
+        // Content edits re-fit the duration to the new word count (scaled by the project's
+        // pacing multiplier), unless this scene is voiceover-synced (wordTimings set) — that
+        // duration must stay locked to the audio track regardless of text edits. Duration is
+        // never set directly anymore (no per-scene field), so this always wins on content edits.
+        if (('lines' in patch || 'kicker' in patch) && !next.wordTimings) {
+          next.durationSec = estimateDuration(next.kicker, next.lines) * (p.theme.durationMultiplier ?? 1);
         }
         return next;
       }),
@@ -136,29 +154,64 @@ export default function Home() {
   // an explicit bulk action, so unlike the live per-edit duration fit above it's fine to
   // clobber styles the user picked manually, same as "Auto-select b-roll for all scenes" does.
   const handleAutoSetStyles = () =>
-    setProject((p) => ({
-      ...p,
-      scenes: p.scenes.map((s) => {
-        const style = pickSceneStyle(s.kicker, s.lines);
-        const big = style === 'bignumber' ? extractBigNumber(s.lines) : null;
-        const lines = big ? big.rest : s.lines;
-        return {
-          ...s,
-          style,
-          lines,
-          number: big ? big.number : s.style === 'bignumber' ? s.number : undefined,
-          numberSuffix: big ? big.suffix : s.style === 'bignumber' ? s.numberSuffix : undefined,
-          dark: style === 'poster' ? true : s.dark,
-          durationSec: s.wordTimings ? s.durationSec : estimateDuration(s.kicker, lines),
-        };
-      }),
-      updatedAt: new Date().toISOString(),
-    }));
+    setProject((p) => {
+      const styles = assignSceneStylesWithVariety(p.scenes.map((s) => ({ kicker: s.kicker, lines: s.lines })));
+      return {
+        ...p,
+        scenes: p.scenes.map((s, i) => {
+          const patch = scenePatchForStyle(s, styles[i]);
+          return {
+            ...s,
+            ...patch,
+            durationSec: s.wordTimings
+              ? s.durationSec
+              : estimateDuration(s.kicker, patch.lines) * (p.theme.durationMultiplier ?? 1),
+          };
+        }),
+        updatedAt: new Date().toISOString(),
+      };
+    });
 
   const handleGenerate = () => {
-    const scenes = parseScript(scriptText);
-    setProject((p) => ({ ...p, scenes, updatedAt: new Date().toISOString() }));
-    selectOne(scenes[0]?.id ?? null);
+    setProject((p) => {
+      const mult = p.theme.durationMultiplier ?? 1;
+      const scenes = parseScript(scriptText).map((s) => ({ ...s, durationSec: s.durationSec * mult }));
+      selectOne(scenes[0]?.id ?? null);
+      return { ...p, scenes, updatedAt: new Date().toISOString() };
+    });
+    setMode('edit');
+  };
+
+  // Re-parses the script text and patches each EXISTING scene's name/kicker/lines by
+  // position, leaving style/duration/colors/font/b-roll/wordTimings untouched — unlike
+  // handleGenerate, which throws away and rebuilds every scene from scratch. Extra blocks
+  // beyond the current scene count are appended as new scenes; fewer blocks just leaves the
+  // trailing scenes as they were.
+  const handleUpdateCopy = () => {
+    const blocks = parseStructuredScript(scriptText);
+    setProject((p) => {
+      const mult = p.theme.durationMultiplier ?? 1;
+      const scenes = p.scenes.map((s, i) => {
+        const b = blocks[i];
+        if (!b) return s;
+        const next = { ...s, name: b.name, kicker: b.kicker || undefined, lines: b.lines };
+        if (!next.wordTimings) next.durationSec = estimateDuration(next.kicker, next.lines) * mult;
+        return next;
+      });
+      for (let i = p.scenes.length; i < blocks.length; i++) {
+        const b = blocks[i];
+        const style = pickSceneStyle(b.kicker, b.lines);
+        scenes.push(createScene({ name: b.name, style, kicker: b.kicker || undefined, lines: b.lines, durationSec: estimateDuration(b.kicker, b.lines) * mult }));
+      }
+      if (blocks.length > 0) {
+        const styles = assignSceneStylesWithVariety(scenes.map((s) => ({ kicker: s.kicker, lines: s.lines })));
+        for (let i = 0; i < scenes.length; i++) {
+          const patch = scenePatchForStyle(scenes[i], styles[i]);
+          scenes[i] = { ...scenes[i], ...patch };
+        }
+      }
+      return { ...p, scenes, updatedAt: new Date().toISOString() };
+    });
     setMode('edit');
   };
 
@@ -191,7 +244,23 @@ export default function Home() {
       const scene = createScene({
         style,
         name: `Scene ${p.scenes.length + 1}`,
-        lines: [{ text: style === 'rotate' ? 'We are' : 'New line' }],
+        durationSec: defaultDurationForStyle(style) * (p.theme.durationMultiplier ?? 1),
+        lines:
+          style === 'rotate'
+            ? [{ text: 'We are' }]
+            : style === 'mosaic'
+              ? [
+                  { text: 'Fast' },
+                  { text: 'Paced', accent: true },
+                  { text: 'High' },
+                  { text: 'Energy', accent: true },
+                  { text: 'Creative' },
+                  { text: 'Graphics' },
+                ]
+              : style === 'badge'
+                ? [{ text: 'Creative pack' }]
+                : [{ text: 'New line' }],
+        kicker: style === 'badge' ? 'Try now!' : undefined,
         dark: style === 'poster',
         rotatingWords: style === 'rotate' ? ['fast', 'reliable', 'simple'] : undefined,
         compareRows:
@@ -252,9 +321,12 @@ export default function Home() {
     });
 
   const handleAutoSelectBroll = async () => {
-    const eligible = project.scenes.filter((s) => !s.broll);
+    // Scoped to the multi-selection when 2+ scenes are selected, otherwise every scene —
+    // same "fill gaps, don't replace existing picks" behavior either way.
+    const targetScenes = multiSelectedIds.length > 1 ? project.scenes.filter((s) => multiSelectedIds.includes(s.id)) : project.scenes;
+    const eligible = targetScenes.filter((s) => !s.broll);
     if (eligible.length === 0) {
-      setBrollStatus('Every scene already has b-roll.');
+      setBrollStatus('Every targeted scene already has b-roll.');
       setTimeout(() => setBrollStatus(''), 2000);
       return;
     }
@@ -264,7 +336,7 @@ export default function Home() {
       const res = await fetch('/api/broll/autoselect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: project.scenes }),
+        body: JSON.stringify({ scenes: targetScenes }),
       });
       const data = (await res.json()) as {
         updates?: { id: string; patch: Partial<Scene> }[];
@@ -289,21 +361,31 @@ export default function Home() {
     setProject(createEmptyProject());
     selectOne(null);
     setScriptText('');
-    setMode('plan');
+    setMode('import');
   };
 
   const selectedScene = project.scenes.find((s) => s.id === selectedSceneId) || null;
 
+  useEffect(() => {
+    if (!selectedScene?.broll) setBrollPanMode(false);
+  }, [selectedSceneId, selectedScene?.broll]);
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#0a0a0a] text-white">
-      <header className="flex items-center justify-between border-b border-white/[0.06] bg-[#1f1f1f]/90 px-5 py-3 backdrop-blur-xl">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#0a0a0a] text-white">
+      <header className="flex shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#1f1f1f]/90 px-5 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <h1 className="text-[1.25rem] font-semibold tracking-tight text-white">TypoAnimation</h1>
           <div className="flex rounded-xl border border-white/10 bg-[#141414] p-0.5">
-            {(['plan', 'edit'] as const).map((m) => (
+            {(['import', 'plan', 'edit'] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
+                onClick={() => {
+                  // Entering Plan with existing scenes re-syncs the textarea from them, so
+                  // whatever's on the canvas is what you see and edit — not whatever script
+                  // text happened to be left over from before those scenes existed.
+                  if (m === 'plan' && project.scenes.length > 0) setScriptText(serializeScript(project.scenes));
+                  setMode(m);
+                }}
                 className={`rounded-[10px] px-3.5 py-1 text-xs font-semibold capitalize transition-colors ${
                   mode === m ? 'bg-gradient-to-br from-[#ff6b35] to-[#ff4757] text-white' : 'text-white/55 hover:text-white/85'
                 }`}
@@ -311,10 +393,27 @@ export default function Home() {
                 {m}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={project.scenes.length === 0}
+              onClick={() => setPresentOpen(true)}
+              className="rounded-[10px] px-3.5 py-1 text-xs font-semibold transition-colors disabled:opacity-40 disabled:hover:text-white/55 bg-white/10 text-white hover:bg-white/15"
+              title="Fullscreen slide presentation (↑↓ to navigate)"
+            >
+              Present
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {status && <span className="text-xs text-white/45">{status}</span>}
+          {(status || brollStatus) && (
+            <span className="max-w-[220px] truncate text-xs text-white/45">{brollStatus || status}</span>
+          )}
+          <button
+            onClick={() => setThemeOverlayOpen(true)}
+            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15"
+          >
+            Theme settings
+          </button>
           <select
             defaultValue=""
             onChange={(e) => handleLoad(e.target.value)}
@@ -344,11 +443,29 @@ export default function Home() {
           <button
             onClick={handleAutoSetStyles}
             disabled={project.scenes.length === 0}
-            title="Re-picks each scene's style (Poster, Big number, Chips, Plain) from its current text"
+            title="Re-picks each scene's style from its text, with varied types across the timeline"
             className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15 disabled:opacity-40"
           >
             Auto-set scene types
           </button>
+          {!IS_STATIC && (
+            <button
+              onClick={handleAutoSelectBroll}
+              disabled={brollBusy || project.scenes.length === 0}
+              title={
+                multiSelectedIds.length > 1
+                  ? `Fill b-roll for ${multiSelectedIds.length} selected scenes without existing picks`
+                  : 'Fill b-roll for all scenes without existing picks'
+              }
+              className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15 disabled:opacity-50"
+            >
+              {brollBusy
+                ? 'Selecting b-roll…'
+                : multiSelectedIds.length > 1
+                  ? `Auto-select b-roll (${multiSelectedIds.length})`
+                  : 'Auto-select b-roll'}
+            </button>
+          )}
           {!IS_STATIC && (
             <div className="ml-2 border-l border-white/10 pl-3">
               <ExportPanel project={project} />
@@ -357,17 +474,76 @@ export default function Home() {
         </div>
       </header>
 
-      {mode === 'plan' ? (
-        <div className="flex flex-1 justify-center overflow-hidden p-4">
-          <div className="flex w-full max-w-2xl flex-col">
-            <div className="flex flex-1 flex-col rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-              <ScriptEditor value={scriptText} onChange={setScriptText} onGenerate={handleGenerate} />
+      {mode === 'import' ? (
+        <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-4">
+          <div className="flex w-full max-w-lg flex-col gap-4">
+            <div className="flex flex-col gap-1 text-center">
+              <h2 className="text-[1.1rem] font-semibold text-white">Start from a video (optional)</h2>
+              <p className="text-xs text-white/45">
+                Upload a webcam/voiceover recording and transcribe it, and scenes get generated straight from what was
+                actually said — correct timing included, no separate sync step. Skip this if you'd rather just type a script.
+              </p>
             </div>
+            {IS_STATIC ? (
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-center text-xs text-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                Upload/transcribe need a real server (ffmpeg, local speech-to-text) — this preview build is static. Run
+                the full app locally (see the Saas hub card) for that.
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                <VideoSyncPanel
+                  project={project}
+                  onProjectChange={patchProject}
+                  onBulkSceneUpdate={handleBulkSceneUpdate}
+                  onGenerated={(scenes) => {
+                    selectOne(scenes[0]?.id ?? null);
+                    setMode('edit');
+                  }}
+                />
+              </div>
+            )}
+            <button
+              onClick={() => setMode('plan')}
+              className="self-center rounded-xl border border-white/10 bg-[#141414] px-4 py-1.5 text-xs font-medium text-white/65 transition-colors hover:bg-[#252525] hover:text-white/90"
+            >
+              Skip — write a script instead →
+            </button>
+          </div>
+        </div>
+      ) : mode === 'plan' ? (
+        <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-4">
+          <div className="flex w-full max-w-2xl flex-col gap-4">
+            <div className="flex min-h-[min(480px,50vh)] flex-col rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+              <ScriptEditor
+                value={scriptText}
+                onChange={setScriptText}
+                onGenerate={handleGenerate}
+                onUpdateCopy={handleUpdateCopy}
+                showUpdateCopy={project.scenes.length > 0 && scriptText !== serializeScript(project.scenes)}
+              />
+            </div>
+            {IS_STATIC ? (
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-center text-xs text-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                Voice sync needs a real server — run the full app locally for upload and transcribe.
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                <VideoSyncPanel
+                  project={project}
+                  onProjectChange={patchProject}
+                  onBulkSceneUpdate={handleBulkSceneUpdate}
+                  onGenerated={(scenes) => {
+                    selectOne(scenes[0]?.id ?? null);
+                    setMode('edit');
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-[340px_1fr_320px] gap-4 p-4">
-          <div className="flex flex-col gap-4 overflow-y-auto">
+        <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr_320px] gap-4 overflow-hidden p-4">
+          <div className="flex min-h-0 flex-col overflow-hidden">
             <SceneList
               scenes={project.scenes}
               theme={project.theme}
@@ -379,53 +555,38 @@ export default function Home() {
               onDuplicate={handleDuplicate}
               onAdd={handleAdd}
             />
-            {IS_STATIC ? (
-              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-xs text-white/45 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-                Webcam voice sync, b-roll, and MP4 export need a real server (ffmpeg, local
-                speech-to-text, video rendering) — this preview build is static. Run the full app
-                locally (see the Saas hub card) for those.
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5 rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-                  <button
-                    onClick={handleAutoSelectBroll}
-                    disabled={brollBusy || project.scenes.length === 0}
-                    className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] disabled:opacity-50"
-                  >
-                    {brollBusy ? 'Selecting b-roll…' : 'Auto-select b-roll for all scenes'}
-                  </button>
-                  {brollStatus && <p className="text-xs text-white/45">{brollStatus}</p>}
-                </div>
-                <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-                  <VideoSyncPanel project={project} onProjectChange={patchProject} onBulkSceneUpdate={handleBulkSceneUpdate} />
-                </div>
-              </>
-            )}
           </div>
 
-          <div className="flex items-start justify-center">
+          <div className="flex min-h-0 items-start justify-center overflow-hidden">
             <div
               className="w-full"
               style={{ maxWidth: project.aspectRatio === '16:9' ? 900 : project.aspectRatio === '9:16' ? 360 : 640 }}
             >
-              <PreviewPlayer project={project} selectedSceneId={selectedSceneId} />
+              <PreviewPlayer
+                project={project}
+                selectedSceneId={selectedSceneId}
+                brollPanMode={brollPanMode}
+                onBrollPatch={(p) => {
+                  if (!selectedSceneId || !selectedScene?.broll) return;
+                  patchScene(selectedSceneId, { broll: { ...selectedScene.broll, ...p } });
+                }}
+              />
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 overflow-y-auto">
-            <button
-              onClick={() => setThemeOverlayOpen(true)}
-              className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-colors hover:bg-[#252525]"
-            >
-              <span className="text-[0.95rem] font-semibold text-white">Theme settings</span>
-              <span className="text-xs text-white/45">Colors, fonts, captions →</span>
-            </button>
+          <div className="flex min-h-0 flex-col overflow-y-auto">
             <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
               {multiSelectedIds.length > 1 ? (
                 <BulkEditPanel sceneIds={multiSelectedIds} onApply={handleBulkPatch} />
               ) : (
-                <SceneStylePanel scene={selectedScene} onChange={patchScene} hideBroll={IS_STATIC} />
+                <SceneStylePanel
+                  scene={selectedScene}
+                  onChange={patchScene}
+                  hideBroll={IS_STATIC}
+                  hasVideo={!!project.video}
+                  brollPanMode={brollPanMode}
+                  onBrollPanModeChange={setBrollPanMode}
+                />
               )}
             </div>
           </div>
@@ -435,6 +596,16 @@ export default function Home() {
       <SettingsOverlay open={themeOverlayOpen} onClose={() => setThemeOverlayOpen(false)} title="Theme settings">
         <ThemePanel project={project} onChange={patchProject} />
       </SettingsOverlay>
+
+      {presentOpen && project.scenes.length > 0 && (
+        <PresentView
+          project={project}
+          initialSceneIndex={
+            selectedSceneId ? Math.max(0, project.scenes.findIndex((s) => s.id === selectedSceneId)) : 0
+          }
+          onClose={() => setPresentOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { downloadBrollVideo } from '@/lib/downloadBroll';
-import type { StockVideoResult } from '@/lib/stockVideo';
+import { downloadBrollMedia } from '@/lib/downloadBroll';
+import type { StockMediaResult } from '@/lib/stockVideo';
 import type { BrollAsset } from '@/types/project';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
-  const body = (await request.json()) as { result?: StockVideoResult };
+  const body = (await request.json()) as { result?: StockMediaResult };
   const result = body.result;
   if (!result || !result.downloadUrl) {
     return NextResponse.json({ error: 'missing result' }, { status: 400 });
   }
 
   try {
-    const { path } = await downloadBrollVideo(result.downloadUrl, result.id, result.provider);
+    const { path } = await downloadBrollMedia(result.downloadUrl, result.id, result.provider, result.kind);
     const broll: BrollAsset = {
       path,
       provider: result.provider,
+      kind: result.kind,
       sourceId: result.id,
       thumbnail: result.thumbnail,
       credit: result.credit,
