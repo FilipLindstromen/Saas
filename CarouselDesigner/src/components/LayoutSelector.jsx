@@ -3,64 +3,52 @@ import './LayoutSelector.css'
 const LAYOUTS = [
   {
     id: 'default',
-    name: 'Left Aligned',
-    description: 'Text aligned to the left',
+    name: 'Bottom caption',
+    description: 'Classic IG carousel — text anchored at the bottom',
     thumbnail: (
-      <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-text-left">TEXT</div>
+      <div className="layout-thumbnail-content layout-thumbnail-carousel">
+        <div className="layout-thumbnail-photo" />
+        <div className="layout-thumbnail-text-bottom">Aa</div>
       </div>
-    )
+    ),
   },
   {
-    id: 'left-video',
-    name: 'Left + Video',
-    description: 'Left aligned text with full-height video on right',
+    id: 'top',
+    name: 'Top hook',
+    description: 'Bold opener at the top — great for slide 1',
     thumbnail: (
-      <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-left-video">
-          <div className="layout-thumbnail-text-left-small">TEXT</div>
-          <div className="layout-thumbnail-video-panel"></div>
-        </div>
+      <div className="layout-thumbnail-content layout-thumbnail-carousel">
+        <div className="layout-thumbnail-text-top">Aa</div>
+        <div className="layout-thumbnail-photo layout-thumbnail-photo-fill" />
       </div>
-    )
-  },
-  {
-    id: 'right-video',
-    name: 'Right + Video',
-    description: 'Right aligned text with full-height video on left',
-    thumbnail: (
-      <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-right-video">
-          <div className="layout-thumbnail-video-panel"></div>
-          <div className="layout-thumbnail-text-right-small">TEXT</div>
-        </div>
-      </div>
-    )
+    ),
   },
   {
     id: 'centered',
-    name: 'Centered',
-    description: 'Text centered on slide',
+    name: 'Center statement',
+    description: 'Single idea centered on the slide',
     thumbnail: (
-      <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-text-center">TEXT</div>
+      <div className="layout-thumbnail-content layout-thumbnail-carousel">
+        <div className="layout-thumbnail-photo layout-thumbnail-photo-fill" />
+        <div className="layout-thumbnail-text-center">Aa</div>
       </div>
-    )
+    ),
   },
   {
     id: 'right',
-    name: 'Right Aligned',
-    description: 'Text aligned to the right',
+    name: 'Right caption',
+    description: 'Text bottom-right — asymmetric carousel look',
     thumbnail: (
-      <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-text-right">TEXT</div>
+      <div className="layout-thumbnail-content layout-thumbnail-carousel">
+        <div className="layout-thumbnail-photo layout-thumbnail-photo-fill" />
+        <div className="layout-thumbnail-text-bottom-right">Aa</div>
       </div>
-    )
+    ),
   },
   {
     id: 'bulletpoints',
-    name: 'Bullets',
-    description: 'Animated bullet points',
+    name: 'Tips list',
+    description: 'Numbered or bulleted tips (one per line)',
     thumbnail: (
       <div className="layout-thumbnail-content">
         <div className="layout-thumbnail-bullets" aria-hidden="true">
@@ -78,23 +66,18 @@ const LAYOUTS = [
           </div>
         </div>
       </div>
-    )
+    ),
   },
   {
-    id: 'video',
-    name: 'Video',
-    description: 'Full screen video/webcam',
+    id: 'minimal',
+    name: 'Minimal type',
+    description: 'Type-only slide — no photo required',
     thumbnail: (
-      <div className="layout-thumbnail-content">
-        <div className="layout-thumbnail-video">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M23 7l-7 5 7 5V7z" />
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-          </svg>
-        </div>
+      <div className="layout-thumbnail-content layout-thumbnail-carousel layout-thumbnail-minimal">
+        <div className="layout-thumbnail-text-center layout-thumbnail-text-large">Aa</div>
       </div>
-    )
-  }
+    ),
+  },
 ]
 
 const CAMERA_OVERRIDE_POSITIONS = [
@@ -105,10 +88,12 @@ const CAMERA_OVERRIDE_POSITIONS = [
   { id: 'circle-bottom-left', title: 'Circle bottom left', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="6" cy="18" r="4" /></svg> },
   { id: 'circle-bottom-right', title: 'Circle bottom right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="18" r="4" /></svg> },
   { id: 'circle-top-left', title: 'Circle top left', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="6" cy="6" r="4" /></svg> },
-  { id: 'circle-top-right', title: 'Circle top right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="6" r="4" /></svg> }
+  { id: 'circle-top-right', title: 'Circle top right', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="22" height="22" rx="2" opacity="0.3" /><circle cx="18" cy="6" r="4" /></svg> },
 ]
 
 function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect, selectedCount = 1 }) {
+  const displayLayout = ['left-video', 'right-video', 'video'].includes(selectedLayout) ? 'default' : selectedLayout
+
   return (
     <div className="layout-selector">
       <div className="layout-selector-header">
@@ -121,7 +106,7 @@ function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOver
         {LAYOUTS.map((layout) => (
           <div
             key={layout.id}
-            className={`layout-thumbnail ${selectedLayout === layout.id ? 'selected' : ''}`}
+            className={`layout-thumbnail ${displayLayout === layout.id ? 'selected' : ''}`}
             onClick={() => onSelectLayout(layout.id)}
             title={layout.description}
           >

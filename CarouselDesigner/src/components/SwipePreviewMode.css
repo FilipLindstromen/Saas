@@ -2,9 +2,14 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 24px;
-  overflow: auto;
+  padding: 16px 24px;
+  overflow: hidden;
   min-height: 0;
+  height: 100%;
+}
+
+.swipe-preview-header {
+  flex-shrink: 0;
 }
 
 .swipe-preview-header h2 {
@@ -13,28 +18,33 @@
 }
 
 .swipe-preview-header p {
-  margin: 0 0 20px;
+  margin: 0 0 12px;
   color: var(--text-muted);
   font-size: 0.9rem;
 }
 
 .swipe-preview-stage {
+  flex: 1;
   display: flex;
-  gap: 32px;
-  align-items: flex-start;
+  gap: 24px;
+  align-items: stretch;
   justify-content: center;
-  flex-wrap: wrap;
+  min-height: 0;
 }
 
 .swipe-preview-phone {
   position: relative;
-  width: 270px;
+  height: 100%;
+  max-height: 100%;
+  width: auto;
   aspect-ratio: 3 / 4;
+  max-width: min(100%, calc((100vh - 180px) * 3 / 4));
   background: #000;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
   border: 3px solid var(--border-default);
+  flex-shrink: 1;
 }
 
 .swipe-preview-slide-wrap {
@@ -101,6 +111,8 @@
   flex-direction: column;
   gap: 12px;
   min-width: 180px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .swipe-preview-counter {

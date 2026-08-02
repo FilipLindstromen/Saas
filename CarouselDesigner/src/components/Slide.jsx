@@ -1447,8 +1447,14 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         />
       )
     }
-    
-    return null
+
+    return (
+      <div
+        className={`slide-text ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+        style={textStyle}
+        dangerouslySetInnerHTML={{ __html: formatContentForDisplay(slide.content || '') }}
+      />
+    )
   }
 
   // Get font family for each heading (fallback to main fontFamily if not set)
@@ -1594,7 +1600,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const { aspectRatio: aspectRatioValue, className: formatClass } = getSlideFormatMeta(slideFormat)
   const hasDraggableBackground = !isPlayMode && onUpdate && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)
   const textAnimSpeed = textAnimationSpeed ?? 1
-  const isTopAligned = contentVerticalAlign === 'top'
+  const isTopAligned = contentVerticalAlign === 'top' || layout === 'top'
   const slideStyle = {
     backgroundColor: hideBackground ? 'transparent' : slideBgColor,
     aspectRatio: aspectRatioValue,
@@ -1870,7 +1876,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         )
       ) : (
         <div 
-          className={`slide-content ${layout === 'default' ? 'default' : ''} ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''}`}
+          className={`slide-content ${layout === 'default' || layout === 'top' ? 'default' : ''} ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'section' ? 'section' : ''} ${layout === 'bulletpoints' ? 'bulletpoints' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${layout === 'minimal' ? 'minimal' : ''}`}
           style={{ 
             color: textColor,
             fontFamily: `"${fontFamily}", sans-serif`,

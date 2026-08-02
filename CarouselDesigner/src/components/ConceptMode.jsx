@@ -19,6 +19,16 @@ function loadJson(key, fallback) {
   }
 }
 
+function normalizeIdeaCopy(item) {
+  if (!item) return ''
+  if (item.copy?.trim()) return item.copy.trim()
+  return [item.headline, item.body].filter((s) => s?.trim()).join('\n\n').trim()
+}
+
+function migrateIdea(item) {
+  return { ...item, copy: normalizeIdeaCopy(item) }
+}
+
 export default function ConceptMode({
   onApplyToPlan,
   onApplyVariantToPlan,
@@ -26,7 +36,7 @@ export default function ConceptMode({
 }) {
   const [instructions, setInstructions] = useState(() => localStorage.getItem(STORAGE_INSTRUCTIONS) || '')
   const [topic, setTopic] = useState('')
-  const [ideas, setIdeas] = useState(() => loadJson(STORAGE_IDEAS, []))
+  const [ideas, setIdeas] = useState(() => loadJson(STORAGE_IDEAS, []).map(migrateIdea))
   const [variants, setVariants] = useState(() => loadJson(STORAGE_VARIANTS, []))
   const [selectedTemplate, setSelectedTemplate] = useState(() => localStorage.getItem(STORAGE_TEMPLATE) || 'hookTipsCta')
   const [slideCount, setSlideCount] = useState(6)
@@ -126,10 +136,9 @@ export default function ConceptMode({
   const handleApplyVariant = (variant) => {
     const slidesFromVariant = (variant.slides || []).map((s, i) => ({
       id: `idea-${Date.now()}-${i}`,
-      headline: s.headline || s.title || '',
-      body: s.body || s.copy || '',
+      copy: normalizeIdeaCopy(s) || String(s.copy || '').trim(),
       role: s.role || template?.roles?.[i] || null,
-    })).filter((s) => s.headline?.trim())
+    })).filter((s) => s.copy?.trim())
 
     if (onApplyVariantToPlan) {
       onApplyVariantToPlan(slidesFromVariant, variant.label)
@@ -147,8 +156,10 @@ export default function ConceptMode({
   }
 
   const addIdea = () => {
-    setIdeas((prev) => [...prev, { id: `idea-${Date.now()}`, headline: '', body: '', role: 'value' }])
+    setIdeas((prev) => [...prev, { id: `idea-${Date.now()}`, copy: '', role: 'value' }])
   }
+
+  const ideasWithCopy = ideas.filter((i) => normalizeIdeaCopy(i))
 
   return (
     <div className="concept-mode">
@@ -262,19 +273,12 @@ export default function ConceptMode({
                             onChange={(role) => updateIdea(idea.id, { role })}
                           />
                         </div>
-                        <input
-                          type="text"
-                          className="concept-input"
-                          value={idea.headline}
-                          onChange={(e) => updateIdea(idea.id, { headline: e.target.value })}
-                          placeholder="Headline"
-                        />
                         <textarea
                           className="concept-textarea concept-textarea-sm"
-                          rows={2}
-                          value={idea.body}
-                          onChange={(e) => updateIdea(idea.id, { body: e.target.value })}
-                          placeholder="Supporting line (optional)"
+                          rows={4}
+                          value={idea.copy ?? normalizeIdeaCopy(idea)}
+                          onChange={(e) => updateIdea(idea.id, { copy: e.target.value })}
+                          placeholder="Slide copy — same field as in Edit mode"
                         />
                       </div>
                       <button type="button" className="concept-remove" onClick={() => removeIdea(idea.id)} aria-label="Remove">×</button>
@@ -287,7 +291,7 @@ export default function ConceptMode({
                 type="button"
                 className="concept-btn concept-btn-primary"
                 onClick={handleApply}
-                disabled={!ideas.some((i) => i.headline?.trim())}
+                disabled={!ideasWithCopy.length}
               >
                 Use in Plan →
               </button>
@@ -308,7 +312,7 @@ export default function ConceptMode({
                         {(variant.slides || []).slice(0, 6).map((s, i) => (
                           <li key={i}>
                             {s.role && <SlideRoleBadge role={s.role} />}
-                            <span>{s.headline || s.title}</span>
+                            <span>{normalizeIdeaCopy(s) || s.headline || s.title}</span>
                           </li>
                         ))}
                         {(variant.slides || []).length > 6 && (
@@ -331,7 +335,7 @@ export default function ConceptMode({
 
           {slides.length > 0 && ideas.length > 0 && activeTab === 'ideas' && (
             <p className="concept-hint">
-              Current carousel has {slides.length} slide{slides.length === 1 ? '' : 's'}. Applying replaces them with {ideas.filter((i) => i.headline?.trim()).length} slides.
+              Current carousel has {slides.length} slide{slides.length === 1 ? '' : 's'}. Applying replaces them with {ideasWithCopy.length} slides.
             </p>
           )}
         </section>

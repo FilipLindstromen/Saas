@@ -108,7 +108,7 @@ export default function SwipePreviewMode({
           <div className="swipe-preview-safe-top" aria-hidden />
           <div className="swipe-preview-slide-wrap">
             {slide && (
-              <Slide slide={slide} {...slideProps} slideFormat={CAROUSEL_FORMAT} />
+              <Slide slide={slide} {...slideProps} slideFormat={CAROUSEL_FORMAT} isPlayMode />
             )}
           </div>
           <div className="swipe-preview-safe-bottom" aria-hidden />

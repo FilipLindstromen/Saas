@@ -951,6 +951,18 @@ input[type="checkbox"]:disabled {
   overflow-x: hidden;
 }
 
+.app-content.preview-mode-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-content.preview-mode-content > .swipe-preview-mode {
+  flex: 1;
+  min-height: 0;
+}
+
 .app-content.video-editing-content {
   display: flex;
   flex-direction: column;

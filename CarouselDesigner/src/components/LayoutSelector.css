@@ -44,7 +44,7 @@
 }
 
 .layout-thumbnail-preview {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 3 / 4;
   background: var(--bg-tertiary);
   border: 2px solid var(--border-default);
   border-radius: 6px;
@@ -213,6 +213,67 @@
   padding-right: 0.25rem;
   flex: 1;
   text-align: right;
+}
+
+.layout-thumbnail-carousel {
+  flex-direction: column;
+  justify-content: flex-end;
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-tertiary) 100%);
+}
+
+.layout-thumbnail-photo {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-tertiary));
+  opacity: 0.85;
+}
+
+.layout-thumbnail-photo-fill {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 40%;
+}
+
+.layout-thumbnail-text-bottom {
+  position: relative;
+  z-index: 1;
+  font-size: 0.45rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  padding: 0.2rem 0.25rem 0.35rem;
+  align-self: flex-start;
+}
+
+.layout-thumbnail-text-top {
+  position: relative;
+  z-index: 1;
+  font-size: 0.45rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  padding: 0.35rem 0.25rem 0.2rem;
+  align-self: flex-start;
+}
+
+.layout-thumbnail-text-bottom-right {
+  position: relative;
+  z-index: 1;
+  font-size: 0.45rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  padding: 0.2rem 0.25rem 0.35rem;
+  align-self: flex-end;
+  width: 100%;
+  text-align: right;
+}
+
+.layout-thumbnail-text-large {
+  font-size: 0.65rem;
+}
+
+.layout-thumbnail-minimal {
+  justify-content: center;
+  background: var(--bg-elevated);
 }
 
 .camera-override-row {

@@ -13,6 +13,8 @@ export const CAROUSEL_LIMITS = {
   headlineChars: 80,
   bodyWords: 35,
   bodyChars: 180,
+  slideCopyWords: 45,
+  slideCopyChars: 260,
   captionChars: 2200,
 }
 

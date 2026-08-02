@@ -45,11 +45,11 @@ export async function generateCarouselIdeas({
     ? `You are an Instagram carousel copywriter. Each slide becomes one 1080×1440 image.
 Rules:
 - Slide 1 MUST be a scroll-stopping hook (question, bold claim, or curiosity gap)
-- Middle slides: ONE idea each, max ${CAROUSEL_LIMITS.headlineWords} word headlines
+- Middle slides: ONE idea each — short, scannable copy
 - Last slide MUST have a clear CTA
-- Return ONLY valid JSON: array of objects with "headline", "body" (optional, short), "role" (hook|value|proof|story|tip|cta|transition)
-- Headlines under ${CAROUSEL_LIMITS.headlineWords} words; body under ${CAROUSEL_LIMITS.bodyWords} words when present`
-    : `Generate Instagram carousel slide ideas. Return ONLY JSON array with "headline", "body", "role".`
+- Return ONLY valid JSON: array of objects with "copy" (all text for that slide, use line breaks if needed), "role" (hook|value|proof|story|tip|cta|transition)
+- Each "copy" under ${CAROUSEL_LIMITS.slideCopyWords} words and ${CAROUSEL_LIMITS.slideCopyChars} characters`
+    : `Generate Instagram carousel slide ideas. Return ONLY JSON array with "copy", "role".`
 
   const user = [
     instructions.trim() && `Instructions:\n${instructions.trim()}`,
@@ -60,12 +60,19 @@ Rules:
 
   const text = await chatCompletion({ system, user })
   const parsed = parseJsonArray(text)
-  return parsed.map((item, i) => ({
-    id: `idea-${Date.now()}-${i}`,
-    headline: String(item.headline || item.title || '').trim(),
-    body: String(item.body || item.copy || item.subtitle || '').trim(),
-    role: item.role || (i === 0 ? 'hook' : i === parsed.length - 1 ? 'cta' : 'value'),
-  })).filter((item) => item.headline)
+  return parsed.map((item, i) => {
+    const copy = String(
+      item.copy
+      || [item.headline, item.body].filter(Boolean).join('\n\n')
+      || item.title
+      || ''
+    ).trim()
+    return {
+      id: `idea-${Date.now()}-${i}`,
+      copy,
+      role: item.role || (i === 0 ? 'hook' : i === parsed.length - 1 ? 'cta' : 'value'),
+    }
+  }).filter((item) => item.copy)
 }
 
 export async function generateCarouselVariants({
@@ -76,7 +83,7 @@ export async function generateCarouselVariants({
 }) {
   const system = `Generate ${variantCount} DISTINCT carousel concept variants for A/B testing.
 Each variant is a complete carousel with ${slideCount} slides.
-Return ONLY JSON: array of variants, each with "label" (A/B/C), "hookAngle" (short description), and "slides" array of {headline, body, role}.
+Return ONLY JSON: array of variants, each with "label" (A/B/C), "hookAngle" (short description), and "slides" array of {copy, role}.
 Variants must differ in hook angle and CTA framing. Keep copy mobile-readable.`
 
   const user = [

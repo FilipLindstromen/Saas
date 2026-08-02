@@ -34,6 +34,24 @@ function getPlainText(content) {
     .replace(/&#39;/g, "'")
 }
 
+function normalizePastedPlainText(text) {
+  if (text == null) return ''
+  return String(text)
+    .replace(/\u2028/g, '\n')
+    .replace(/\u2029/g, '\n\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+}
+
+function splitPasteIntoSlides(text) {
+  const normalized = normalizePastedPlainText(text).trim()
+  if (!normalized) return []
+  if (/\n\s*---\s*\n/.test(normalized)) {
+    return normalized.split(/\n\s*---\s*\n/).map((p) => p.trim()).filter(Boolean)
+  }
+  return normalized.split(/\n\s*\n+/).map((p) => p.trim()).filter(Boolean)
+}
+
 function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = false, setShowTemplates, settings, chapters = [], currentChapterId, onUpdateChapterSlides, onReorderChapters, onUpdateChapterName, projectName = '', onProjectNameChange, carouselCaption = '', carouselHashtags = '', carouselFirstComment = '', onCaptionUpdate, conceptInstructions = '' }) {
   const [planView, setPlanView] = useState('standard') // 'standard' | 'overview'
   const [editingId, setEditingId] = useState(null)
@@ -67,12 +85,14 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   const [selectedMicrophone, setSelectedMicrophone] = useState(null)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [showGenerate, setShowGenerate] = useState(false)
+  const [showPasteText, setShowPasteText] = useState(false)
   const [slideCount, setSlideCount] = useState(() => localStorage.getItem('carouselDesignerSlideCount') || '')
   const [pasteTextInput, setPasteTextInput] = useState('')
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
   const textareaRef = useRef(null)
+  const pasteTextareaRef = useRef(null)
   const [showCaptionPanel, setShowCaptionPanel] = useState(true)
   const [fittingId, setFittingId] = useState(null)
 
@@ -691,15 +711,11 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
   }
 
   const handlePasteToSlides = () => {
-    const text = pasteTextInput.trim()
-    if (!text) return
-    // Split only on --- separator lines; double line breaks stay inside one slide
-    const parts = text.split(/\n\s*---\s*\n/).map((p) => p.trim()).filter(Boolean)
-    const paragraphs = parts.length > 1 ? parts : [text]
+    const paragraphs = splitPasteIntoSlides(pasteTextInput)
     if (paragraphs.length === 0) return
     const contextKey = isOverview ? (currentChapter?.id ?? currentChapterId) : null
     let nextId = maxSlideId() + 1
-    const newSlides = paragraphs.map(content => ({
+    const newSlides = paragraphs.map((content) => ({
       id: nextId++,
       content: plainTextToStorage(content),
       subtitle: '',
@@ -719,6 +735,25 @@ function PlanMode({ slides, onUpdateSlides, onLoadTemplate, showTemplates = fals
     setPasteTextInput('')
     setEditingId(newSlides[0]?.id ?? null)
     setEditContent(paragraphs[0] ?? '')
+  }
+
+  const handlePasteTextAreaPaste = (e) => {
+    const plain = e.clipboardData?.getData('text/plain')
+    if (plain == null) return
+    e.preventDefault()
+    const inserted = normalizePastedPlainText(plain)
+    const ta = e.target
+    const start = ta.selectionStart ?? pasteTextInput.length
+    const end = ta.selectionEnd ?? start
+    const next = pasteTextInput.slice(0, start) + inserted + pasteTextInput.slice(end)
+    setPasteTextInput(next)
+    const cursor = start + inserted.length
+    requestAnimationFrame(() => {
+      if (pasteTextareaRef.current) {
+        pasteTextareaRef.current.selectionStart = cursor
+        pasteTextareaRef.current.selectionEnd = cursor
+      }
+    })
   }
 
   const handleGenerateSlides = async () => {
@@ -1130,17 +1165,36 @@ Example format:
                     {isGenerating ? 'Generating...' : 'Generate'}
                   </button>
                 </div>
+              </div>
+            )}
+            <button
+              type="button"
+              className="plan-generate-toggle plan-paste-toggle"
+              onClick={() => setShowPasteText(!showPasteText)}
+              title={showPasteText ? 'Hide paste text' : 'Paste text into slides'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+              </svg>
+              <span>Paste text</span>
+            </button>
+            {showPasteText && (
+              <div className="plan-generate-content show plan-paste-content">
                 <div className="plan-generate-section plan-paste-section">
-                  <label className="plan-ramble-label">Paste text</label>
-                  <p className="plan-paste-hint">Each paragraph (separated by blank lines) becomes one slide.</p>
+                  <p className="plan-paste-hint">Each paragraph (separated by blank lines) becomes one slide. Line breaks within a paragraph are kept on that slide.</p>
                   <textarea
+                    ref={pasteTextareaRef}
                     className="plan-generate-input plan-paste-input"
-                    placeholder="If you operate at a high level during the day…&#10;&#10;make decisions… carry responsibility… solve problems…&#10;&#10;…but when you lie down at night your brain won't shut off…&#10;&#10;this training is for you."
+                    placeholder={'If you operate at a high level during the day…\n\nmake decisions… carry responsibility… solve problems…\n\n…but when you lie down at night your brain won\'t shut off…\n\nthis training is for you.'}
                     value={pasteTextInput}
-                    onChange={(e) => setPasteTextInput(e.target.value)}
-                    rows={5}
+                    onChange={(e) => setPasteTextInput(normalizePastedPlainText(e.target.value))}
+                    onPaste={handlePasteTextAreaPaste}
+                    rows={8}
+                    spellCheck
                   />
                   <button
+                    type="button"
                     className="plan-generate-btn plan-paste-btn"
                     onClick={handlePasteToSlides}
                     disabled={!pasteTextInput.trim()}

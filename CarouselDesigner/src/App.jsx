@@ -974,17 +974,21 @@ function App() {
   }, [chapters, settings, projectName, isExportingPng])
 
   const handleApplyConceptToPlan = useCallback((ideas) => {
-    const filtered = (ideas || []).filter((idea) => idea.headline?.trim())
+    const filtered = (ideas || []).filter((idea) => {
+      const copy = String(idea.copy ?? [idea.headline, idea.body].filter(Boolean).join('\n\n') ?? '').trim()
+      return copy.length > 0
+    })
     if (!filtered.length) return
 
     let nextId = Math.max(...slides.map((s) => s.id), 0)
     const newSlides = filtered.map((idea) => {
       nextId += 1
       const toStorage = (text) => String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+      const copy = String(idea.copy ?? [idea.headline, idea.body].filter(Boolean).join('\n\n') ?? '').trim()
       return {
         id: nextId,
-        content: toStorage(idea.headline.trim()),
-        subtitle: idea.body?.trim() ? toStorage(idea.body.trim()) : '',
+        content: toStorage(copy),
+        subtitle: '',
         role: idea.role || undefined,
         variantLabel: idea.variantLabel || undefined,
         imageUrl: '',
