@@ -11,6 +11,11 @@ export const CAPTION_STYLES: { value: CaptionStyle; label: string }[] = [
   { value: 'outline', label: 'Outline' },
   { value: 'box-top', label: 'Box top' },
   { value: 'typewriter', label: 'Typewriter' },
+  { value: 'hormozi', label: 'Bold impact (Hormozi)' },
+  { value: 'bubble', label: 'Bubble' },
+  { value: 'highlighter', label: 'Highlighter' },
+  { value: 'gradient', label: 'Gradient' },
+  { value: 'neon', label: 'Neon glow' },
 ]
 
 export const CAPTION_ANIMATIONS: { value: CaptionAnimation; label: string }[] = [

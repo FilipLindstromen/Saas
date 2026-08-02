@@ -1,6 +1,8 @@
 // Animation Engine - Handles professional motion graphics and sequential timing
 class AnimationEngine {
-    constructor() {
+    constructor(canvasWidth = 1080, canvasHeight = 1920) {
+        this.width = canvasWidth;
+        this.height = canvasHeight;
         this.words = [];
         this.currentWordIndex = 0;
         this.startTime = 0;
@@ -16,16 +18,29 @@ class AnimationEngine {
         this.durationPerWord = 1200 / speedMultiplier;
         this.overlap = -200 / speedMultiplier;
 
-        this.words = words.map((word, index) => {
+        const centerX = this.width / 2;
+        const centerY = this.height / 2;
+
+        this.words = words.map((word) => {
             // Syncopated timing: Randomize duration and start offset slightly
             const syncopationFactor = 0.9 + Math.random() * 0.2; // ±10%
             const timingOffset = (Math.random() - 0.5) * 150; // ms jitter
+
+            // Direction from frame center to the word's mosaic position --
+            // used by the "converge" style so every piece settles inward
+            // along its own natural placement vector instead of flying in
+            // from an arbitrary, unrelated direction.
+            const dx = word.x - centerX;
+            const dy = word.y - centerY;
+            const dist = Math.hypot(dx, dy) || 1;
 
             return {
                 ...word,
                 visible: false,
                 animationProgress: 0,
                 style: this.getRandomStyle(),
+                dirX: dx / dist,
+                dirY: dy / dist,
                 prevTransform: null,
                 velocity: { x: 0, y: 0, scale: 0, rotation: 0 },
                 syncDuration: this.durationPerWord * syncopationFactor,
@@ -38,9 +53,15 @@ class AnimationEngine {
         this.reset();
     }
 
+    // A small, complementary set of motions that all read as pieces
+    // "settling into" the mosaic rather than the wide grab-bag of
+    // unrelated entrances (fly up, fly sideways, spin in...) that used to
+    // fire independently on every word and made playback feel chaotic.
     getRandomStyle() {
-        const styles = ['fade', 'slide-up', 'mask-reveal', 'scale-bounce', 'rotate-in', 'slide-side'];
-        return styles[Math.floor(Math.random() * styles.length)];
+        const roll = Math.random();
+        if (roll < 0.15) return 'mask-reveal';
+        if (roll < 0.4) return 'settle';
+        return 'converge';
     }
 
     update(currentTime, force = false) {
@@ -75,7 +96,7 @@ class AnimationEngine {
         // Premium Easing: Quintic Out for elegant arrival
         const easeQuint = 1 - Math.pow(1 - p, 5);
 
-        // Back Out for subtle bounce
+        // Back Out for a subtle settle-bounce
         const backAmount = 1.70158;
         const easeBackCustom = 1 + (backAmount + 1) * Math.pow(p - 1, 3) + backAmount * Math.pow(p - 1, 2);
 
@@ -90,23 +111,21 @@ class AnimationEngine {
 
         const style = word.style;
 
-        if (style === 'fade') {
-            transform.opacity = easeQuint;
-        } else if (style === 'slide-up') {
-            transform.opacity = p < 0.2 ? p * 5 : 1;
-            transform.translateY = (1 - easeQuint) * 100;
+        if (style === 'converge') {
+            // Piece snaps inward into its mosaic slot along the same
+            // radial direction it sits from center -- every word moves
+            // along a direction derived from the actual layout, so
+            // neighboring pieces never fly in from clashing directions.
+            const travel = (1 - easeQuint) * 90;
+            transform.translateX = word.dirX * travel;
+            transform.translateY = word.dirY * travel;
+            transform.scale = 0.88 + (easeBackCustom * 0.12);
+            transform.opacity = p < 0.25 ? p * 4 : 1;
+        } else if (style === 'settle') {
+            transform.scale = 0.9 + (easeBackCustom * 0.1);
+            transform.opacity = p < 0.25 ? p * 4 : 1;
         } else if (style === 'mask-reveal') {
             transform.clipPath = `inset(0 0 ${(1 - easeQuint) * 100}% 0)`;
-        } else if (style === 'scale-bounce') {
-            transform.scale = easeBackCustom;
-            transform.opacity = p < 0.2 ? p * 5 : 1;
-        } else if (style === 'rotate-in') {
-            transform.rotation = (1 - easeQuint) * -20;
-            transform.opacity = p < 0.1 ? p * 10 : 1;
-            transform.scale = 0.8 + (easeQuint * 0.2);
-        } else if (style === 'slide-side') {
-            transform.translateX = (1 - easeQuint) * -150;
-            transform.opacity = p < 0.3 ? p * 3.3 : 1;
         }
 
         // Velocity for motion blur

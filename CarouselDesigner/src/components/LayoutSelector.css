@@ -12,6 +12,41 @@
   gap: 0.5rem;
 }
 
+.layout-selector-collapsed {
+  padding-bottom: 0.65rem;
+}
+
+.layout-selector-collapsed .layout-selector-header {
+  margin-bottom: 0;
+}
+
+.layout-selector-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.layout-selector-toggle {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.layout-selector-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
 .layout-selector-multi-hint {
   font-size: 0.75rem;
   color: var(--text-tertiary);

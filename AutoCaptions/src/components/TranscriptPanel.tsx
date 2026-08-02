@@ -1,18 +1,9 @@
 import type { CaptionSegment } from '../types'
 import styles from './TranscriptPanel.module.css'
 
-function formatTime(s: number): string {
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  const ms = Math.floor((s % 1) * 100)
-  return `${m}:${sec.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`
-}
-
 interface TranscriptPanelProps {
   segments: CaptionSegment[]
   onSegmentsChange: (segments: CaptionSegment[]) => void
-  currentTime: number
-  onSeek: (time: number) => void
   onTranscribe: () => void
   isTranscribing: boolean
   transcribeError: string | null
@@ -21,8 +12,6 @@ interface TranscriptPanelProps {
 export function TranscriptPanel({
   segments,
   onSegmentsChange,
-  currentTime = 0,
-  onSeek,
   onTranscribe,
   isTranscribing = false,
   transcribeError = null,
@@ -51,7 +40,7 @@ export function TranscriptPanel({
         </button>
       </div>
       {transcribeError && <p className={styles.error}>{transcribeError}</p>}
-      <p className={styles.hint}>Edit text to fix spelling. Click a time to seek in the video.</p>
+      <p className={styles.hint}>Edit text to fix spelling.</p>
       <textarea
         className={styles.textarea}
         value={fullText}
@@ -60,26 +49,6 @@ export function TranscriptPanel({
         aria-label="Transcript text"
         rows={12}
       />
-      {segments.length > 0 && onSeek && (
-        <div className={styles.timeRow} role="list">
-          {segments.map((seg, i) => {
-            const isActive = currentTime >= seg.start && currentTime < seg.end
-            return (
-              <button
-                key={i}
-                type="button"
-                className={`${styles.timeBtn} ${isActive ? styles.timeBtnActive : ''}`}
-                onClick={() => onSeek(seg.start)}
-                title={`Go to ${formatTime(seg.start)}`}
-                aria-label={`Seek to ${formatTime(seg.start)}`}
-                role="listitem"
-              >
-                {formatTime(seg.start)}–{formatTime(seg.end)}
-              </button>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }

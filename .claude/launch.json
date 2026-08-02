@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mosaic-typography",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "4173", "MosaicTypography"],
+      "port": 4173
+    },
+    {
+      "name": "autocaptions",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-s", "-l", "4174", "AutoCaptions/dist"],
+      "port": 4174
+    }
+  ]
+}

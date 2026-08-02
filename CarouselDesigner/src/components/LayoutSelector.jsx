@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
 import './LayoutSelector.css'
+
+const LAYOUTS_VISIBLE_KEY = 'carouselDesignerShowLayouts'
 
 const LAYOUTS = [
   {
@@ -93,15 +96,43 @@ const CAMERA_OVERRIDE_POSITIONS = [
 
 function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', onCameraOverrideChange, onCameraOverridePositionSelect, selectedCount = 1 }) {
   const displayLayout = ['left-video', 'right-video', 'video'].includes(selectedLayout) ? 'default' : selectedLayout
+  const [layoutsVisible, setLayoutsVisible] = useState(() => {
+    try {
+      return localStorage.getItem(LAYOUTS_VISIBLE_KEY) !== 'false'
+    } catch {
+      return true
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUTS_VISIBLE_KEY, layoutsVisible ? 'true' : 'false')
+    } catch {
+      /* ignore */
+    }
+  }, [layoutsVisible])
 
   return (
-    <div className="layout-selector">
+    <div className={`layout-selector ${layoutsVisible ? '' : 'layout-selector-collapsed'}`}>
       <div className="layout-selector-header">
         <span className="layout-selector-title">Layouts</span>
-        {selectedCount > 1 && (
-          <span className="layout-selector-multi-hint">Applying to {selectedCount} slides</span>
-        )}
+        <div className="layout-selector-header-actions">
+          {layoutsVisible && selectedCount > 1 && (
+            <span className="layout-selector-multi-hint">Applying to {selectedCount} slides</span>
+          )}
+          <button
+            type="button"
+            className="layout-selector-toggle"
+            onClick={() => setLayoutsVisible((v) => !v)}
+            aria-expanded={layoutsVisible}
+            title={layoutsVisible ? 'Hide layouts' : 'Show layouts'}
+          >
+            {layoutsVisible ? 'Hide' : 'Show'}
+          </button>
+        </div>
       </div>
+      {layoutsVisible ? (
+        <>
       <div className="layout-thumbnails">
         {LAYOUTS.map((layout) => (
           <div
@@ -144,6 +175,8 @@ function LayoutSelector({ onSelectLayout, selectedLayout = 'default', cameraOver
           </div>
         )}
       </div>
+        </>
+      ) : null}
     </div>
   )
 }

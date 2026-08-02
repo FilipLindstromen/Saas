@@ -11,7 +11,7 @@ export interface CaptionSegment {
   words?: CaptionWord[]
 }
 
-/** 10 caption visual styles */
+/** 15 caption visual styles */
 export type CaptionStyle =
   | 'lower-third'
   | 'centered-subtitle'
@@ -23,6 +23,11 @@ export type CaptionStyle =
   | 'outline'
   | 'box-top'
   | 'typewriter'
+  | 'hormozi'
+  | 'bubble'
+  | 'highlighter'
+  | 'gradient'
+  | 'neon'
 
 /** 10 in/out animation styles for captions */
 export type CaptionAnimation =

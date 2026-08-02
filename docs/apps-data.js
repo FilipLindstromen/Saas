@@ -9,7 +9,7 @@ window.SAAS_APPS_CATALOG = [
       { name: 'Carousel Designer', href: 'CarouselDesigner/', icon: 'pitch-deck.svg' },
       { name: 'Info Graphics', href: 'InfoGraphics/', icon: 'info-graphics.svg' },
       { name: 'Native Ads', href: 'NativeAdsGenerator/', icon: 'native-ads.svg' },
-      { name: 'Typography', href: 'Typography/', icon: 'typography.svg' },
+      { name: 'Mosaic Typography', href: 'MosaicTypography/', icon: 'typography.svg' },
     ],
   },
   {

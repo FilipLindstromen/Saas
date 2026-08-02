@@ -43,7 +43,7 @@ jobs:
           cp docs/robots.txt deploy/
           cp -r conversation-generator deploy/
           cp -r ConversationFunnelBuilder deploy/
-          cp -r Typography deploy/
+          cp -r MosaicTypography deploy/
           cp -r VSLWriter deploy/
           cp -r docs/ContentGenerator deploy/
 

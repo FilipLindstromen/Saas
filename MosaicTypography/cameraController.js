@@ -46,9 +46,19 @@ class CameraController {
             this.targetX = word.x;
             this.targetY = word.y;
 
-            // Dynamic zoom with a slight "punch" for smaller words
+            // Average the target size over a small look-ahead window so the
+            // zoom trends smoothly across neighboring pieces instead of
+            // snapping to whatever a single word's size happens to be.
+            // Words are laid out largest-to-smallest outward from center,
+            // so this reads as one continuous, gentle push-in rather than
+            // a per-word pulse.
+            const windowEnd = Math.min(words.length, currentWordIndex + 3);
+            let sizeSum = 0;
+            for (let i = currentWordIndex; i < windowEnd; i++) sizeSum += words[i].size;
+            const avgSize = sizeSum / (windowEnd - currentWordIndex);
+
             const distanceScale = 1.0 / this.distance;
-            this.targetZoom = (550 / word.size) * distanceScale;
+            this.targetZoom = (550 / avgSize) * distanceScale;
             this.targetZoom = Math.max(0.4, Math.min(1.4, this.targetZoom));
         }
 

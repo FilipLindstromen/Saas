@@ -330,6 +330,112 @@ export function drawCaption(
     ctx.textBaseline = 'middle'
     ctx.fillText(displayText, width / 2, centerY)
     ctx.strokeText(displayText, width / 2, centerY)
+  } else if (style === 'hormozi') {
+    // Big bold impact captions with the currently-spoken word picked out
+    // in a bright accent color -- the "MrBeast/Hormozi" TikTok look.
+    ctx.font = `900 ${fontSize}px "${fontFamily}", sans-serif`
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = Math.max(4, fontSize / 6)
+    ctx.strokeStyle = '#000'
+    const activeWord = hasWordTiming
+      ? words.find((w) => currentTime >= w.start && currentTime <= w.end)?.word
+      : null
+    const lines = wrapText(ctx, displayText, maxWidth)
+    const totalH = lines.length * lineHeight
+    const startY = centerY - totalH / 2 + lineHeight / 2
+    const spaceWidth = ctx.measureText(' ').width
+    lines.forEach((line, li) => {
+      const lineWords = line.split(' ')
+      const wordWidths = lineWords.map((w) => ctx.measureText(w).width)
+      const lineW = wordWidths.reduce((a, b) => a + b, 0) + (lineWords.length - 1) * spaceWidth
+      let x = width / 2 - lineW / 2
+      const y = startY + li * lineHeight
+      ctx.textAlign = 'left'
+      lineWords.forEach((w, wi) => {
+        ctx.fillStyle = w === activeWord ? '#FFEB3B' : '#fff'
+        ctx.strokeText(w, x, y)
+        ctx.fillText(w, x, y)
+        x += wordWidths[wi] + spaceWidth
+      })
+    })
+    ctx.textAlign = 'center'
+  } else if (style === 'bubble') {
+    ctx.font = `bold ${fontSize}px "${fontFamily}", sans-serif`
+    ctx.textBaseline = 'middle'
+    const lines = wrapText(ctx, displayText, maxWidth)
+    const blockPad = Math.round(fontSize * 0.55)
+    const lineGap = Math.round(fontSize * 0.2)
+    const boxH = lineHeight + blockPad * 2
+    const totalH = lines.length * boxH + Math.max(0, lines.length - 1) * lineGap
+    let y = centerY - totalH / 2 + boxH / 2
+    lines.forEach((line) => {
+      const lineW = ctx.measureText(line).width
+      const boxW = lineW + blockPad * 2
+      const x = (width - boxW) / 2
+      ctx.fillStyle = 'rgba(255, 107, 53, 0.95)'
+      ctx.beginPath()
+      roundRect(ctx, x, y - boxH / 2, boxW, boxH, boxH / 2)
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.fillText(line, width / 2, y)
+      y += boxH + lineGap
+    })
+  } else if (style === 'highlighter') {
+    ctx.font = `bold ${fontSize}px "${fontFamily}", sans-serif`
+    ctx.textBaseline = 'middle'
+    const lines = wrapText(ctx, displayText, maxWidth)
+    const totalH = lines.length * lineHeight
+    const startY = centerY - totalH / 2 + lineHeight / 2
+    const markH = Math.round(fontSize * 0.9)
+    lines.forEach((line, i) => {
+      const y = startY + i * lineHeight
+      const lineW = ctx.measureText(line).width
+      ctx.save()
+      ctx.translate(width / 2, y)
+      ctx.rotate(-0.015)
+      ctx.translate(-width / 2, -y)
+      ctx.fillStyle = 'rgba(255, 235, 59, 0.85)'
+      ctx.fillRect(width / 2 - lineW / 2 - fontSize * 0.2, y - markH / 2, lineW + fontSize * 0.4, markH)
+      ctx.restore()
+      ctx.fillStyle = '#111'
+      ctx.fillText(line, width / 2, y)
+    })
+  } else if (style === 'gradient') {
+    ctx.font = `900 ${fontSize}px "${fontFamily}", sans-serif`
+    ctx.textBaseline = 'middle'
+    const lines = wrapText(ctx, displayText, maxWidth)
+    const totalH = lines.length * lineHeight
+    const startY = centerY - totalH / 2 + lineHeight / 2
+    lines.forEach((line, i) => {
+      const y = startY + i * lineHeight
+      const lineW = ctx.measureText(line).width
+      const gradient = ctx.createLinearGradient(width / 2 - lineW / 2, 0, width / 2 + lineW / 2, 0)
+      gradient.addColorStop(0, '#ff6b35')
+      gradient.addColorStop(1, '#ff2d78')
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)'
+      ctx.lineWidth = Math.max(2, fontSize / 14)
+      ctx.strokeText(line, width / 2, y)
+      ctx.fillStyle = gradient
+      ctx.fillText(line, width / 2, y)
+    })
+  } else if (style === 'neon') {
+    ctx.font = `bold ${fontSize}px "${fontFamily}", sans-serif`
+    ctx.textBaseline = 'middle'
+    const lines = wrapText(ctx, displayText, maxWidth)
+    const totalH = lines.length * lineHeight
+    const startY = centerY - totalH / 2 + lineHeight / 2
+    ctx.shadowColor = '#00e5ff'
+    ctx.shadowBlur = Math.max(12, fontSize / 3)
+    ctx.fillStyle = '#e9feff'
+    ctx.strokeStyle = '#00e5ff'
+    ctx.lineWidth = Math.max(2, fontSize / 16)
+    lines.forEach((line, i) => {
+      const y = startY + i * lineHeight
+      ctx.strokeText(line, width / 2, y)
+      ctx.fillText(line, width / 2, y)
+      ctx.fillText(line, width / 2, y)
+    })
+    ctx.shadowBlur = 0
   } else {
     // bold-block
     ctx.font = `bold ${fontSize}px "${fontFamily}", sans-serif`

@@ -1,12 +1,12 @@
 // Main Application Controller
-class TypographyAnimationApp {
+class MosaicTypographyApp {
     constructor() {
         this.canvas = document.getElementById('previewCanvas');
         this.overlay = document.getElementById('canvasOverlay');
 
         // Initialize modules
         this.wordCloud = new WordCloud(1080, 1920);
-        this.animationEngine = new AnimationEngine();
+        this.animationEngine = new AnimationEngine(1080, 1920);
         this.cameraController = new CameraController(1080, 1920);
         this.renderer = new Renderer(this.canvas);
         this.audioManager = new AudioManager();
@@ -458,8 +458,22 @@ class TypographyAnimationApp {
         this.elements.exportMP4.addEventListener('click', () => this.exportVideo('mp4'));
     }
 
+    // Wait for the given font families to actually be downloaded/parsed so that
+    // canvas measureText() (used for mosaic packing) reflects real glyph metrics
+    // instead of a fallback font. Without this, the very first layout (and any
+    // layout requested before the Google Fonts <link> finishes) gets measured
+    // with the wrong font and renders as a mismatched, overlapping mess.
+    async ensureFontsLoaded(fontFamilies) {
+        try {
+            await Promise.all(
+                fontFamilies.map(f => document.fonts.load(`700 100px "${f}"`).catch(() => {}))
+            );
+            await document.fonts.ready;
+        } catch (e) { /* font loading API unsupported — proceed with best effort */ }
+    }
+
     // Generate preview
-    generatePreview() {
+    async generatePreview() {
         const text = this.elements.textInput.value.trim();
 
         if (!text) {
@@ -491,6 +505,12 @@ class TypographyAnimationApp {
             alert('Minimum size must be less than maximum size');
             return;
         }
+
+        // Guard against overlapping async calls (e.g. fast typing) clobbering
+        // a newer request's result once fonts resolve.
+        const requestToken = (this._previewToken = (this._previewToken || 0) + 1);
+        await this.ensureFontsLoaded(selectedFonts);
+        if (requestToken !== this._previewToken) return;
 
         // Generate word cloud
         const allowRotation = this.elements.allowRotation.checked;
@@ -674,7 +694,7 @@ class TypographyAnimationApp {
 
             // Download
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-            const filename = `typography-animation-${timestamp}.${format}`;
+            const filename = `mosaic-typography-${timestamp}.${format}`;
             this.videoExporter.downloadBlob(blob, filename);
 
             // Reset UI
@@ -701,7 +721,7 @@ class TypographyAnimationApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new TypographyAnimationApp();
+    window.app = new MosaicTypographyApp();
 
     // Settings modal - shared API keys
     const settingsModal = document.getElementById('settingsModal');

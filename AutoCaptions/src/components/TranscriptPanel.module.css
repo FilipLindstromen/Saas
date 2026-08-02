@@ -71,33 +71,3 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
 }
-
-.timeRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.timeBtn {
-  padding: 6px 10px;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-tertiary);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-}
-
-.timeBtn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-default);
-}
-
-.timeBtnActive {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}

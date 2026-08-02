@@ -250,8 +250,6 @@ export default function App() {
           <TranscriptPanel
             segments={segments}
             onSegmentsChange={setSegments}
-            currentTime={currentTime}
-            onSeek={handleSeek}
             onTranscribe={handleTranscribe}
             isTranscribing={isTranscribing}
             transcribeError={transcribeError}
