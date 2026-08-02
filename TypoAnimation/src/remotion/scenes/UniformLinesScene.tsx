@@ -2,8 +2,7 @@ import React, { useMemo } from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
-import { BrollBackground } from '../shared/BrollBackground';
-import { SceneVideo } from '../shared/SceneVideo';
+import { SceneBackdrop } from '../shared/SceneBackdrop';
 import { sceneCaptionText } from '../shared/caption';
 import { fitFontSizeToWidth } from '../shared/measureText';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -22,8 +21,7 @@ export function UniformLinesScene({ scene, theme, t, dur, label, showCaptions, s
 
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
-      <BrollBackground broll={scene.broll} />
-      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
+      <SceneBackdrop broll={scene.broll} video={video} ink={theme.ink} />
       <Chrome
         theme={theme}
         label={label}

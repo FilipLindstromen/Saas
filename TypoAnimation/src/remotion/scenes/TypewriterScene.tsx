@@ -1,8 +1,7 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
-import { BrollBackground } from '../shared/BrollBackground';
-import { SceneVideo } from '../shared/SceneVideo';
+import { SceneBackdrop } from '../shared/SceneBackdrop';
 import { sceneCaptionText } from '../shared/caption';
 import { blink } from '../shared/motion';
 import { stripInlineHighlightMarkup } from '@/lib/inlineHighlight';
@@ -38,8 +37,7 @@ export function TypewriterScene({ scene, theme, t, dur, label, showCaptions, sho
   const layout = layoutLines(scene.lines, dur);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
-      <BrollBackground broll={scene.broll} />
-      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
+      <SceneBackdrop broll={scene.broll} video={video} ink={theme.ink} />
       <Chrome
         theme={theme}
         label={label}

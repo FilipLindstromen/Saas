@@ -1,14 +1,19 @@
 import type { RefObject } from 'react';
 import type { Project, Scene } from '@/types/project';
 import { sceneFrames, sceneStartFrame } from '@/remotion/Composition';
+import { presentSettleFrames as settleFramesForScene } from '@/lib/sceneEntranceTiming';
 import { FPS } from '@/remotion/constants';
 import type { PlayerRef } from '@remotion/player';
 
 /** Matches SceneTransition TRANS_DUR in remotion/shared/SceneTransition.tsx */
 export const PRESENT_TRANS_DUR_SEC = 0.28;
 
-export function presentSettleFrames(scene: Scene, fps: number): number {
-  return Math.min(Math.round(fps * 0.8), Math.floor(sceneFrames(scene, fps) * 0.4));
+export function presentSettleFrames(
+  scene: Scene,
+  fps: number,
+  transition?: Project['theme']['transition']
+): number {
+  return settleFramesForScene(scene, fps, transition);
 }
 
 export function presentExitStartOffsetFrames(scene: Scene, fps: number): number {
@@ -29,7 +34,7 @@ export function presentRestFrame(project: Project, sceneIndex: number, fps: numb
   const { start, frames } = sceneAbsoluteFrames(project, sceneIndex, fps);
   const scene = project.scenes[sceneIndex];
   if (!scene || frames <= 0) return start;
-  return start + presentSettleFrames(scene, fps);
+  return start + presentSettleFrames(scene, fps, project.theme.transition);
 }
 
 export function playFrameRange(player: PlayerRef, fromFrame: number, toFrame: number): Promise<void> {
@@ -73,7 +78,7 @@ export async function presentEnterScene(player: PlayerRef, project: Project, sce
   const { start, frames } = sceneAbsoluteFrames(project, sceneIndex, FPS);
   const scene = project.scenes[sceneIndex];
   if (!scene || frames <= 0) return;
-  const to = start + presentSettleFrames(scene, FPS);
+  const to = start + presentSettleFrames(scene, FPS, project.theme.transition);
   await playFrameRange(player, start, to);
 }
 

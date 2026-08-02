@@ -1,32 +1,21 @@
-import React from 'react';
-import { AbsoluteFill, Img, OffthreadVideo } from 'remotion';
+import React, { useId } from 'react';
+import { AbsoluteFill, Img } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
+import { SceneBackdrop } from '../shared/SceneBackdrop';
 import { enter } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { ResolvedSceneTheme } from '../shared/theme';
 import { stripInlineHighlightMarkup } from '@/lib/inlineHighlight';
 import type { BrollAsset } from '@/types/project';
 import type { SceneComponentProps } from '../shared/sceneProps';
-import { resolveRemotionSrc, brollMediaKind } from '../shared/mediaSrc';
+import { brollMediaKind } from '../shared/mediaSrc';
 import { brollMediaStyle } from '../shared/brollFraming';
+import { RemotionVideo } from '../shared/RemotionVideo';
+import { useBrollSrc } from '../shared/useBrollSrc';
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// Matches the maxWidth convention other scene styles use for centered headline text
-// (PosterScene, PlainScene) — the 1080-wide square composition leaves this much room either
-// side of center before clipping.
 const MASK_W = 980;
 
-// A headline line filled with the scene's own b-roll footage instead of a flat color: an
-// inline SVG <text> (matching the line's font/size/weight, so it's an exact glyph match, not
-// an HTML-layout approximation) is used as a `mask-image` on the video, so only the pixels
-// under the letterforms are visible — a real clip, not a blend/tint. `destination-in` is
-// tempting but wrong here: that's a canvas/SVG compositing operator, not a valid
-// `mix-blend-mode` value, so the browser would silently drop it and show nothing. Falls back
-// to a normal ink-colored line when the scene has no b-roll attached.
 function VideoMaskedLine({
   text,
   t,
@@ -44,8 +33,12 @@ function VideoMaskedLine({
   theme: ResolvedSceneTheme;
   broll?: BrollAsset;
 }) {
+  const maskId = useId().replace(/:/g, '');
   const m = enter(t, { start, end, inDur: 0.32, outDur: 0.2, rise: 46 });
   const scaledSize = size * theme.fontScale;
+  const plain = stripInlineHighlightMarkup(text);
+  const binding = useBrollSrc(broll);
+
   const textStyle: React.CSSProperties = {
     fontFamily: theme.fontHeading,
     fontWeight: theme.headingWeight,
@@ -53,48 +46,110 @@ function VideoMaskedLine({
     lineHeight: 0.98,
     letterSpacing: '-0.02em',
     textAlign: 'center',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'pre-wrap',
+    maxWidth: MASK_W,
   };
 
-  if (!broll) {
+  if (!broll?.path || !binding) {
     return (
       <div style={{ opacity: m.opacity, transform: m.transform, filter: m.filter, color: theme.ink, ...textStyle }}>
-        {text}
+        {plain}
       </div>
     );
   }
 
-  const maskHeight = Math.round(scaledSize * 1.3);
-  const svg =
-    `<svg xmlns='http://www.w3.org/2000/svg' width='${MASK_W}' height='${maskHeight}'>` +
-    `<text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' ` +
-    `font-family='${theme.fontHeading}' font-weight='${theme.headingWeight}' font-size='${scaledSize}' ` +
-    `letter-spacing='-2' fill='white'>${escapeXml(stripInlineHighlightMarkup(text))}</text></svg>`;
-  const maskImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  const maskProps: React.CSSProperties = {
-    WebkitMaskImage: maskImage,
-    maskImage,
-    WebkitMaskRepeat: 'no-repeat',
-    maskRepeat: 'no-repeat',
-    WebkitMaskPosition: 'center',
-    maskPosition: 'center',
+  const maskHeight = Math.round(scaledSize * 1.45);
+  const kind = brollMediaKind(broll);
+  const mediaStyle: React.CSSProperties = {
+    ...brollMediaStyle(broll),
+    width: '100%',
+    height: '100%',
+    minWidth: MASK_W,
+    minHeight: maskHeight,
   };
 
   return (
-    <div style={{ opacity: m.opacity, transform: m.transform, filter: m.filter, width: MASK_W, height: maskHeight, ...maskProps }}>
-      {brollMediaKind(broll) === 'image' ? (
-        <Img src={resolveRemotionSrc(broll.path)} style={brollMediaStyle(broll)} />
-      ) : (
-        <OffthreadVideo src={resolveRemotionSrc(broll.path)} muted style={brollMediaStyle(broll)} />
-      )}
+    <div
+      style={{
+        opacity: m.opacity,
+        transform: m.transform,
+        filter: m.filter,
+        position: 'relative',
+        width: '100%',
+        maxWidth: MASK_W,
+        height: maskHeight,
+        margin: '0 auto',
+      }}
+    >
+      <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
+        <defs>
+          <mask
+            id={maskId}
+            maskUnits="userSpaceOnUse"
+            x={0}
+            y={0}
+            width={MASK_W}
+            height={maskHeight}
+          >
+            <rect width={MASK_W} height={maskHeight} fill="black" />
+            <text
+              x="50%"
+              y="50%"
+              dominantBaseline="central"
+              textAnchor="middle"
+              fill="white"
+              fontFamily={theme.fontHeading}
+              fontWeight={theme.headingWeight}
+              fontSize={scaledSize}
+              letterSpacing="-0.02em"
+            >
+              {plain}
+            </text>
+          </mask>
+        </defs>
+      </svg>
+      <div
+        style={{
+          width: MASK_W,
+          height: maskHeight,
+          margin: '0 auto',
+          WebkitMaskImage: `url(#${maskId})`,
+          maskImage: `url(#${maskId})`,
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          WebkitMaskSize: `${MASK_W}px ${maskHeight}px`,
+          maskSize: `${MASK_W}px ${maskHeight}px`,
+          overflow: 'hidden',
+        }}
+      >
+        {kind === 'image' ? (
+          <Img src={binding.src} onError={binding.onError} style={mediaStyle} />
+        ) : (
+          <RemotionVideo src={binding.src} muted onError={binding.onError} style={mediaStyle} />
+        )}
+      </div>
     </div>
   );
 }
 
-export function VideoTextScene({ scene, theme, t, dur, label, showCaptions, showTimecode, sceneIndex, sceneCount, elapsedSec, totalSec }: SceneComponentProps) {
+export function VideoTextScene({
+  scene,
+  theme,
+  t,
+  dur,
+  label,
+  showCaptions,
+  showTimecode,
+  sceneIndex,
+  sceneCount,
+  elapsedSec,
+  totalSec,
+  video,
+}: SceneComponentProps) {
   const lineStart = 0.08;
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
+      <SceneBackdrop broll={scene.broll} video={video} ink={theme.ink} />
       <Chrome
         theme={theme}
         label={label}
@@ -123,7 +178,16 @@ export function VideoTextScene({ scene, theme, t, dur, label, showCaptions, show
           />
         )}
         {scene.lines.map((ln, i) => (
-          <VideoMaskedLine key={i} text={ln.text} t={t} start={lineStart + i * 0.2} end={dur} size={104} theme={theme} broll={scene.broll} />
+          <VideoMaskedLine
+            key={i}
+            text={ln.text}
+            t={t}
+            start={lineStart + i * 0.2}
+            end={dur}
+            size={104}
+            theme={theme}
+            broll={scene.broll}
+          />
         ))}
       </AbsoluteFill>
     </AbsoluteFill>

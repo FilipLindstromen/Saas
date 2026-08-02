@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
-import { BrollBackground } from '../shared/BrollBackground';
-import { SceneVideo } from '../shared/SceneVideo';
+import { SceneBackdrop } from '../shared/SceneBackdrop';
 import { enter, pop } from '../shared/motion';
 import { sceneCaptionText } from '../shared/caption';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -37,8 +36,7 @@ export function MosaicScene({ scene, theme, t, dur, label, showCaptions, showTim
 
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
-      <BrollBackground broll={scene.broll} />
-      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
+      <SceneBackdrop broll={scene.broll} video={video} ink={theme.ink} />
       <Chrome
         theme={theme}
         label={label}

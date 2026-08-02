@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { MainComposition, computeTotalDurationInFrames, sceneStartFrame, sceneFrames } from '@/remotion/Composition';
+import { presentSettleFrames } from '@/lib/sceneEntranceTiming';
 import { FPS, getCompositionSize } from '@/remotion/constants';
 import type { BrollAsset, Project } from '@/types/project';
 import { BrollFramingOverlay } from '@/components/BrollFramingOverlay';
@@ -148,17 +149,16 @@ export const PreviewPlayer = React.forwardRef<
   // should jump the playhead there once, but editing that scene's text afterward shouldn't
   // keep yanking playback back to its start on every keystroke.
   //
-  // Seeks past the entrance animation rather than to frame 0: landing exactly on a scene's
-  // first frame means every style's word-by-word/typewriter/etc reveal hasn't started yet, so
-  // you'd click a scene and see blank or half-animated text instead of the actual copy. A
-  // fixed ~0.8s offset (clamped to 40% of the scene's own length, so short scenes don't
-  // overshoot into their exit animation) comfortably clears every style's entrance timing.
+  // Seeks past the entrance animation rather than to frame 0 — timing matches Present mode
+  // (per-scene style + word stagger / voice sync).
   useEffect(() => {
     if (!selectedSceneId) return;
     const project = projectRef.current;
     const scene = project.scenes.find((s) => s.id === selectedSceneId);
     const startFrame = sceneStartFrame(project, selectedSceneId, FPS);
-    const settleFrames = scene ? Math.min(Math.round(FPS * 0.8), Math.floor(sceneFrames(scene, FPS) * 0.4)) : 0;
+    const settleFrames = scene
+      ? presentSettleFrames(scene, FPS, project.theme.transition)
+      : 0;
     playerRef.current?.seekTo(startFrame + settleFrames);
   }, [selectedSceneId]);
 

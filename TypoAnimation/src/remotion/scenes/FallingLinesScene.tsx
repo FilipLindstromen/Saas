@@ -2,8 +2,7 @@ import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
-import { BrollBackground } from '../shared/BrollBackground';
-import { SceneVideo } from '../shared/SceneVideo';
+import { SceneBackdrop } from '../shared/SceneBackdrop';
 import { sceneCaptionText } from '../shared/caption';
 import { animate, Easing } from '../shared/motion';
 import type { SceneComponentProps } from '../shared/sceneProps';
@@ -58,8 +57,7 @@ export function FallingLinesScene({ scene, theme, t, dur, label, showCaptions, s
   const layout = layoutLines(scene.lines, dur);
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
-      <BrollBackground broll={scene.broll} />
-      {video?.mode === 'background' && <SceneVideo video={video} ink={theme.ink} />}
+      <SceneBackdrop broll={scene.broll} video={video} ink={theme.ink} />
       <Chrome
         theme={theme}
         label={label}

@@ -23,6 +23,13 @@ export const STYLE_OPTIONS: { value: SceneStyle; label: string }[] = [
   { value: 'uniform', label: 'Uniform lines — every line sized to match width' },
 ];
 
+function defaultRotatingWordsFromLines(lines: SceneLine[]): string[] {
+  const last = lines[lines.length - 1]?.text.trim();
+  if (!last) return ['word'];
+  const parts = last.split(/\s+/).filter(Boolean);
+  return parts.length ? parts : ['word'];
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
@@ -189,7 +196,18 @@ export function SceneStylePanel({
       </Field>
 
       <Field label="Style">
-        <select className={inputClass} value={scene.style} onChange={(e) => patch({ style: e.target.value as SceneStyle })}>
+        <select
+          className={inputClass}
+          value={scene.style}
+          onChange={(e) => {
+            const style = e.target.value as SceneStyle;
+            if (style === 'rotate' && !(scene.rotatingWords || []).some((w) => w.trim())) {
+              patch({ style, rotatingWords: defaultRotatingWordsFromLines(scene.lines) });
+              return;
+            }
+            patch({ style });
+          }}
+        >
           {STYLE_OPTIONS.map((o) => (
             <option key={o.value} value={o.value} className="bg-[#1f1f1f]">
               {o.label}
@@ -390,6 +408,29 @@ export function SceneStylePanel({
 
       {scene.style === 'rotate' && (
         <div className="flex flex-col gap-2">
+          <p className="text-xs text-white/45">
+            Lines above stay fixed. The words below cycle in the rotating slot — one entry per word or short phrase.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-white/65">Fill from line:</span>
+            {scene.lines.map((ln, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() =>
+                  patch({
+                    rotatingWords: ln.text
+                      .trim()
+                      .split(/\s+/)
+                      .filter(Boolean),
+                  })
+                }
+                className="rounded-lg border border-white/10 bg-[#141414] px-2 py-1 text-xs text-white/80 hover:border-[#ff6b35]/40"
+              >
+                Line {i + 1}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-white/65">Rotating words</span>
             <button onClick={addWord} className="text-xs font-medium text-white/90 hover:text-[#ff6b35]">
