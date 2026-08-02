@@ -3,6 +3,7 @@ import path from "path";
 import pdfParse from "pdf-parse";
 
 export const REFERENCE_DIR_SUFFIX = ".reference";
+export const FOLDER_REFERENCE_DIR_NAME = "_reference";
 export const REFERENCE_MANIFEST = "manifest.json";
 export const MAX_REFERENCE_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_REFERENCE_FILES_PER_REQUEST = 50;
@@ -36,6 +37,10 @@ const SKIP_DIR_NAMES = new Set([
 
 export function getReferenceDirAbsolute(documentAbsolutePath) {
   return `${documentAbsolutePath}${REFERENCE_DIR_SUFFIX}`;
+}
+
+export function getFolderReferenceDirAbsolute(folderAbsolutePath) {
+  return path.join(folderAbsolutePath, FOLDER_REFERENCE_DIR_NAME);
 }
 
 export function sanitizeUploadFileName(name) {
@@ -222,6 +227,25 @@ export function buildReferenceManifest({
   };
 }
 
+export function rebuildReferenceManifestFromFiles(files, previousManifest) {
+  if (!files?.length) return null;
+  const label =
+    files.length === 1
+      ? files[0].path.split("/").pop() || files[0].path
+      : `${files.length} files`;
+  return {
+    uploadedAt: new Date().toISOString(),
+    sourceFileName: label,
+    sourceNames: previousManifest?.sourceNames,
+    files: files.map((file) => ({
+      path: file.path,
+      charCount: file.text.length
+    })),
+    totalChars: files.reduce((sum, file) => sum + file.text.length, 0),
+    skippedBinary: previousManifest?.skippedBinary
+  };
+}
+
 export async function extractReferenceFromUploads(uploads) {
   const files = [];
   const sourceNames = [];
@@ -258,8 +282,7 @@ export function buildReferencePromptContext(files, maxChars = MAX_REFERENCE_PROM
   if (!files?.length) return "";
 
   const header = [
-    "Reference material (examples, instructions, tips, and source notes uploaded by the author).",
-    "Use this material to match style, structure, and quality, but write specifically for the current document, instructions, and prompt — do not copy verbatim unless quoting briefly.",
+    "Use the following as examples, research, and style guides. Match quality and structure where appropriate; write original content for the current document and task.",
     ""
   ].join("\n");
 

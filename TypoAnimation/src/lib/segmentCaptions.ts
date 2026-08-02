@@ -32,7 +32,52 @@ function toSegment(words: CaptionWord[]): Segment {
 }
 
 function normSpaces(s: string): string {
-  return s.replace(/\s+/g, ' ').trim();
+  return s
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?…])/g, '$1')
+    .trim();
+}
+
+/** True when a whisper token is punctuation that should follow the previous word with no space. */
+function isPunctuationToken(text: string): boolean {
+  const t = text.trim();
+  return t.length > 0 && /^[,.;:!?…]+$/.test(t);
+}
+
+/** Join whisper word tokens for display — no space before comma, period, etc. */
+export function joinCaptionTokens(tokens: string[]): string {
+  let out = '';
+  for (const piece of tokens) {
+    const t = piece.trim();
+    if (!t) continue;
+    if (!out) {
+      out = t;
+      continue;
+    }
+    if (isPunctuationToken(t)) out += t;
+    else out += ` ${t}`;
+  }
+  return normSpaces(out);
+}
+
+export function joinCaptionWords(words: CaptionWord[]): string {
+  return joinCaptionTokens(words.map((w) => w.text));
+}
+
+/** Merge standalone punctuation tokens into the previous word (timing spans both). */
+export function normalizeCaptionWords(words: CaptionWord[]): CaptionWord[] {
+  const out: CaptionWord[] = [];
+  for (const w of words) {
+    const t = w.text.trim();
+    if (!t) continue;
+    if (out.length && isPunctuationToken(t)) {
+      const prev = out[out.length - 1];
+      out[out.length - 1] = { ...prev, text: prev.text + t, endMs: Math.max(prev.endMs, w.endMs) };
+    } else {
+      out.push({ ...w, text: t });
+    }
+  }
+  return out;
 }
 
 function endsSentence(word: string): boolean {
@@ -62,7 +107,7 @@ export function segmentBySentences(words: CaptionWord[], gapMs = 500): Segment[]
 }
 
 export function segmentText(seg: Segment): string {
-  return seg.words.map((w) => w.text).join(' ');
+  return joinCaptionWords(seg.words);
 }
 
 export function segmentsToBeatLayout(segments: Segment[]): string {
@@ -81,7 +126,7 @@ export function segmentsFromBeatLayout(layout: string, words: CaptionWord[]): Se
     const chunk: CaptionWord[] = [];
     while (wi < words.length) {
       chunk.push(words[wi++]);
-      const built = normSpaces(chunk.map((w) => w.text).join(' '));
+      const built = normSpaces(joinCaptionTokens(chunk.map((w) => w.text)));
       if (built === target) break;
       if (built.length >= target.length && target.length > 0) break;
     }

@@ -18,6 +18,7 @@ import { BadgeScene } from './scenes/BadgeScene';
 import { UniformLinesScene } from './scenes/UniformLinesScene';
 import { SceneTransition } from './shared/SceneTransition';
 import { SceneVideo, type ResolvedSceneVideo } from './shared/SceneVideo';
+import { ProjectVoiceoverAudio } from './shared/ProjectVoiceoverAudio';
 
 const SCENE_COMPONENTS: Record<SceneStyle, React.ComponentType<SceneComponentProps>> = {
   plain: PlainScene,
@@ -131,6 +132,7 @@ export function MainComposition({ project }: MainCompositionProps) {
   const { fps } = useVideoConfig();
   const scenes = project.scenes;
   const totalSec = scenes.reduce((n, s) => n + s.durationSec, 0);
+  const durationInFrames = computeTotalDurationInFrames(project, fps);
 
   let frameCursor = 0;
   const laidOut = scenes.map((scene) => {
@@ -143,6 +145,7 @@ export function MainComposition({ project }: MainCompositionProps) {
 
   return (
     <AbsoluteFill style={{ background: project.theme.bg }}>
+      <ProjectVoiceoverAudio project={project} durationInFrames={durationInFrames} />
       {laidOut.map(({ scene, frames, fromFrame, startSec }, i) => (
         <Sequence key={scene.id} from={fromFrame} durationInFrames={frames} name={scene.name}>
           <SceneLayer project={project} scene={scene} sceneIndex={i} fromFrame={fromFrame} startSec={startSec} totalSec={totalSec} />

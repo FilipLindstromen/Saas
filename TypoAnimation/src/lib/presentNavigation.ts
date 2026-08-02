@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import type { Project, Scene } from '@/types/project';
 import { sceneFrames, sceneStartFrame } from '@/remotion/Composition';
 import { FPS } from '@/remotion/constants';
@@ -24,22 +25,47 @@ export function sceneAbsoluteFrames(project: Project, sceneIndex: number, fps: n
   return { start, frames, end: start + frames - 1 };
 }
 
+export function presentRestFrame(project: Project, sceneIndex: number, fps: number): number {
+  const { start, frames } = sceneAbsoluteFrames(project, sceneIndex, fps);
+  const scene = project.scenes[sceneIndex];
+  if (!scene || frames <= 0) return start;
+  return start + presentSettleFrames(scene, fps);
+}
+
 export function playFrameRange(player: PlayerRef, fromFrame: number, toFrame: number): Promise<void> {
   return new Promise((resolve) => {
     player.seekTo(fromFrame);
-    player.play();
+    if (fromFrame === toFrame) {
+      player.pause();
+      resolve();
+      return;
+    }
+
     const forward = toFrame >= fromFrame;
-    const handler = (e: { detail: { frame: number } }) => {
-      const f = e.detail.frame;
+    player.play();
+
+    let raf = 0;
+    const maxMs = (Math.abs(toFrame - fromFrame) / FPS) * 1000 * 2.5 + 1500;
+    const timeout = window.setTimeout(finish, maxMs);
+
+    function finish() {
+      window.clearTimeout(timeout);
+      if (raf) cancelAnimationFrame(raf);
+      player.pause();
+      player.seekTo(toFrame);
+      resolve();
+    }
+
+    const tick = () => {
+      const f = player.getCurrentFrame();
       const done = forward ? f >= toFrame : f <= toFrame;
       if (done) {
-        player.pause();
-        player.seekTo(toFrame);
-        player.removeEventListener('timeupdate', handler);
-        resolve();
+        finish();
+        return;
       }
+      raf = requestAnimationFrame(tick);
     };
-    player.addEventListener('timeupdate', handler);
+    raf = requestAnimationFrame(tick);
   });
 }
 
@@ -57,4 +83,23 @@ export async function presentExitScene(player: PlayerRef, project: Project, scen
   if (!scene || frames <= 0) return;
   const from = start + presentExitStartOffsetFrames(scene, FPS);
   await playFrameRange(player, from, end);
+}
+
+export function waitForPlayer(playerRef: RefObject<PlayerRef | null>, attempts = 60): Promise<PlayerRef | null> {
+  return new Promise((resolve) => {
+    let n = 0;
+    const tick = () => {
+      if (playerRef.current) {
+        resolve(playerRef.current);
+        return;
+      }
+      n++;
+      if (n >= attempts) {
+        resolve(null);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
 }

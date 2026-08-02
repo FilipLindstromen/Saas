@@ -11,6 +11,7 @@ import type {
   Transcription,
   ReferenceMaterialSummary
 } from "./types";
+import { rebuildReferenceManifestFromFiles } from "./lib/referenceMaterial";
 
 const TREE_KEY = "powerwriter_tree";
 const FOLDER_PREFIX = "powerwriter_folder::";
@@ -190,12 +191,14 @@ export function storageGetFolderDetails(path: string): FolderDetails {
     return r ? JSON.parse(r) : null;
   };
   const aggregated = getAggregatedInstructions(path, "folder", getFolder, () => null);
+  const referenceMaterial = storageGetReferenceSummary(path);
   return {
     path,
     name,
     instructions,
     aggregatedInstructions: aggregated,
-    color
+    color,
+    referenceMaterial
   };
 }
 
@@ -293,6 +296,29 @@ export function storageClearReferenceMaterial(path: string): void {
   localStorage.removeItem(getReferenceKey(path));
 }
 
+export function storageRemoveReferenceFile(
+  path: string,
+  filePath: string
+): ReferenceMaterialSummary | null {
+  const existing = storageGetReferenceFiles(path);
+  const filtered = existing.filter((file) => file.path !== filePath);
+  if (filtered.length === existing.length) {
+    throw new Error("Reference file not found");
+  }
+  if (filtered.length === 0) {
+    storageClearReferenceMaterial(path);
+    return null;
+  }
+  const previous = storageGetReferenceSummary(path);
+  const manifest = rebuildReferenceManifestFromFiles(filtered, previous);
+  if (!manifest) {
+    storageClearReferenceMaterial(path);
+    return null;
+  }
+  storageSaveReferenceMaterial(path, manifest, filtered);
+  return manifest;
+}
+
 export function storageSaveDocument(
   path: string,
   content: string,
@@ -326,6 +352,16 @@ export function storageCreateDocument(folderPath: string | null, name: string): 
   return { path };
 }
 
+function migrateReferenceKey(oldBase: string, newBase: string): void {
+  const oldRef = getReferenceKey(oldBase);
+  const newRef = getReferenceKey(newBase);
+  const refRaw = localStorage.getItem(oldRef);
+  if (refRaw) {
+    localStorage.setItem(newRef, refRaw);
+    localStorage.removeItem(oldRef);
+  }
+}
+
 function migrateStorageKeysForRename(oldBase: string, newBase: string, node: TreeNode): void {
   if (node.type === "folder") {
     const oldKey = getFolderKey(oldBase);
@@ -335,6 +371,7 @@ function migrateStorageKeysForRename(oldBase: string, newBase: string, node: Tre
       localStorage.setItem(newKey, raw);
       localStorage.removeItem(oldKey);
     }
+    migrateReferenceKey(oldBase, newBase);
     if (node.children) {
       for (const child of node.children) {
         migrateStorageKeysForRename(
@@ -352,6 +389,7 @@ function migrateStorageKeysForRename(oldBase: string, newBase: string, node: Tre
       localStorage.setItem(newKey, raw);
       localStorage.removeItem(oldKey);
     }
+    migrateReferenceKey(oldBase, newBase);
   }
 }
 
@@ -400,6 +438,7 @@ export function storageDeleteFolder(path: string): void {
   }
   removeFromTree(tree, path);
   localStorage.removeItem(getFolderKey(path));
+  storageClearReferenceMaterial(path);
 }
 
 export function storageDeleteDocument(path: string): void {

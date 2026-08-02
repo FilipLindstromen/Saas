@@ -85,9 +85,19 @@ export function ThemePanel({
             className="h-8 w-14 cursor-pointer rounded-lg border border-white/10"
           />
         </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-white/65">
+          Inline text
+          <input
+            type="color"
+            value={theme.highlightInk ?? theme.ink}
+            onChange={(e) => patchTheme({ highlightInk: e.target.value })}
+            className="h-8 w-14 cursor-pointer rounded-lg border border-white/10"
+          />
+        </label>
       </div>
       <p className="-mt-1.5 text-xs text-white/35">
-        Right-click a text selection in a scene's Lines box to set its background to this color.
+        Right-click a text selection in a scene's Lines box to set its background to the inline highlight color.
+        Inline text defaults to your ink color unless you change it above.
       </p>
 
       <div className="flex flex-col gap-1.5">

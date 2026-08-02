@@ -14,6 +14,7 @@ export type FolderDetails = {
   instructions: string;
   aggregatedInstructions: string;
   color: string | null;
+  referenceMaterial?: ReferenceMaterialSummary | null;
 };
 
 export type WordTimestamp = {

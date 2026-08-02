@@ -101,6 +101,8 @@ export interface ProjectTheme {
   /** background color for inline-highlighted text spans (SceneLine.text wrapped in [[ ]]);
    * falls back to `accent` if unset */
   highlightColor?: string;
+  /** text color on inline-highlighted spans; falls back to the scene's regular ink if unset */
+  highlightInk?: string;
   /** key into FONT_PAIRINGS */
   fontPairing: string;
   /** how scenes hand off to each other; defaults to a hard cut */

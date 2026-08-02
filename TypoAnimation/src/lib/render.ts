@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
 import type { Project } from '@/types/project';
+import type { ExportRenderSettings } from '@/lib/exportSettings';
 import { COMPOSITION_ID } from '@/remotion/constants';
 import { updateJob } from './renderJobs';
 
@@ -32,7 +33,11 @@ function getBundleLocation(): Promise<string> {
   });
 }
 
-export async function renderProject(jobId: string, project: Project): Promise<string> {
+export async function renderProject(
+  jobId: string,
+  project: Project,
+  exportSettings: ExportRenderSettings = { preset: 'standard', scale: 1, crf: 23 }
+): Promise<string> {
   updateJob(jobId, { status: 'rendering', progress: 0 });
 
   const serveUrl = await getBundleLocation();
@@ -48,8 +53,11 @@ export async function renderProject(jobId: string, project: Project): Promise<st
     composition,
     serveUrl,
     codec: 'h264',
+    audioCodec: 'aac',
     outputLocation,
     inputProps,
+    scale: exportSettings.scale,
+    crf: exportSettings.crf,
     onProgress: ({ progress }) => updateJob(jobId, { progress }),
   });
 

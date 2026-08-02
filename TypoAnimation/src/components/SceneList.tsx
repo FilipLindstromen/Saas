@@ -201,15 +201,6 @@ export function SceneList({
             >
               <span className="w-6 shrink-0 text-right text-[0.85rem] font-semibold text-white/65">{i + 1}</span>
 
-              <input
-                type="checkbox"
-                checked={inMultiSelect}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => onSelect(scene.id, { toggle: true })}
-                title="Add to multi-select"
-                className="shrink-0"
-              />
-
               <div
                 onClick={(e) => onSelect(scene.id, { shift: e.shiftKey, toggle: e.metaKey || e.ctrlKey })}
                 className={`relative min-w-0 flex-1 cursor-move overflow-hidden rounded-2xl border p-[0.875rem] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-200 ${

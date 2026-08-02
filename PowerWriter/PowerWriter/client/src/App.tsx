@@ -23,13 +23,19 @@ import {
   deleteFolder,
   uploadDocumentAudio,
   uploadDocumentReferenceFiles,
-  clearDocumentReferenceMaterial
+  uploadFolderReferenceFiles,
+  clearDocumentReferenceMaterial,
+  clearFolderReferenceMaterial,
+  removeDocumentReferenceFile,
+  removeFolderReferenceFile
 } from "./api";
+import { ReferenceFileList } from "./components/ReferenceFileList";
 import { AudioEditor } from "./AudioEditor";
 import type { Transcription } from "./types";
 import { loadApiKeys, saveApiKeys } from "./apiKeys";
 import ThemeToggle from "@shared/ThemeToggle";
 import { getTheme, setTheme, initThemeSync } from "@shared/theme";
+import { DOCUMENT_GENERATE_TASK } from "./lib/generationPrompt";
 
 type Selection =
   | {
@@ -89,13 +95,9 @@ const LS_KEYS = {
 } as const;
 const DEFAULT_SIDEBAR_WIDTH = 280;
 const DEFAULT_INSTRUCTIONS_RATIO = 0.32;
-const DEFAULT_INLINE_RATIO = 0.26;
+const CHAT_PANEL_RATIO = 0.35;
 const MIN_INSTRUCTIONS_RATIO = 0.18;
-const MIN_INLINE_RATIO = 0.18;
 const MIN_DOCUMENT_RATIO = 0.28;
-const DEFAULT_INLINE_EDITOR_RATIO = 0.55;
-const MIN_INLINE_EDITOR_RATIO = 0.2;
-const MAX_INLINE_EDITOR_RATIO = 0.85;
 const DEFAULT_FOLDER_COLOR = "#6b6b6b";
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -391,15 +393,6 @@ const IconSparkles = createIcon(
   </>
 );
 
-const VARIANT_ICONS: Partial<Record<VariantMode, (props: IconProps) => JSX.Element>> = {
-  simplify: IconSimplify,
-  punchUp: IconPunch,
-  sensory: IconSensory,
-  expand: IconInline,
-  rephrase: IconTextEditor,
-  summarize: IconDocument
-};
-
 type DocumentSnapshot = {
   content: string;
   instructions: string;
@@ -425,17 +418,16 @@ const toFolderSnapshot = (details: FolderDetails): FolderSnapshot => ({
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
-const normalizeRatios = (instructions: number, inline: number) => {
-  let inst = clamp(instructions, MIN_INSTRUCTIONS_RATIO, 0.7);
-  let inl = clamp(inline, MIN_INLINE_RATIO, 0.7);
-  const maxSum = 1 - MIN_DOCUMENT_RATIO;
-  if (inst + inl > maxSum) {
-    const scale = maxSum / (inst + inl);
-    inst *= scale;
-    inl *= scale;
-  }
-  return [inst, inl] as const;
-};
+function clampInstructionsRatio(
+  value: number,
+  reservedShare: number
+): number {
+  const max = Math.max(
+    MIN_INSTRUCTIONS_RATIO,
+    1 - MIN_DOCUMENT_RATIO - reservedShare
+  );
+  return clamp(value, MIN_INSTRUCTIONS_RATIO, max);
+}
 
 function getInitialSidebarWidth() {
   if (typeof window !== "undefined") {
@@ -450,45 +442,16 @@ function getInitialSidebarWidth() {
   return DEFAULT_SIDEBAR_WIDTH;
 }
 
-function getInitialRatios() {
+function getInitialInstructionsRatio() {
   if (typeof window !== "undefined") {
     const storedInstructions = parseFloat(
       window.localStorage.getItem(LS_KEYS.instructionsWidth) ?? ""
     );
-    const storedInline = parseFloat(
-      window.localStorage.getItem(LS_KEYS.inlineWidth) ?? ""
-    );
-    const [inst, inl] = normalizeRatios(
-      Number.isFinite(storedInstructions)
-        ? storedInstructions
-        : DEFAULT_INSTRUCTIONS_RATIO,
-      Number.isFinite(storedInline)
-        ? storedInline
-        : DEFAULT_INLINE_RATIO
-    );
-    return { instructions: inst, inline: inl };
-  }
-  const [inst, inl] = normalizeRatios(
-    DEFAULT_INSTRUCTIONS_RATIO,
-    DEFAULT_INLINE_RATIO
-  );
-  return { instructions: inst, inline: inl };
-}
-
-function getInitialInlineEditorRatio() {
-  if (typeof window !== "undefined") {
-    const stored = parseFloat(
-      window.localStorage.getItem(LS_KEYS.inlineEditorHeight) ?? ""
-    );
-    if (Number.isFinite(stored)) {
-      return clamp(
-        stored,
-        MIN_INLINE_EDITOR_RATIO,
-        MAX_INLINE_EDITOR_RATIO
-      );
+    if (Number.isFinite(storedInstructions)) {
+      return clampInstructionsRatio(storedInstructions, CHAT_PANEL_RATIO);
     }
   }
-  return DEFAULT_INLINE_EDITOR_RATIO;
+  return DEFAULT_INSTRUCTIONS_RATIO;
 }
 
 const VARIANT_LABELS: Record<VariantMode, string> = {
@@ -500,7 +463,6 @@ const VARIANT_LABELS: Record<VariantMode, string> = {
   sensory: "Enrich Detail"
 };
 const SELECTION_ACTIONS: VariantMode[] = ["simplify", "expand", "rephrase"];
-const PARAGRAPH_ACTIONS: VariantMode[] = ["simplify", "punchUp", "sensory"];
 
 function findNodeByPath(nodes: TreeNode[], targetPath: string): TreeNode | null {
   for (const node of nodes) {
@@ -513,13 +475,6 @@ function findNodeByPath(nodes: TreeNode[], targetPath: string): TreeNode | null 
     }
   }
   return null;
-}
-
-function getInitialInlineOrder() {
-  if (typeof window !== "undefined") {
-    return window.localStorage.getItem(LS_KEYS.inlineOrder) === "true";
-  }
-  return false;
 }
 
 function Tree({
@@ -815,7 +770,7 @@ export default function App() {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Selection | null>(null);
-  const initialRatiosRef = useRef(getInitialRatios());
+  const initialInstructionsRatioRef = useRef(getInitialInstructionsRatio());
   const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth);
   const [sidebarVisible, setSidebarVisible] = useState(() => {
     const stored = window.localStorage.getItem("powerwriter.sidebarVisible");
@@ -921,14 +876,11 @@ export default function App() {
     };
   }, []);
   const [instructionsRatio, setInstructionsRatio] = useState(
-    initialRatiosRef.current.instructions
+    initialInstructionsRatioRef.current
   );
-  const [inlineRatio, setInlineRatio] = useState(initialRatiosRef.current.inline);
   const [draggingResizer, setDraggingResizer] = useState<
-    "sidebar" | "instructions" | "inline" | "inlineHeight" | "audioEditor" | null
+    "sidebar" | "instructions" | "audioEditor" | null
   >(null);
-  const [inlineBeforeDocument, setInlineBeforeDocument] =
-    useState(getInitialInlineOrder);
 
   const [status, setStatus] = useState<
     { type: "success" | "error"; message: string } | null
@@ -953,12 +905,12 @@ export default function App() {
   const [isDocGenerating, setIsDocGenerating] = useState(false);
   const [isReferenceUploading, setIsReferenceUploading] = useState(false);
   const referenceFilesInputRef = useRef<HTMLInputElement | null>(null);
+  const folderReferenceFilesInputRef = useRef<HTMLInputElement | null>(null);
   const [draggedItem, setDraggedItem] = useState<Selection | null>(null);
   const [selectionMenu, setSelectionMenu] =
     useState<SelectionMenuState | null>(null);
   const [variantModal, setVariantModal] =
     useState<VariantModalState | null>(null);
-  const [inlineActionsEnabled, setInlineActionsEnabled] = useState(true);
   const [documentNameInput, setDocumentNameInput] = useState("");
   const [folderColorInput, setFolderColorInput] =
     useState<string>(DEFAULT_FOLDER_COLOR);
@@ -973,10 +925,6 @@ export default function App() {
   });
   const [documentVisible, setDocumentVisible] = useState(() => {
     const stored = window.localStorage.getItem(LS_KEYS.documentVisible);
-    return stored !== null ? stored === "true" : true;
-  });
-  const [inlineEditorVisible, setInlineEditorVisible] = useState(() => {
-    const stored = window.localStorage.getItem(LS_KEYS.inlineEditorVisible);
     return stored !== null ? stored === "true" : true;
   });
   const [chatVisible, setChatVisible] = useState(() => {
@@ -1193,9 +1141,6 @@ export default function App() {
     );
   }
   const audioEditorRef = useRef<HTMLDivElement | null>(null);
-  const [inlineEditorRatio, setInlineEditorRatio] = useState(
-    getInitialInlineEditorRatio
-  );
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
@@ -1280,30 +1225,6 @@ export default function App() {
       instructionsRatio.toFixed(4)
     );
   }, [instructionsRatio]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      LS_KEYS.inlineWidth,
-      inlineRatio.toFixed(4)
-    );
-  }, [inlineRatio]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      LS_KEYS.inlineEditorHeight,
-      inlineEditorRatio.toFixed(4)
-    );
-  }, [inlineEditorRatio]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      LS_KEYS.inlineOrder,
-      inlineBeforeDocument ? "true" : "false"
-    );
-  }, [inlineBeforeDocument]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -2011,28 +1932,6 @@ export default function App() {
     return "Select a folder or document to see aggregated instructions.";
   }, [aggregatedInstructions, selected]);
 
-  const paragraphEntries = useMemo(() => {
-    if (!inlineActionsEnabled || selected?.type !== "document") return [];
-    const content = documentDetails?.content ?? "";
-    return content
-      .split(/\n{2,}/)
-      .map((text, index) => ({
-        id: `${index}-${text.slice(0, 8)}`,
-        text: text.trim()
-      }))
-      .filter((entry) => entry.text.length > 0);
-  }, [selected?.type, documentDetails?.content, inlineActionsEnabled]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const nodes =
-      document.querySelectorAll<HTMLTextAreaElement>(".paragraph-card-textarea");
-    nodes.forEach((element) => {
-      element.style.height = "auto";
-      element.style.height = `${element.scrollHeight}px`;
-    });
-  }, [paragraphEntries]);
-
   useEffect(() => {
     setSelectionMenu(null);
   }, [selected?.path]);
@@ -2101,11 +2000,6 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(LS_KEYS.inlineEditorVisible, String(inlineEditorVisible));
-  }, [inlineEditorVisible]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem(LS_KEYS.chatVisible, String(chatVisible));
   }, [chatVisible]);
 
@@ -2137,12 +2031,6 @@ export default function App() {
       setFolderColorCustom(false);
     }
   }, [selected?.type, folderDetails?.color]);
-
-  useEffect(() => {
-    if (!inlineActionsEnabled) {
-      setSelectionMenu(null);
-    }
-  }, [inlineActionsEnabled]);
 
   useEffect(() => {
     if (variantModal) {
@@ -2186,9 +2074,8 @@ export default function App() {
   const showFolderPanel = selected?.type === "folder";
 
   const mainContentRef = useRef<HTMLDivElement | null>(null);
-  const inlinePanelRef = useRef<HTMLDivElement | null>(null);
   const hasEditableInstructions = showFolderPanel || showDocumentPanel;
-  const inlinePanelVisible = inlineEditorVisible || chatVisible;
+  const chatPanelVisible = currentMode === "planning" && chatVisible;
   const isDocumentSelected = selected?.type === "document";
   const isFolderSelected = selected?.type === "folder";
   const currentDocumentSaving =
@@ -2236,15 +2123,18 @@ export default function App() {
     : "Ready to write mindful experiences.";
   const audioEditorShare = audioEditorVisible ? audioEditorRatio : 0;
   const instructionsShare = instructionsVisible ? instructionsRatio : 0;
-  const inlineShare = inlinePanelVisible ? inlineRatio : 0;
+  const chatShare = chatPanelVisible ? CHAT_PANEL_RATIO : 0;
   const baseDocumentShare = documentVisible
-    ? Math.max(MIN_DOCUMENT_RATIO, 1 - audioEditorShare - instructionsShare - inlineShare)
+    ? Math.max(
+        MIN_DOCUMENT_RATIO,
+        1 - audioEditorShare - instructionsShare - chatShare
+      )
     : 0;
   const totalShare =
     (audioEditorVisible ? audioEditorShare : 0) +
     (instructionsVisible ? instructionsShare : 0) +
-      (documentVisible ? baseDocumentShare : 0) +
-      (inlinePanelVisible ? inlineShare : 0) || 1;
+    (documentVisible ? baseDocumentShare : 0) +
+    chatShare || 1;
   const audioEditorFlexBasis = audioEditorVisible
     ? `${(audioEditorShare / totalShare) * 100}%`
     : undefined;
@@ -2253,9 +2143,6 @@ export default function App() {
     : undefined;
   const documentFlexBasis = documentVisible
     ? `${(baseDocumentShare / totalShare) * 100}%`
-    : undefined;
-  const inlineFlexBasis = inlinePanelVisible
-    ? `${(inlineShare / totalShare) * 100}%`
     : undefined;
   const instructionsPlaceholder = showFolderPanel
     ? "Add folder-specific instructions that are applied to documents inside this folder."
@@ -2375,7 +2262,6 @@ export default function App() {
       }
       if (
         (draggingResizer === "instructions" ||
-          draggingResizer === "inline" ||
           draggingResizer === "audioEditor") &&
         mainContentRef.current
       ) {
@@ -2386,64 +2272,27 @@ export default function App() {
           return;
         }
 
+        const reservedShare =
+          (chatPanelVisible ? CHAT_PANEL_RATIO : 0) +
+          (draggingResizer === "audioEditor" ? 0 : audioEditorRatio);
+
         if (draggingResizer === "instructions") {
-          const maxInstructions = Math.max(
-            MIN_INSTRUCTIONS_RATIO,
-            1 - audioEditorRatio - inlineRatio - MIN_DOCUMENT_RATIO
-          );
           const desired =
-            offset / width < 0
-              ? MIN_INSTRUCTIONS_RATIO
-              : offset / width;
-          const clamped = clamp(desired, MIN_INSTRUCTIONS_RATIO, maxInstructions);
-          const [inst, inl] = normalizeRatios(clamped, inlineRatio);
-          setInstructionsRatio(inst);
-          setInlineRatio(inl);
+            offset / width < 0 ? MIN_INSTRUCTIONS_RATIO : offset / width;
+          setInstructionsRatio(
+            clampInstructionsRatio(desired, reservedShare)
+          );
         } else if (draggingResizer === "audioEditor") {
           const desiredAudio =
-            offset / width < 0
-              ? 0.18
-              : offset / width;
+            offset / width < 0 ? 0.18 : offset / width;
           const maxAudio = Math.max(
             0.18,
-            1 - instructionsRatio - inlineRatio - MIN_DOCUMENT_RATIO
+            1 - instructionsRatio - CHAT_PANEL_RATIO - MIN_DOCUMENT_RATIO
           );
           const clamped = clamp(desiredAudio, 0.18, maxAudio);
           setAudioEditorRatio(clamped);
-        } else if (draggingResizer === "inline") {
-          const desiredInline =
-            offset / width > 1
-              ? MIN_INLINE_RATIO
-              : 1 - offset / width;
-          const maxInline = Math.max(
-            MIN_INLINE_RATIO,
-            1 - instructionsRatio - audioEditorRatio - MIN_DOCUMENT_RATIO
-          );
-          const clamped = clamp(desiredInline, MIN_INLINE_RATIO, maxInline);
-          const [inst, inl] = normalizeRatios(instructionsRatio, clamped);
-          setInstructionsRatio(inst);
-          setInlineRatio(inl);
         }
         return;
-      }
-      if (
-        draggingResizer === "inlineHeight" &&
-        inlinePanelRef.current &&
-        inlineEditorVisible &&
-        chatVisible
-      ) {
-        const rect = inlinePanelRef.current.getBoundingClientRect();
-        const offset = event.clientY - rect.top;
-        const height = rect.height;
-        if (height <= 0) {
-          return;
-        }
-        const desiredRatio = clamp(
-          offset / height,
-          MIN_INLINE_EDITOR_RATIO,
-          MAX_INLINE_EDITOR_RATIO
-        );
-        setInlineEditorRatio(desiredRatio);
       }
     };
 
@@ -2455,8 +2304,7 @@ export default function App() {
     window.addEventListener("mouseup", handleUp);
     const previousCursor = document.body.style.cursor;
     const previousSelect = document.body.style.userSelect;
-    const cursor =
-      draggingResizer === "inlineHeight" ? "row-resize" : "col-resize";
+    const cursor = "col-resize";
     document.body.style.cursor = cursor;
     document.body.style.userSelect = "none";
 
@@ -2466,14 +2314,7 @@ export default function App() {
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousSelect;
     };
-  }, [
-    draggingResizer,
-    instructionsRatio,
-    inlineRatio,
-    audioEditorRatio,
-    inlineEditorVisible,
-    chatVisible
-  ]);
+  }, [draggingResizer, instructionsRatio, audioEditorRatio, chatPanelVisible]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2705,8 +2546,7 @@ export default function App() {
     try {
       const response = await generateAnswer({
         path: selected.path,
-        prompt:
-          "Generate updated content for this document following all aggregated instructions.",
+        prompt: DOCUMENT_GENERATE_TASK,
         apiKey: userApiKey || undefined
       });
       setDocumentDetails((prev) =>
@@ -2758,6 +2598,102 @@ export default function App() {
         error instanceof Error
           ? error.message
           : "Unable to import reference files";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
+  const handleFolderReferenceFilesSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const fileList = event.target.files;
+    event.target.value = "";
+    if (!fileList?.length || selected?.type !== "folder") return;
+    const files = Array.from(fileList);
+
+    setIsReferenceUploading(true);
+    try {
+      const { referenceMaterial } = await uploadFolderReferenceFiles(
+        selected.path,
+        files
+      );
+      setFolderDetails((prev) =>
+        prev ? { ...prev, referenceMaterial } : prev
+      );
+      setStatus({
+        type: "success",
+        message: `Folder reference updated (${referenceMaterial.files.length} files) — applies to all documents in this folder`
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to import folder reference files";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
+  const handleRemoveDocumentReferenceFile = async (filePath: string) => {
+    if (selected?.type !== "document") return;
+    setIsReferenceUploading(true);
+    try {
+      const { referenceMaterial } = await removeDocumentReferenceFile(
+        selected.path,
+        filePath
+      );
+      setDocumentDetails((prev) =>
+        prev ? { ...prev, referenceMaterial: referenceMaterial ?? null } : prev
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to remove reference file";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
+  const handleRemoveFolderReferenceFile = async (filePath: string) => {
+    if (selected?.type !== "folder") return;
+    setIsReferenceUploading(true);
+    try {
+      const { referenceMaterial } = await removeFolderReferenceFile(
+        selected.path,
+        filePath
+      );
+      setFolderDetails((prev) =>
+        prev ? { ...prev, referenceMaterial: referenceMaterial ?? null } : prev
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to remove reference file";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
+  const handleClearFolderReferenceMaterial = async () => {
+    if (selected?.type !== "folder") return;
+    setIsReferenceUploading(true);
+    try {
+      await clearFolderReferenceMaterial(selected.path);
+      setFolderDetails((prev) =>
+        prev ? { ...prev, referenceMaterial: null } : prev
+      );
+      setStatus({ type: "success", message: "Folder reference material removed" });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to remove folder reference material";
       setStatus({ type: "error", message });
     } finally {
       setIsReferenceUploading(false);
@@ -3042,10 +2978,6 @@ export default function App() {
   const handleDocumentMouseUp = (
     event: React.MouseEvent<HTMLTextAreaElement>
   ) => {
-    if (!inlineActionsEnabled) {
-      setSelectionMenu(null);
-      return;
-    }
     if (selected?.type !== "document" || !documentDetails) {
       setSelectionMenu(null);
       return;
@@ -3132,14 +3064,6 @@ export default function App() {
     const source = selectionMenu.text;
     setSelectionMenu(null);
     await startVariantFlow(mode, source);
-  };
-
-  const handleParagraphAction = async (
-    mode: VariantMode,
-    paragraph: string
-  ) => {
-    if (!paragraph.trim()) return;
-    await startVariantFlow(mode, paragraph.trim());
   };
 
   const handleCopyVariant = async (value: string) => {
@@ -3267,15 +3191,6 @@ export default function App() {
                 title={`${documentVisible ? "Hide" : "Show"} Text Editor Panel`}
               >
                 <IconTextEditor className="icon" />
-              </button>
-              <button
-                type="button"
-                aria-pressed={inlineEditorVisible}
-                className={clsx("panel-toggle-btn", !inlineEditorVisible && "toggle-off")}
-                onClick={() => setInlineEditorVisible((prev) => !prev)}
-                title={`${inlineEditorVisible ? "Hide" : "Show"} Inline Editor Panel`}
-              >
-                <IconInline className="icon" />
               </button>
               <button
                 type="button"
@@ -3615,11 +3530,60 @@ export default function App() {
                     </div>
                   </div>
                 ) : null}
+                {showFolderPanel && folderDetails ? (
+                  <div className="document-reference-controls folder-reference-controls">
+                    <p className="panel-label folder-reference-label">
+                      Folder reference
+                    </p>
+                    <input
+                      ref={folderReferenceFilesInputRef}
+                      type="file"
+                      accept=".zip,.pdf,.txt,.md,.markdown,.json,.html,.htm,.yaml,.yml,application/pdf,application/zip,text/plain,text/markdown"
+                      multiple
+                      className="sr-only"
+                      onChange={(event) =>
+                        void handleFolderReferenceFilesSelected(event)
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="ghost document-reference-upload-btn"
+                      disabled={isReferenceUploading}
+                      onClick={() =>
+                        folderReferenceFilesInputRef.current?.click()
+                      }
+                    >
+                      {isReferenceUploading
+                        ? "Importing…"
+                        : folderDetails.referenceMaterial
+                        ? "Add more folder reference files"
+                        : "Upload folder reference files"}
+                    </button>
+                    {folderDetails.referenceMaterial ? (
+                      <ReferenceFileList
+                        referenceMaterial={folderDetails.referenceMaterial}
+                        disabled={isReferenceUploading}
+                        onRemove={(filePath) =>
+                          void handleRemoveFolderReferenceFile(filePath)
+                        }
+                        onRemoveAll={() =>
+                          void handleClearFolderReferenceMaterial()
+                        }
+                      />
+                    ) : (
+                      <p className="document-reference-hint">
+                        Reference uploaded here applies to every document in this
+                        folder and its subfolders (together with each document’s
+                        own reference files).
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </section>
           )}
 
-          {currentMode === "planning" && instructionsVisible && (documentVisible || inlinePanelVisible) && (
+          {currentMode === "planning" && instructionsVisible && (documentVisible || chatPanelVisible) && (
             <div
               className="resizer resizer-vertical panel-resizer instructions-resizer"
               onMouseDown={() => setDraggingResizer("instructions")}
@@ -4248,7 +4212,7 @@ export default function App() {
           ) : null}
 
 
-          {audioEditorVisible && selected?.type === "document" && (documentVisible || inlinePanelVisible) && (
+          {audioEditorVisible && selected?.type === "document" && (documentVisible || chatPanelVisible) && (
             <div
               className="resizer resizer-vertical panel-resizer audio-editor-resizer"
               onMouseDown={() => setDraggingResizer("audioEditor")}
@@ -4265,7 +4229,7 @@ export default function App() {
                 flexBasis: documentFlexBasis,
                 flexGrow: 1,
                 flexShrink: 0,
-                order: currentMode === "recording" ? 1 : (inlineBeforeDocument ? 4 : 2)
+                order: currentMode === "recording" ? 1 : 2
               }}
             >
               <div className="panel-header document-editor-header">
@@ -4379,30 +4343,21 @@ export default function App() {
                           : "Upload reference files"}
                       </button>
                       {documentDetails.referenceMaterial ? (
-                        <div className="document-reference-summary">
-                          <span className="document-reference-meta">
-                            {documentDetails.referenceMaterial.sourceFileName} ·{" "}
-                            {documentDetails.referenceMaterial.files.length}{" "}
-                            files · ~
-                            {Math.round(
-                              documentDetails.referenceMaterial.totalChars / 1000
-                            )}
-                            k chars
-                          </span>
-                          <button
-                            type="button"
-                            className="ghost document-reference-clear-btn"
-                            disabled={isReferenceUploading}
-                            onClick={() => void handleClearReferenceMaterial()}
-                          >
-                            Remove all
-                          </button>
-                        </div>
+                        <ReferenceFileList
+                          referenceMaterial={documentDetails.referenceMaterial}
+                          disabled={isReferenceUploading}
+                          onRemove={(filePath) =>
+                            void handleRemoveDocumentReferenceFile(filePath)
+                          }
+                          onRemoveAll={() =>
+                            void handleClearReferenceMaterial()
+                          }
+                        />
                       ) : (
                         <p className="document-reference-hint">
-                          Add one or more files (.pdf, .txt, .md) or zip
-                          archives. New uploads are merged into this document’s
-                          reference library.
+                          Add document-specific reference (.pdf, .txt, .md, or
+                          zip). Parent folder reference is included
+                          automatically when you generate.
                         </p>
                       )}
                     </div>
@@ -4464,7 +4419,7 @@ export default function App() {
                 flexBasis: documentFlexBasis,
                 flexGrow: 1,
                 flexShrink: 0,
-                order: inlineBeforeDocument ? 4 : 2
+                order: 2
               }}
             >
               <div className="panel-header">
@@ -4481,140 +4436,23 @@ export default function App() {
             </section>
           ) : null}
 
-          {documentVisible && inlinePanelVisible && (
+          {documentVisible && chatPanelVisible && (
             <div
               className="resizer resizer-vertical panel-resizer inline-resizer"
-              onMouseDown={() => setDraggingResizer("inline")}
               role="presentation"
               style={{ order: 3 }}
             />
           )}
 
-          {inlinePanelVisible && (
-            <section
-              className="inline-panel"
-              style={{
-                flexBasis: inlineFlexBasis,
-                flexGrow: 0,
-                flexShrink: 0,
-                order: inlineBeforeDocument ? 2 : 4
-              }}
-              ref={inlinePanelRef}
-            >
-              {/* Creative Studio - Inline Editor (full width now that chat is separate) */}
-              {currentMode === "planning" && inlineEditorVisible && (
-                <div
-                  className="inline-panel-section inline-editor-section"
-                  style={{
-                    flexBasis: "100%"
-                  }}
-                >
-                  <div className="panel-header">
-                    <h2>Inline Editor</h2>
-                  </div>
-                  <div className="panel-body inline-editor-body">
-                    {!documentDetails ? (
-                      <p className="inline-editor-placeholder">
-                        Select a document to enable inline actions.
-                      </p>
-                    ) : !inlineActionsEnabled ? (
-                      <p className="inline-editor-placeholder">
-                        Inline actions are currently disabled.
-                      </p>
-                    ) : paragraphEntries.length === 0 ? (
-                      <p className="inline-editor-placeholder">
-                        Write paragraphs in the document to see inline actions.
-                      </p>
-                    ) : (
-                      <div className="inline-editor-list">
-                        {paragraphEntries.map((entry, index) => (
-                          <div className="paragraph-card" key={entry.id}>
-                            <div className="paragraph-card-editor">
-                              <textarea
-                                className="paragraph-card-textarea"
-                                defaultValue={entry.text}
-                                onChange={(event) => {
-                                  if (!documentDetails) return;
-                                  const updatedParagraphs = [...paragraphEntries];
-                                  updatedParagraphs[index] = {
-                                    ...entry,
-                                    text: event.target.value
-                                  };
-                                  const merged = updatedParagraphs
-                                    .map((item) => item.text)
-                                    .join("\n\n");
-                                  setDocumentDetails({
-                                    ...documentDetails,
-                                    content: merged
-                                  });
-                                }}
-                                onInput={(event) => {
-                                  const element = event.currentTarget;
-                                  element.style.height = "auto";
-                                  element.style.height = `${element.scrollHeight}px`;
-                                }}
-                              />
-                              <div className="paragraph-card-actions">
-                                {PARAGRAPH_ACTIONS.map((mode) => {
-                                  const IconComponent =
-                                    VARIANT_ICONS[mode] ?? IconDocument;
-                                  return (
-                                    <button
-                                      type="button"
-                                      key={`${entry.id}-${mode}`}
-                                      onClick={() =>
-                                        void handleParagraphAction(mode, entry.text)
-                                      }
-                                      aria-label={VARIANT_LABELS[mode]}
-                                      title={VARIANT_LABELS[mode]}
-                                    >
-                                      <IconComponent className="icon" size={16} />
-                                      <span className="sr-only">
-                                        {VARIANT_LABELS[mode]}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {inlineEditorVisible && chatVisible && (
-                <div
-                  className="resizer resizer-horizontal panel-resizer inline-height-resizer"
-                  onMouseDown={() => setDraggingResizer("inlineHeight")}
-                  role="presentation"
-                />
-              )}
-
-            </section>
-          )}
-
-          {/* Resizer between Inline Panel and Chat Panel in Creative Studio */}
-          {currentMode === "planning" && inlinePanelVisible && chatVisible && (
-            <div
-              className="resizer resizer-vertical panel-resizer inline-resizer"
-              onMouseDown={() => setDraggingResizer("inline")}
-              role="presentation"
-              style={{ order: 5 }}
-            />
-          )}
-
           {/* Creative Studio - ChatGPT Panel (Right Vertical Panel) */}
-          {currentMode === "planning" && chatVisible && (
+          {chatPanelVisible && (
             <section
               className="chat-panel"
               style={{
-                flexBasis: "35%",
+                flexBasis: `${(chatShare / totalShare) * 100}%`,
                 flexGrow: 0,
                 flexShrink: 0,
-                order: 6,
+                order: 4,
                 minWidth: 300
               }}
             >
@@ -4674,7 +4512,7 @@ export default function App() {
         )}
       </main>
 
-      {inlineActionsEnabled && selectionMenu ? (
+      {selectionMenu ? (
         <div
           className="selection-menu"
           style={{

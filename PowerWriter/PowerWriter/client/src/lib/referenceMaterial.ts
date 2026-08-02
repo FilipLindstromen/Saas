@@ -1,8 +1,4 @@
 import JSZip from "jszip";
-import * as pdfjs from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export type ReferenceMaterialSummary = {
   uploadedAt: string;
@@ -73,6 +69,11 @@ function isLikelyText(bytes: Uint8Array): boolean {
 }
 
 export async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  }
   const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
   const parts: string[] = [];
   for (let pageNum = 1; pageNum <= doc.numPages; pageNum += 1) {
@@ -276,6 +277,28 @@ export function buildReferenceManifest(params: {
   };
 }
 
+export function rebuildReferenceManifestFromFiles(
+  files: ReferenceMaterialFile[],
+  previousManifest: ReferenceMaterialSummary | null | undefined
+): ReferenceMaterialSummary | null {
+  if (!files.length) return null;
+  const label =
+    files.length === 1
+      ? files[0]!.path.split("/").pop() || files[0]!.path
+      : `${files.length} files`;
+  return {
+    uploadedAt: new Date().toISOString(),
+    sourceFileName: label,
+    sourceNames: previousManifest?.sourceNames,
+    files: files.map((file) => ({
+      path: file.path,
+      charCount: file.text.length
+    })),
+    totalChars: files.reduce((sum, file) => sum + file.text.length, 0),
+    skippedBinary: previousManifest?.skippedBinary
+  };
+}
+
 export async function extractReferenceFromUploadFiles(
   uploads: File[]
 ): Promise<{
@@ -312,6 +335,40 @@ export async function extractReferenceFromUploadFiles(
   return { files, sourceNames, skippedBinary };
 }
 
+export function gatherReferenceFilesForDocument(
+  documentPath: string,
+  getFilesForPath: (path: string) => ReferenceMaterialFile[]
+): ReferenceMaterialFile[] {
+  const segments = documentPath.split("/").filter(Boolean);
+  if (segments.length === 0) return [];
+
+  const folderParts = segments.slice(0, -1);
+  let merged: ReferenceMaterialFile[] = [];
+
+  for (let i = 0; i < folderParts.length; i += 1) {
+    const folderPath = folderParts.slice(0, i + 1).join("/");
+    const folderFiles = getFilesForPath(folderPath).map((file) => ({
+      path: `${folderPath}/${file.path}`,
+      text: file.text
+    }));
+    merged = mergeReferenceFiles(merged, folderFiles);
+  }
+
+  const docFiles = getFilesForPath(documentPath);
+  return mergeReferenceFiles(merged, docFiles);
+}
+
+export function buildReferencePromptContextForDocument(
+  documentPath: string,
+  getFilesForPath: (path: string) => ReferenceMaterialFile[],
+  maxChars = MAX_REFERENCE_PROMPT_CHARS
+): string {
+  return buildReferencePromptContext(
+    gatherReferenceFilesForDocument(documentPath, getFilesForPath),
+    maxChars
+  );
+}
+
 export function buildReferencePromptContext(
   files: ReferenceMaterialFile[],
   maxChars = MAX_REFERENCE_PROMPT_CHARS
@@ -319,8 +376,7 @@ export function buildReferencePromptContext(
   if (!files.length) return "";
 
   const header = [
-    "Reference material (examples, instructions, tips, and source notes uploaded by the author).",
-    "Use this material to match style, structure, and quality, but write specifically for the current document, instructions, and prompt — do not copy verbatim unless quoting briefly.",
+    "Use the following as examples, research, and style guides. Match quality and structure where appropriate; write original content for the current document and task.",
     ""
   ].join("\n");
 

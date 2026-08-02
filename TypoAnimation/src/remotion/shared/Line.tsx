@@ -115,6 +115,7 @@ export function Line({
               filter: mj.filter,
               transformOrigin: 'bottom left',
               background: theme.highlightColor,
+              color: theme.highlightInk,
               padding: '0.03em 0.16em',
               boxDecorationBreak: 'clone',
               WebkitBoxDecorationBreak: 'clone',

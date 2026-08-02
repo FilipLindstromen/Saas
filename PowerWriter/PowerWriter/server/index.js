@@ -37,8 +37,16 @@ import {
   buildReferencePromptContext,
   extractReferenceFromUploads,
   getReferenceDirAbsolute,
-  mergeReferenceFiles
+  getFolderReferenceDirAbsolute,
+  mergeReferenceFiles,
+  rebuildReferenceManifestFromFiles
 } from "./referenceMaterial.js";
+import {
+  buildGenerationSystemPrompt,
+  buildGenerationUserContent,
+  buildVariantSystemPrompt,
+  buildVariantUserContent
+} from "./generationPrompt.js";
 
 const execAsync = promisify(exec);
 
@@ -582,11 +590,53 @@ async function gatherAggregatedInstructions(relativePath, type) {
   return collected.filter(Boolean).join("\n\n");
 }
 
-async function readReferenceSummary(documentAbsolutePath) {
-  const manifestPath = path.join(
-    getReferenceDirAbsolute(documentAbsolutePath),
-    REFERENCE_MANIFEST
-  );
+async function gatherInstructionSections(relativePath, type) {
+  const segments = relativePath ? relativePath.split("/") : [];
+  const sections = [];
+
+  if (type === "document") {
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const segmentPath = segments.slice(0, i + 1).join("/");
+      const fullPath = resolveMeditationPath(segmentPath);
+      if (
+        fsSync.existsSync(fullPath) &&
+        fsSync.statSync(fullPath).isDirectory()
+      ) {
+        const text = (await getFolderInstructions(segmentPath)).trim();
+        if (text) {
+          sections.push({ layer: "folder", path: segmentPath, text });
+        }
+      }
+    }
+    const documentInstructions = (
+      await getDocumentInstructions(relativePath)
+    ).trim();
+    if (documentInstructions) {
+      sections.push({
+        layer: "document",
+        path: relativePath,
+        text: documentInstructions
+      });
+    }
+    return sections;
+  }
+
+  for (let i = 0; i < segments.length; i += 1) {
+    const segmentPath = segments.slice(0, i + 1).join("/");
+    const fullPath = resolveMeditationPath(segmentPath);
+    if (fsSync.existsSync(fullPath) && fsSync.statSync(fullPath).isDirectory()) {
+      const text = (await getFolderInstructions(segmentPath)).trim();
+      if (text) {
+        sections.push({ layer: "folder", path: segmentPath, text });
+      }
+    }
+  }
+
+  return sections;
+}
+
+async function readReferenceSummaryAtDir(referenceDir) {
+  const manifestPath = path.join(referenceDir, REFERENCE_MANIFEST);
   try {
     const raw = await fs.readFile(manifestPath, "utf8");
     return JSON.parse(raw);
@@ -598,9 +648,8 @@ async function readReferenceSummary(documentAbsolutePath) {
   }
 }
 
-async function loadReferenceFilesForPrompt(documentAbsolutePath) {
-  const referenceDir = getReferenceDirAbsolute(documentAbsolutePath);
-  const manifest = await readReferenceSummary(documentAbsolutePath);
+async function loadReferenceFilesAtDir(referenceDir, pathPrefix = "") {
+  const manifest = await readReferenceSummaryAtDir(referenceDir);
   if (!manifest?.files?.length) {
     return [];
   }
@@ -610,14 +659,30 @@ async function loadReferenceFilesForPrompt(documentAbsolutePath) {
     const text = await readTextIfExists(path.join(referenceDir, entry.path));
     const trimmed = text.trim();
     if (trimmed) {
-      files.push({ path: entry.path, text: trimmed });
+      const prefixedPath = pathPrefix
+        ? `${pathPrefix}/${entry.path}`
+        : entry.path;
+      files.push({ path: prefixedPath, text: trimmed });
     }
   }
   return files;
 }
 
-async function writeReferenceMaterial(documentAbsolutePath, extracted) {
-  const referenceDir = getReferenceDirAbsolute(documentAbsolutePath);
+async function readReferenceSummaryForDocument(documentAbsolutePath) {
+  return readReferenceSummaryAtDir(getReferenceDirAbsolute(documentAbsolutePath));
+}
+
+async function readReferenceSummaryForFolder(folderAbsolutePath) {
+  return readReferenceSummaryAtDir(
+    getFolderReferenceDirAbsolute(folderAbsolutePath)
+  );
+}
+
+async function loadReferenceFilesForPrompt(documentAbsolutePath) {
+  return loadReferenceFilesAtDir(getReferenceDirAbsolute(documentAbsolutePath));
+}
+
+async function writeReferenceMaterialAtDir(referenceDir, extracted) {
   await fs.rm(referenceDir, { recursive: true, force: true });
   await fs.mkdir(referenceDir, { recursive: true });
   for (const file of extracted.files) {
@@ -632,6 +697,20 @@ async function writeReferenceMaterial(documentAbsolutePath, extracted) {
   );
 }
 
+async function writeReferenceMaterial(documentAbsolutePath, extracted) {
+  await writeReferenceMaterialAtDir(
+    getReferenceDirAbsolute(documentAbsolutePath),
+    extracted
+  );
+}
+
+async function writeFolderReferenceMaterial(folderAbsolutePath, extracted) {
+  await writeReferenceMaterialAtDir(
+    getFolderReferenceDirAbsolute(folderAbsolutePath),
+    extracted
+  );
+}
+
 async function clearReferenceMaterial(documentAbsolutePath) {
   await fs.rm(getReferenceDirAbsolute(documentAbsolutePath), {
     recursive: true,
@@ -639,12 +718,64 @@ async function clearReferenceMaterial(documentAbsolutePath) {
   });
 }
 
-async function gatherReferencePromptForPath(relativePath) {
-  if (typeof relativePath !== "string" || !relativePath.endsWith(".txt")) {
-    return "";
+async function clearFolderReferenceMaterial(folderAbsolutePath) {
+  await fs.rm(getFolderReferenceDirAbsolute(folderAbsolutePath), {
+    recursive: true,
+    force: true
+  });
+}
+
+async function removeOneReferenceFileAtDir(referenceDir, filePath) {
+  if (typeof filePath !== "string" || !filePath.trim()) {
+    throw new Error("Missing reference file path");
   }
+  const manifest = await readReferenceSummaryAtDir(referenceDir);
+  if (!manifest?.files?.length) {
+    throw new Error("Reference file not found");
+  }
+  const existingFiles = await loadReferenceFilesAtDir(referenceDir);
+  const filtered = existingFiles.filter((file) => file.path !== filePath);
+  if (filtered.length === existingFiles.length) {
+    throw new Error("Reference file not found");
+  }
+  if (filtered.length === 0) {
+    await fs.rm(referenceDir, { recursive: true, force: true });
+    return null;
+  }
+  const nextManifest = rebuildReferenceManifestFromFiles(filtered, manifest);
+  await writeReferenceMaterialAtDir(referenceDir, {
+    manifest: nextManifest,
+    files: filtered
+  });
+  return nextManifest;
+}
+
+async function gatherReferenceFilesForDocument(relativePath) {
+  if (typeof relativePath !== "string" || !relativePath.endsWith(".txt")) {
+    return [];
+  }
+
+  const segments = relativePath.split("/").filter(Boolean);
+  const folderParts = segments.slice(0, -1);
+  let merged = [];
+
+  for (let i = 0; i < folderParts.length; i += 1) {
+    const folderRel = folderParts.slice(0, i + 1).join("/");
+    const folderAbs = resolveMeditationPath(folderRel);
+    const folderFiles = await loadReferenceFilesAtDir(
+      getFolderReferenceDirAbsolute(folderAbs),
+      folderRel
+    );
+    merged = mergeReferenceFiles(merged, folderFiles);
+  }
+
   const documentPath = resolveMeditationPath(relativePath);
-  const files = await loadReferenceFilesForPrompt(documentPath);
+  const docFiles = await loadReferenceFilesForPrompt(documentPath);
+  return mergeReferenceFiles(merged, docFiles);
+}
+
+async function gatherReferencePromptForPath(relativePath) {
+  const files = await gatherReferenceFilesForDocument(relativePath);
   return buildReferencePromptContext(files);
 }
 
@@ -690,12 +821,14 @@ app.get("/api/folder", async (req, res) => {
       await readTextIfExists(path.join(folderPath, FOLDER_COLOR_FILE))
     ).trim();
     const aggregated = await gatherAggregatedInstructions(safePath, "folder");
+    const referenceMaterial = await readReferenceSummaryForFolder(folderPath);
     res.json({
       name: path.basename(folderPath),
       path: toPosix(safePath),
       instructions,
       aggregatedInstructions: aggregated,
-      color: color || null
+      color: color || null,
+      referenceMaterial: referenceMaterial || null
     });
   } catch (error) {
     res.status(500).send(
@@ -770,7 +903,7 @@ app.get("/api/document", async (req, res) => {
         gatherAggregatedInstructions(relative, "document"),
         readDocumentMeta(documentPath),
         readTranscription(documentPath),
-        readReferenceSummary(documentPath)
+        readReferenceSummaryForDocument(documentPath)
       ]);
 
     let audioUrl = null;
@@ -841,7 +974,7 @@ app.post(
 
       const append = req.body?.append !== "false";
       const previousManifest = append
-        ? await readReferenceSummary(documentPath)
+        ? await readReferenceSummaryForDocument(documentPath)
         : null;
       const existingFiles = append
         ? await loadReferenceFilesForPrompt(documentPath)
@@ -874,6 +1007,140 @@ app.post(
     }
   }
 );
+
+  }
+);
+
+app.post(
+  "/api/folder/reference",
+  referenceUpload.array("files", MAX_REFERENCE_FILES_PER_REQUEST),
+  async (req, res) => {
+    try {
+      const relative =
+        typeof req.body?.path === "string"
+          ? req.body.path
+          : typeof req.query?.path === "string"
+          ? req.query.path
+          : "";
+      if (!relative || relative.endsWith(".txt")) {
+        return res.status(400).send("Missing or invalid folder path");
+      }
+
+      const uploads = Array.isArray(req.files) ? req.files : [];
+      if (uploads.length === 0) {
+        return res.status(400).send("Missing files (field name: files)");
+      }
+
+      const folderPath = resolveMeditationPath(relative);
+      const stat = await fs.stat(folderPath);
+      if (!stat.isDirectory()) {
+        return res.status(400).send("Path is not a folder");
+      }
+
+      const append = req.body?.append !== "false";
+      const previousManifest = append
+        ? await readReferenceSummaryForFolder(folderPath)
+        : null;
+      const existingFiles = append
+        ? await loadReferenceFilesAtDir(
+            getFolderReferenceDirAbsolute(folderPath)
+          )
+        : [];
+
+      const extracted = await extractReferenceFromUploads(uploads);
+      const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+      const manifest = buildReferenceManifest({
+        sourceNames: extracted.sourceNames,
+        files: mergedFiles,
+        skippedBinary: extracted.skippedBinary,
+        previousManifest
+      });
+
+      await writeFolderReferenceMaterial(folderPath, {
+        manifest,
+        files: mergedFiles
+      });
+
+      res.json({
+        success: true,
+        referenceMaterial: manifest
+      });
+    } catch (error) {
+      res.status(500).send(
+        error instanceof Error
+          ? error.message
+          : "Unable to import folder reference material"
+      );
+    }
+  }
+);
+
+app.delete("/api/folder/reference", async (req, res) => {
+  try {
+    const relative =
+      typeof req.query?.path === "string" ? req.query.path : "";
+    if (!relative || relative.endsWith(".txt")) {
+      return res.status(400).send("Missing or invalid folder path");
+    }
+    const folderPath = resolveMeditationPath(relative);
+    await clearFolderReferenceMaterial(folderPath);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error
+        ? error.message
+        : "Unable to remove folder reference material"
+    );
+  }
+});
+
+app.delete("/api/folder/reference/file", async (req, res) => {
+  try {
+    const relative =
+      typeof req.query?.path === "string" ? req.query.path : "";
+    const filePath =
+      typeof req.query?.filePath === "string" ? req.query.filePath : "";
+    if (!relative || relative.endsWith(".txt")) {
+      return res.status(400).send("Missing or invalid folder path");
+    }
+    const folderPath = resolveMeditationPath(relative);
+    const referenceMaterial = await removeOneReferenceFileAtDir(
+      getFolderReferenceDirAbsolute(folderPath),
+      filePath
+    );
+    res.json({ success: true, referenceMaterial });
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error
+        ? error.message
+        : "Unable to remove folder reference file"
+    );
+  }
+});
+
+app.delete("/api/document/reference/file", async (req, res) => {
+  try {
+    const relative =
+      typeof req.query?.path === "string" ? req.query.path : "";
+    const filePath =
+      typeof req.query?.filePath === "string" ? req.query.filePath : "";
+    if (!relative.endsWith(".txt")) {
+      return res.status(400).send("Missing or invalid document path");
+    }
+    const documentPath = resolveMeditationPath(relative);
+    const referenceMaterial = await removeOneReferenceFileAtDir(
+      getReferenceDirAbsolute(documentPath),
+      filePath
+    );
+    res.json({ success: true, referenceMaterial });
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error
+        ? error.message
+        : "Unable to remove reference file"
+    );
+  }
+});
 
 app.delete("/api/document/reference", async (req, res) => {
   try {
@@ -1942,17 +2209,14 @@ app.post("/api/generate-variants", async (req, res) => {
     const pathString =
       typeof relative === "string" ? relative : relative ?? "";
 
-    const aggregated =
+    const instructionType =
+      pathString.endsWith(".txt") ? "document" : "folder";
+    const instructionSections =
       typeof relative === "string"
-        ? await gatherAggregatedInstructions(
-            pathString,
-            pathString.endsWith(".txt") ? "document" : "folder"
-          )
-        : "";
+        ? await gatherInstructionSections(pathString, instructionType)
+        : [];
 
-    const systemPrompt =
-      aggregated ||
-      "You are a helpful writing assistant that rewrites user-provided passages.";
+    const systemPrompt = buildVariantSystemPrompt(instructionSections);
 
     const taskInstruction = VARIANT_MODE_INSTRUCTIONS[mode];
 
@@ -1961,19 +2225,11 @@ app.post("/api/generate-variants", async (req, res) => {
       referenceContext = await gatherReferencePromptForPath(relative);
     }
 
-    const userPrompt = [
-      `Task: ${taskInstruction}`,
-      referenceContext || null,
-      "Original text:",
-      text.trim(),
-      "",
-      "Provide exactly three distinct variations that satisfy the task.",
-      "Respond strictly as JSON in the format:",
-      '["Variant 1", "Variant 2", "Variant 3"]',
-      "Do not include any additional commentary."
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const userPrompt = buildVariantUserContent({
+      taskInstruction,
+      referenceContext,
+      originalText: text.trim()
+    });
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -2150,13 +2406,15 @@ app.post("/api/generate", async (req, res) => {
 
     const client = new OpenAI({ apiKey: effectiveKey });
 
-    const aggregated =
+    const pathString =
+      typeof relative === "string" ? relative : relative ?? "";
+
+    const instructionType =
+      pathString.endsWith(".txt") ? "document" : "folder";
+    const instructionSections =
       typeof relative === "string"
-        ? await gatherAggregatedInstructions(
-            pathString,
-            pathString.endsWith(".txt") ? "document" : "folder"
-          )
-        : "";
+        ? await gatherInstructionSections(pathString, instructionType)
+        : [];
 
     let documentContent = "";
     let referenceContext = "";
@@ -2170,21 +2428,15 @@ app.post("/api/generate", async (req, res) => {
     const messages = [
       {
         role: "system",
-        content:
-          aggregated ||
-          "You are a writing assistant that helps create calm, mindful meditations."
+        content: buildGenerationSystemPrompt(instructionSections)
       },
       {
         role: "user",
-        content: [
-          prompt.trim(),
-          referenceContext || null,
+        content: buildGenerationUserContent({
+          task: prompt.trim(),
+          referenceContext,
           documentContent
-            ? `\nCurrent document:\n${documentContent}`.trim()
-            : null
-        ]
-          .filter(Boolean)
-          .join("\n\n")
+        })
       }
     ];
 

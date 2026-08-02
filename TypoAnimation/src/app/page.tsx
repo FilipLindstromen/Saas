@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import type { PlayerRef } from '@remotion/player';
 import { createEmptyProject, createScene, defaultDurationForStyle, type Project, type Scene, type SceneStyle } from '@/types/project';
 import { parseScript, parseStructuredScript, serializeScript, pickSceneStyle, estimateDuration, assignSceneStylesWithVariety, scenePatchForStyle } from '@/lib/parseScript';
-import { PreviewPlayer } from '@/components/PreviewPlayer';
+import { PreviewPlayer, PreviewTransportBar } from '@/components/PreviewPlayer';
 import { ScriptEditor } from '@/components/ScriptEditor';
 import { SceneList } from '@/components/SceneList';
 import { SceneStylePanel } from '@/components/SceneStylePanel';
@@ -56,6 +57,7 @@ export default function Home() {
   const [mode, setMode] = useState<'import' | 'plan' | 'edit'>('import');
   const [themeOverlayOpen, setThemeOverlayOpen] = useState(false);
   const [presentOpen, setPresentOpen] = useState(false);
+  const previewPlayerRef = useRef<PlayerRef>(null);
 
   const refreshProjectList = () => {
     if (IS_STATIC) {
@@ -403,6 +405,34 @@ export default function Home() {
               Present
             </button>
           </div>
+          <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+            <select
+              defaultValue=""
+              onChange={(e) => handleLoad(e.target.value)}
+              className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs text-white"
+            >
+              <option value="" disabled className="bg-[#1f1f1f]">
+                Load project…
+              </option>
+              {savedProjects.map((p) => (
+                <option key={p.id} value={p.id} className="bg-[#1f1f1f]">
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleSave}
+              className="rounded-xl bg-gradient-to-br from-[#ff6b35] to-[#ff4757] px-4 py-1.5 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleNew}
+              className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15"
+            >
+              New
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {(status || brollStatus) && (
@@ -413,32 +443,6 @@ export default function Home() {
             className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15"
           >
             Theme settings
-          </button>
-          <select
-            defaultValue=""
-            onChange={(e) => handleLoad(e.target.value)}
-            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs text-white"
-          >
-            <option value="" disabled className="bg-[#1f1f1f]">
-              Load project…
-            </option>
-            {savedProjects.map((p) => (
-              <option key={p.id} value={p.id} className="bg-[#1f1f1f]">
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleSave}
-            className="rounded-xl bg-gradient-to-br from-[#ff6b35] to-[#ff4757] px-4 py-1.5 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleNew}
-            className="rounded-xl border border-white/10 bg-[#141414] px-3 py-1.5 text-xs font-medium text-white/90 transition-colors hover:bg-[#252525] hover:border-white/15"
-          >
-            New
           </button>
           <button
             onClick={handleAutoSetStyles}
@@ -542,54 +546,59 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr_320px] gap-4 overflow-hidden p-4">
-          <div className="flex min-h-0 flex-col overflow-hidden">
-            <SceneList
-              scenes={project.scenes}
-              theme={project.theme}
-              selectedId={selectedSceneId}
-              multiSelectedIds={multiSelectedIds}
-              onSelect={handleSelectScene}
-              onReorder={handleReorder}
-              onRemove={handleRemove}
-              onDuplicate={handleDuplicate}
-              onAdd={handleAdd}
-            />
-          </div>
-
-          <div className="flex min-h-0 items-start justify-center overflow-hidden">
-            <div
-              className="w-full"
-              style={{ maxWidth: project.aspectRatio === '16:9' ? 900 : project.aspectRatio === '9:16' ? 360 : 640 }}
-            >
-              <PreviewPlayer
-                project={project}
-                selectedSceneId={selectedSceneId}
-                brollPanMode={brollPanMode}
-                onBrollPatch={(p) => {
-                  if (!selectedSceneId || !selectedScene?.broll) return;
-                  patchScene(selectedSceneId, { broll: { ...selectedScene.broll, ...p } });
-                }}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 pb-3">
+          <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr_320px] gap-4 overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden">
+              <SceneList
+                scenes={project.scenes}
+                theme={project.theme}
+                selectedId={selectedSceneId}
+                multiSelectedIds={multiSelectedIds}
+                onSelect={handleSelectScene}
+                onReorder={handleReorder}
+                onRemove={handleRemove}
+                onDuplicate={handleDuplicate}
+                onAdd={handleAdd}
               />
             </div>
-          </div>
 
-          <div className="flex min-h-0 flex-col overflow-y-auto">
-            <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-              {multiSelectedIds.length > 1 ? (
-                <BulkEditPanel sceneIds={multiSelectedIds} onApply={handleBulkPatch} />
-              ) : (
-                <SceneStylePanel
-                  scene={selectedScene}
-                  onChange={patchScene}
-                  hideBroll={IS_STATIC}
-                  hasVideo={!!project.video}
+            <div className="flex min-h-0 items-center justify-center overflow-hidden">
+              <div
+                className="flex h-full w-full max-h-full flex-col items-center justify-center"
+                style={{ maxWidth: project.aspectRatio === '16:9' ? 900 : project.aspectRatio === '9:16' ? 360 : 640 }}
+              >
+                <PreviewPlayer
+                  ref={previewPlayerRef}
+                  hideTransport
+                  project={project}
+                  selectedSceneId={selectedSceneId}
                   brollPanMode={brollPanMode}
-                  onBrollPanModeChange={setBrollPanMode}
+                  onBrollPatch={(p) => {
+                    if (!selectedSceneId || !selectedScene?.broll) return;
+                    patchScene(selectedSceneId, { broll: { ...selectedScene.broll, ...p } });
+                  }}
                 />
-              )}
+              </div>
+            </div>
+
+            <div className="flex min-h-0 flex-col overflow-y-auto">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#1f1f1f] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
+                {multiSelectedIds.length > 1 ? (
+                  <BulkEditPanel sceneIds={multiSelectedIds} onApply={handleBulkPatch} />
+                ) : (
+                  <SceneStylePanel
+                    scene={selectedScene}
+                    onChange={patchScene}
+                    hideBroll={IS_STATIC}
+                    hasVideo={!!project.video}
+                    brollPanMode={brollPanMode}
+                    onBrollPanModeChange={setBrollPanMode}
+                  />
+                )}
+              </div>
             </div>
           </div>
+          <PreviewTransportBar playerRef={previewPlayerRef} project={project} />
         </div>
       )}
 

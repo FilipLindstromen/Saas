@@ -5,6 +5,8 @@ import type { CaptionWord, Project, Scene, VideoAsset } from '@/types/project';
 import { createScene } from '@/types/project';
 import {
   computeSceneBoundaries,
+  joinCaptionWords,
+  normalizeCaptionWords,
   segmentBySentences,
   segmentsFromBeatLayout,
   segmentsToBeatLayout,
@@ -101,16 +103,21 @@ export function VideoSyncPanel({
   const [beatLayout, setBeatLayout] = useState('');
   const [beatLayoutCustom, setBeatLayoutCustom] = useState(false);
 
+  const normalizedCaptions = useMemo(
+    () => (project.captions?.length ? normalizeCaptionWords(project.captions) : []),
+    [project.captions]
+  );
+
   useEffect(() => {
-    if (!project.captions?.length) {
+    if (!normalizedCaptions.length) {
       setBeatLayout('');
       setBeatLayoutCustom(false);
       return;
     }
     if (!beatLayoutCustom) {
-      setBeatLayout(segmentsToBeatLayout(segmentBySentences(project.captions)));
+      setBeatLayout(segmentsToBeatLayout(segmentBySentences(normalizedCaptions)));
     }
-  }, [project.captions, beatLayoutCustom]);
+  }, [normalizedCaptions, beatLayoutCustom]);
 
   useEffect(() => {
     if (!transcribeUi || transcribeUi.finished) return;
@@ -119,12 +126,12 @@ export function VideoSyncPanel({
   }, [transcribeUi]);
 
   const segments = useMemo(() => {
-    if (!project.captions?.length) return [];
+    if (!normalizedCaptions.length) return [];
     if (beatLayoutCustom && beatLayout.trim()) {
-      return segmentsFromBeatLayout(beatLayout, project.captions);
+      return segmentsFromBeatLayout(beatLayout, normalizedCaptions);
     }
-    return segmentBySentences(project.captions);
-  }, [project.captions, beatLayout, beatLayoutCustom]);
+    return segmentBySentences(normalizedCaptions);
+  }, [normalizedCaptions, beatLayout, beatLayoutCustom]);
 
   const patchVideo = (p: Partial<VideoAsset>) => project.video && onProjectChange({ video: { ...project.video, ...p } });
 
@@ -182,7 +189,7 @@ export function VideoSyncPanel({
         }));
       });
 
-      onProjectChange({ captions });
+      onProjectChange({ captions: normalizeCaptionWords(captions) });
       setBeatLayoutCustom(false);
       setTranscribeUi((prev) =>
         prev
@@ -237,7 +244,7 @@ export function VideoSyncPanel({
     const boundaries = computeSceneBoundaries(segments, project.video.durationMs);
     const sceneInputs = segments.map((seg) => ({
       kicker: null as string | null,
-      lines: [{ text: seg.words.map((w) => w.text).join(' ') }],
+      lines: [{ text: joinCaptionWords(seg.words) }],
     }));
     const styles = assignSceneStylesWithVariety(sceneInputs);
     const scenes: Scene[] = segments.map((seg, i) => {
@@ -408,7 +415,7 @@ export function VideoSyncPanel({
             {segments.map((s, i) => (
               <div key={i} className="border-b border-white/[0.06] px-2 py-1 last:border-0">
                 <span className="text-white/45">{fmt(s.startMs)}–{fmt(s.endMs)}</span>{' '}
-                <span className="text-white/90">{s.words.map((w) => w.text).join(' ')}</span>
+                <span className="text-white/90">{joinCaptionWords(s.words)}</span>
               </div>
             ))}
           </div>

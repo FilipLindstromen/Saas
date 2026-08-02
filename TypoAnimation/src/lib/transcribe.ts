@@ -5,6 +5,7 @@ import { promises as fs } from 'fs';
 import { spawn } from 'child_process';
 import { installWhisperCpp, downloadWhisperModel, transcribe as whisperTranscribe, toCaptions } from '@remotion/install-whisper-cpp';
 import type { Caption } from '@remotion/captions';
+import { normalizeCaptionWords } from './segmentCaptions';
 
 // Pinned to the release Remotion ships a prebuilt Windows binary for (their own S3-hosted
 // zip) rather than a newer version, since @remotion/install-whisper-cpp otherwise falls back
@@ -236,10 +237,13 @@ export async function transcribeVideo(
   });
 
   const { captions } = toCaptions({ whisperCppOutput: json });
+  const normalized = normalizeCaptionWords(
+    captions.map((c) => ({ text: c.text, startMs: c.startMs, endMs: c.endMs }))
+  );
   report(onProgress, {
     phase: 'done',
-    message: `Done — ${captions.length} words transcribed`,
+    message: `Done — ${normalized.length} words transcribed`,
     progress: 100,
   });
-  return captions;
+  return normalized as Caption[];
 }

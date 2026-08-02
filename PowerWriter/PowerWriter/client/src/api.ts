@@ -23,14 +23,22 @@ import {
   storageSaveReferenceMaterial,
   storageClearReferenceMaterial,
   storageGetReferenceFiles,
-  storageGetReferenceSummary
+  storageGetReferenceSummary,
+  storageRemoveReferenceFile
 } from "./storage";
 import {
   buildReferenceManifest,
-  buildReferencePromptContext,
+  buildReferencePromptContextForDocument,
   extractReferenceFromUploadFiles,
   mergeReferenceFiles
 } from "./lib/referenceMaterial";
+import {
+  buildGenerationSystemPrompt,
+  buildGenerationUserContent,
+  buildVariantSystemPrompt,
+  buildVariantUserContent,
+  gatherInstructionSectionsFromStorage
+} from "./lib/generationPrompt";
 import type { ReferenceMaterialSummary } from "./types";
 
 const VARIANT_MODE_INSTRUCTIONS: Record<string, string> = {
@@ -199,6 +207,59 @@ export async function uploadDocumentReferenceFiles(
   return { referenceMaterial: data.referenceMaterial };
 }
 
+export async function uploadFolderReferenceFiles(
+  path: string,
+  files: File[]
+): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  if (files.length === 0) {
+    throw new Error("Select at least one file to upload.");
+  }
+
+  if (await shouldUseStorage()) {
+    const previousManifest = storageGetReferenceSummary(path);
+    const existingFiles = storageGetReferenceFiles(path);
+    const extracted = await extractReferenceFromUploadFiles(files);
+    const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+    const manifest = buildReferenceManifest({
+      sourceNames: extracted.sourceNames,
+      files: mergedFiles,
+      skippedBinary: extracted.skippedBinary,
+      previousManifest
+    });
+    storageSaveReferenceMaterial(path, manifest, mergedFiles);
+    return { referenceMaterial: manifest };
+  }
+
+  const formData = new FormData();
+  formData.append("path", path);
+  formData.append("append", "true");
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch("/api/folder/reference", {
+    method: "POST",
+    body: formData
+  });
+  const data = await handleResponse<{
+    success: true;
+    referenceMaterial: ReferenceMaterialSummary;
+  }>(response);
+  return { referenceMaterial: data.referenceMaterial };
+}
+
+export async function clearFolderReferenceMaterial(path: string) {
+  if (await shouldUseStorage()) {
+    storageClearReferenceMaterial(path);
+    return { success: true as const };
+  }
+  const response = await fetch(
+    `/api/folder/reference?path=${encodeURIComponent(path)}`,
+    { method: "DELETE" }
+  );
+  return handleResponse<{ success: true }>(response);
+}
+
 /** @deprecated use uploadDocumentReferenceFiles */
 export async function uploadDocumentReferenceZip(
   path: string,
@@ -217,6 +278,42 @@ export async function clearDocumentReferenceMaterial(path: string) {
     { method: "DELETE" }
   );
   return handleResponse<{ success: true }>(response);
+}
+
+export async function removeDocumentReferenceFile(
+  path: string,
+  filePath: string
+): Promise<{ referenceMaterial: ReferenceMaterialSummary | null }> {
+  if (await shouldUseStorage()) {
+    const referenceMaterial = storageRemoveReferenceFile(path, filePath);
+    return { referenceMaterial };
+  }
+  const response = await fetch(
+    `/api/document/reference/file?path=${encodeURIComponent(path)}&filePath=${encodeURIComponent(filePath)}`,
+    { method: "DELETE" }
+  );
+  return handleResponse<{
+    success: true;
+    referenceMaterial: ReferenceMaterialSummary | null;
+  }>(response);
+}
+
+export async function removeFolderReferenceFile(
+  path: string,
+  filePath: string
+): Promise<{ referenceMaterial: ReferenceMaterialSummary | null }> {
+  if (await shouldUseStorage()) {
+    const referenceMaterial = storageRemoveReferenceFile(path, filePath);
+    return { referenceMaterial };
+  }
+  const response = await fetch(
+    `/api/folder/reference/file?path=${encodeURIComponent(path)}&filePath=${encodeURIComponent(filePath)}`,
+    { method: "DELETE" }
+  );
+  return handleResponse<{
+    success: true;
+    referenceMaterial: ReferenceMaterialSummary | null;
+  }>(response);
 }
 
 export async function createDocument(
@@ -362,40 +459,52 @@ export async function generateAnswer(params: {
   }
 
   const pathString = typeof params.path === "string" ? params.path : "";
-  let aggregated = "";
   let documentContent = "";
   let referenceContext = "";
+  let instructionSections: ReturnType<
+    typeof gatherInstructionSectionsFromStorage
+  > = [];
+
   if (pathString) {
+    const instructionType = pathString.endsWith(".txt") ? "document" : "folder";
+    const getFolderInstructions = (p: string) =>
+      storageGetFolderDetails(p).instructions || "";
+    const getDocumentInstructions = (p: string) =>
+      storageGetDocumentDetails(p).instructions || "";
+
+    instructionSections = gatherInstructionSectionsFromStorage(
+      pathString,
+      instructionType,
+      getFolderInstructions,
+      getDocumentInstructions
+    );
+
     if (pathString.endsWith(".txt")) {
       const doc = storageGetDocumentDetails(pathString);
-      aggregated = doc.aggregatedInstructions || "";
       documentContent = doc.content || "";
-      referenceContext = buildReferencePromptContext(
-        storageGetReferenceFiles(pathString)
+      referenceContext = buildReferencePromptContextForDocument(
+        pathString,
+        storageGetReferenceFiles
       );
-    } else {
-      const folder = storageGetFolderDetails(pathString);
-      aggregated = folder.aggregatedInstructions || "";
     }
   }
 
   const openai = new OpenAI({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
-  const systemContent =
-    aggregated ||
-    "You are a writing assistant that helps create calm, mindful meditations.";
-  const userContent = [
-    params.prompt.trim(),
-    referenceContext || null,
-    documentContent ? `\nCurrent document:\n${documentContent}`.trim() : null
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: systemContent },
-      { role: "user", content: userContent }
+      {
+        role: "system",
+        content: buildGenerationSystemPrompt(instructionSections)
+      },
+      {
+        role: "user",
+        content: buildGenerationUserContent({
+          task: params.prompt.trim(),
+          referenceContext,
+          documentContent
+        })
+      }
     ],
     temperature: 0.7
   });
@@ -450,43 +559,42 @@ export async function generateVariants(params: {
   }
 
   const pathString = typeof params.path === "string" ? params.path : "";
-  let aggregated = "";
   let referenceContext = "";
+  let instructionSections: ReturnType<
+    typeof gatherInstructionSectionsFromStorage
+  > = [];
+
   if (pathString) {
+    const instructionType = pathString.endsWith(".txt") ? "document" : "folder";
+    instructionSections = gatherInstructionSectionsFromStorage(
+      pathString,
+      instructionType,
+      (p) => storageGetFolderDetails(p).instructions || "",
+      (p) => storageGetDocumentDetails(p).instructions || ""
+    );
+
     if (pathString.endsWith(".txt")) {
-      const doc = storageGetDocumentDetails(pathString);
-      aggregated = doc.aggregatedInstructions || "";
-      referenceContext = buildReferencePromptContext(
-        storageGetReferenceFiles(pathString)
+      referenceContext = buildReferencePromptContextForDocument(
+        pathString,
+        storageGetReferenceFiles
       );
-    } else {
-      const folder = storageGetFolderDetails(pathString);
-      aggregated = folder.aggregatedInstructions || "";
     }
   }
 
-  const systemPrompt =
-    aggregated ||
-    "You are a helpful writing assistant that rewrites user-provided passages.";
-  const userPrompt = [
-    `Task: ${taskInstruction}`,
-    referenceContext || null,
-    "Original text:",
-    params.text.trim(),
-    "",
-    "Provide exactly three distinct variations that satisfy the task.",
-    "Respond strictly as JSON in the format:",
-    '["Variant 1", "Variant 2", "Variant 3"]',
-    "Do not include any additional commentary."
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const userPrompt = buildVariantUserContent({
+    taskInstruction,
+    referenceContext,
+    originalText: params.text.trim()
+  });
 
   const openai = new OpenAI({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: systemPrompt },
+      {
+        role: "system",
+        content: buildVariantSystemPrompt(instructionSections)
+      },
       { role: "user", content: userPrompt }
     ],
     temperature: 0.7

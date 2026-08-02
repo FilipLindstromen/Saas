@@ -17,6 +17,8 @@ export interface ResolvedSceneTheme {
   fontScale: number;
   /** background for inline-highlighted [[ ]] text spans — falls back to accent if unset */
   highlightColor: string;
+  /** ink on inline-highlighted [[ ]] spans — falls back to scene ink if unset */
+  highlightInk: string;
 }
 
 // Merges the project-wide theme with a scene's own overrides (dark mode, accent color,
@@ -30,9 +32,10 @@ export function resolveSceneTheme(theme: ProjectTheme, scene: Scene): ResolvedSc
   const pairing = getFontPairing(scene.font || theme.fontPairing);
   const dark = !!scene.dark;
   const useSecondary = !dark && !!scene.secondaryBg && !!theme.secondaryBg;
+  const ink = dark ? theme.bg : useSecondary ? theme.secondaryInk || theme.ink : theme.ink;
   return {
     bg: dark ? accent : useSecondary ? theme.secondaryBg! : theme.bg,
-    ink: dark ? theme.bg : useSecondary ? theme.secondaryInk || theme.ink : theme.ink,
+    ink,
     accent,
     accentDeep: deepen(accent),
     fontHeading: pairing.heading,
@@ -42,5 +45,6 @@ export function resolveSceneTheme(theme: ProjectTheme, scene: Scene): ResolvedSc
     dark,
     fontScale: theme.fontScale ?? 1,
     highlightColor: theme.highlightColor || accent,
+    highlightInk: theme.highlightInk ?? ink,
   };
 }

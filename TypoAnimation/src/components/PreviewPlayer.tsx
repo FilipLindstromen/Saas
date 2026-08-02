@@ -30,7 +30,7 @@ function sceneCutFrames(project: Project, fps: number): number[] {
 // which overlays the bar on top of the video frame itself — driven entirely through
 // PlayerRef's imperative API + event listeners, since the Player has no "controls below"
 // layout option of its own.
-function PlayerControls({
+function PreviewTransport({
   playerRef,
   durationInFrames,
   fps,
@@ -69,7 +69,7 @@ function PlayerControls({
     'flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-[#141414] text-white/90 hover:border-white/20 hover:bg-[#1f1f1f]';
 
   return (
-    <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#1f1f1f] px-3 py-2">
+    <div className="flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.06] bg-[#1f1f1f] px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
       <button className={btnClass} onClick={() => playerRef.current?.toggle()} title={playing ? 'Pause' : 'Play'}>
         {playing ? '❚❚' : '▶'}
       </button>
@@ -105,34 +105,46 @@ function PlayerControls({
   );
 }
 
-export function PreviewPlayer({
-  project,
-  selectedSceneId,
-  brollPanMode,
-  onBrollPatch,
-}: {
-  project: Project;
-  selectedSceneId?: string | null;
-  brollPanMode?: boolean;
-  onBrollPatch?: (patch: Partial<BrollAsset>) => void;
-}) {
+export function PreviewTransportBar({ playerRef, project }: { playerRef: React.RefObject<PlayerRef | null>; project: Project }) {
+  const durationInFrames = useMemo(() => computeTotalDurationInFrames(project, FPS), [project.scenes]);
+  const cutFrames = useMemo(() => sceneCutFrames(project, FPS), [project.scenes]);
+  return (
+    <PreviewTransport
+      playerRef={playerRef}
+      durationInFrames={durationInFrames}
+      fps={FPS}
+      cutFrames={cutFrames}
+    />
+  );
+}
+
+export const PreviewPlayer = React.forwardRef<
+  PlayerRef,
+  {
+    project: Project;
+    selectedSceneId?: string | null;
+    brollPanMode?: boolean;
+    onBrollPatch?: (patch: Partial<BrollAsset>) => void;
+    hideTransport?: boolean;
+  }
+>(function PreviewPlayer(
+  { project, selectedSceneId, brollPanMode, onBrollPatch, hideTransport },
+  ref
+) {
   const playerRef = useRef<PlayerRef>(null);
+  React.useImperativeHandle(ref, () => playerRef.current!, []);
   const projectRef = useRef(project);
   projectRef.current = project;
+  const hasVoiceover = !!project.video;
 
   const { width, height } = getCompositionSize(project.aspectRatio);
 
   const durationInFrames = useMemo(
     () => computeTotalDurationInFrames(project, FPS),
-    // scene identity + durations are what actually change the timeline length; re-deriving
-    // on every project change (incl. unrelated color tweaks) is cheap enough to just depend
-    // on the whole scenes array.
     [project.scenes]
   );
 
-  const cutFrames = useMemo(() => sceneCutFrames(project, FPS), [project.scenes]);
-
-  // Deliberately keyed only on the selected scene id, not on `project` — selecting a scene
+  // Deliberately keyed only on the selected scene id
   // should jump the playhead there once, but editing that scene's text afterward shouldn't
   // keep yanking playback back to its start on every keystroke.
   //
@@ -150,11 +162,19 @@ export function PreviewPlayer({
     playerRef.current?.seekTo(startFrame + settleFrames);
   }, [selectedSceneId]);
 
+  useEffect(() => {
+    if (!hasVoiceover) return;
+    const id = window.setTimeout(() => {
+      playerRef.current?.unmute();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [hasVoiceover, durationInFrames]);
+
   const selectedScene = selectedSceneId ? project.scenes.find((s) => s.id === selectedSceneId) : null;
 
   return (
-    <div className="w-full">
-      <div className="relative w-full">
+    <div className="flex h-full w-full flex-col">
+      <div className="relative min-h-0 flex-1 w-full">
         <Player
           ref={playerRef}
           component={MainComposition}
@@ -163,10 +183,12 @@ export function PreviewPlayer({
           compositionWidth={width}
           compositionHeight={height}
           fps={FPS}
-          style={{ width: '100%', aspectRatio: `${width} / ${height}` }}
+          style={{ width: '100%', maxHeight: '100%', aspectRatio: `${width} / ${height}` }}
           loop
           clickToPlay={!brollPanMode}
           spaceKeyToPlayOrPause
+          initiallyMuted={!hasVoiceover}
+          numberOfSharedAudioTags={hasVoiceover ? 2 : 0}
         />
         {selectedScene?.broll && onBrollPatch && (
           <BrollFramingOverlay
@@ -176,7 +198,9 @@ export function PreviewPlayer({
           />
         )}
       </div>
-      <PlayerControls playerRef={playerRef} durationInFrames={durationInFrames} fps={FPS} cutFrames={cutFrames} />
+      {!hideTransport && (
+        <PreviewTransportBar playerRef={playerRef} project={project} />
+      )}
     </div>
   );
-}
+});
