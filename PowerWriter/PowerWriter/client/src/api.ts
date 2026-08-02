@@ -30,6 +30,7 @@ import {
   buildReferenceManifest,
   buildReferencePromptContextForDocument,
   extractReferenceFromUploadFiles,
+  extractReferenceFromUrls,
   mergeReferenceFiles
 } from "./lib/referenceMaterial";
 import {
@@ -240,6 +241,86 @@ export async function uploadFolderReferenceFiles(
   const response = await fetch("/api/folder/reference", {
     method: "POST",
     body: formData
+  });
+  const data = await handleResponse<{
+    success: true;
+    referenceMaterial: ReferenceMaterialSummary;
+  }>(response);
+  return { referenceMaterial: data.referenceMaterial };
+}
+
+async function mergeReferenceUrlsIntoPath(
+  path: string,
+  url: string,
+  useLocalStorage: boolean
+): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    throw new Error("Enter a URL");
+  }
+
+  if (useLocalStorage) {
+    const previousManifest = storageGetReferenceSummary(path);
+    const existingFiles = storageGetReferenceFiles(path);
+    const extracted = await extractReferenceFromUrls(trimmed);
+    const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+    const manifest = buildReferenceManifest({
+      sourceNames: extracted.sourceNames,
+      files: mergedFiles,
+      skippedBinary: extracted.skippedBinary,
+      previousManifest
+    });
+    storageSaveReferenceMaterial(path, manifest, mergedFiles);
+    return { referenceMaterial: manifest };
+  }
+
+  const response = await fetch("/api/document/reference/url", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({ path, url: trimmed })
+  });
+  const data = await handleResponse<{
+    success: true;
+    referenceMaterial: ReferenceMaterialSummary;
+  }>(response);
+  return { referenceMaterial: data.referenceMaterial };
+}
+
+export async function addDocumentReferenceUrl(
+  path: string,
+  url: string
+): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  return mergeReferenceUrlsIntoPath(path, url, await shouldUseStorage());
+}
+
+export async function addFolderReferenceUrl(
+  path: string,
+  url: string
+): Promise<{ referenceMaterial: ReferenceMaterialSummary }> {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    throw new Error("Enter a URL");
+  }
+
+  if (await shouldUseStorage()) {
+    const previousManifest = storageGetReferenceSummary(path);
+    const existingFiles = storageGetReferenceFiles(path);
+    const extracted = await extractReferenceFromUrls(trimmed);
+    const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+    const manifest = buildReferenceManifest({
+      sourceNames: extracted.sourceNames,
+      files: mergedFiles,
+      skippedBinary: extracted.skippedBinary,
+      previousManifest
+    });
+    storageSaveReferenceMaterial(path, manifest, mergedFiles);
+    return { referenceMaterial: manifest };
+  }
+
+  const response = await fetch("/api/folder/reference/url", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({ path, url: trimmed })
   });
   const data = await handleResponse<{
     success: true;

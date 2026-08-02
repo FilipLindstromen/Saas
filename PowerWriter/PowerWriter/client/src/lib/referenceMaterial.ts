@@ -17,6 +17,9 @@ export type ReferenceMaterialFile = {
 export const MAX_REFERENCE_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_REFERENCE_FILES_PER_REQUEST = 50;
 export const MAX_REFERENCE_PROMPT_CHARS = 120_000;
+export const MAX_REFERENCE_URL_BYTES = 2 * 1024 * 1024;
+export const REFERENCE_URL_FETCH_TIMEOUT_MS = 20_000;
+export const MAX_REFERENCE_URLS_PER_REQUEST = 5;
 
 const TEXT_EXTENSIONS = new Set([
   ".txt",
@@ -330,6 +333,196 @@ export async function extractReferenceFromUploadFiles(
     throw new Error(
       "No usable reference text found. Upload .txt, .md, .pdf, or .zip archives containing those formats."
     );
+  }
+
+  return { files, sourceNames, skippedBinary };
+}
+
+export function parseReferenceUrlInputs(input: unknown): string[] {
+  if (Array.isArray(input)) {
+    return [
+      ...new Set(input.map((value) => String(value).trim()).filter(Boolean))
+    ];
+  }
+  if (typeof input === "string") {
+    return [
+      ...new Set(
+        input
+          .split(/[\n,]+/)
+          .map((part) => part.trim())
+          .filter(Boolean)
+      )
+    ];
+  }
+  return [];
+}
+
+export function normalizeReferenceUrl(input: string): string {
+  const trimmed = String(input || "").trim();
+  if (!trimmed) {
+    throw new Error("URL is required");
+  }
+  let url: URL;
+  try {
+    url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+  } catch {
+    throw new Error("Invalid URL");
+  }
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error("Only http and https URLs are supported");
+  }
+  return url.href;
+}
+
+export function referencePathFromUrl(urlString: string): string {
+  const url = new URL(urlString);
+  const host = url.hostname.replace(/[^\w.-]+/g, "_");
+  let pathname = url.pathname.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!pathname) pathname = "index";
+  pathname = pathname
+    .replace(/[^\w./-]+/g, "_")
+    .replace(/\.\./g, "_");
+  const querySuffix = url.search
+    ? `_${url.search
+        .slice(1)
+        .replace(/[^\w=&-]+/g, "_")
+        .slice(0, 48)}`
+    : "";
+  return `web/${host}/${pathname}${querySuffix}.txt`;
+}
+
+export function htmlToPlainText(html: string): string {
+  let source = String(html || "");
+  source = source
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ");
+
+  const titleMatch = source.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch
+    ? titleMatch[1]!.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+    : "";
+
+  source = source.replace(
+    /<\/?(p|div|br|hr|h[1-6]|li|tr|td|th|section|article|header|footer|blockquote|main|aside|figure|figcaption)[^>]*>/gi,
+    "\n"
+  );
+  source = source.replace(/<[^>]+>/g, " ");
+  source = source
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  source = source
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+
+  if (title && !source.startsWith(title)) {
+    source = `Title: ${title}\n\n${source}`;
+  }
+  return source;
+}
+
+export async function fetchReferenceFromUrl(urlInput: string): Promise<{
+  files: ReferenceMaterialFile[];
+  sourceNames: string[];
+  skippedBinary: number;
+}> {
+  const href = normalizeReferenceUrl(urlInput);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    REFERENCE_URL_FETCH_TIMEOUT_MS
+  );
+
+  try {
+    const response = await fetch(href, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        Accept:
+          "text/html,application/xhtml+xml,text/plain,text/markdown;q=0.9,*/*;q=0.8"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Could not fetch URL (HTTP ${response.status})`);
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    if (buffer.length > MAX_REFERENCE_URL_BYTES) {
+      throw new Error(
+        `Page too large (max ${MAX_REFERENCE_URL_BYTES / (1024 * 1024)} MB)`
+      );
+    }
+
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+    let text: string;
+    if (
+      contentType.includes("text/plain") ||
+      contentType.includes("text/markdown")
+    ) {
+      text = decoded.replace(/\u0000/g, "").trim();
+    } else {
+      text = htmlToPlainText(decoded);
+    }
+
+    if (!text || text.length < 80) {
+      throw new Error(
+        "Could not extract enough text from this page. Try a different URL or upload a file instead."
+      );
+    }
+
+    return {
+      files: [{ path: referencePathFromUrl(href), text }],
+      sourceNames: [href],
+      skippedBinary: 0
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Timed out fetching URL");
+    }
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Could not fetch this URL from the browser (blocked by CORS). Run the PowerWriter server and use server mode, or upload saved page text as a file."
+      );
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+export async function extractReferenceFromUrls(urls: unknown): Promise<{
+  files: ReferenceMaterialFile[];
+  sourceNames: string[];
+  skippedBinary: number;
+}> {
+  const list = parseReferenceUrlInputs(urls);
+  if (list.length === 0) {
+    throw new Error("Enter at least one URL");
+  }
+  if (list.length > MAX_REFERENCE_URLS_PER_REQUEST) {
+    throw new Error(
+      `At most ${MAX_REFERENCE_URLS_PER_REQUEST} URLs per request`
+    );
+  }
+
+  const files: ReferenceMaterialFile[] = [];
+  const sourceNames: string[] = [];
+  let skippedBinary = 0;
+
+  for (const url of list) {
+    const part = await fetchReferenceFromUrl(url);
+    files.push(...part.files);
+    sourceNames.push(...part.sourceNames);
+    skippedBinary += part.skippedBinary;
   }
 
   return { files, sourceNames, skippedBinary };

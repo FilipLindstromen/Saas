@@ -2094,6 +2094,27 @@
   color: var(--text-secondary);
 }
 
+.reference-file-list-heading {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.reference-file-list-empty {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  border-radius: 8px;
+  border: 1px dashed var(--border-subtle, rgba(255, 255, 255, 0.12));
+}
+
+.document-reference-panel-label {
+  margin: 0 0 4px;
+}
+
 .reference-file-list-wrap {
   display: flex;
   flex-direction: column;
@@ -2142,17 +2163,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
   height: 26px;
-  padding: 0;
-  border: none;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
 .reference-file-remove:hover:not(:disabled) {
@@ -2177,6 +2198,35 @@
 
 .document-reference-upload-btn {
   align-self: flex-start;
+  font-size: 0.875rem;
+}
+
+.document-reference-url-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.document-reference-url-input {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base, transparent);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.document-reference-url-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.document-reference-url-btn {
+  flex-shrink: 0;
   font-size: 0.875rem;
 }
 

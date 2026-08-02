@@ -24,12 +24,14 @@ import {
   uploadDocumentAudio,
   uploadDocumentReferenceFiles,
   uploadFolderReferenceFiles,
+  addDocumentReferenceUrl,
+  addFolderReferenceUrl,
   clearDocumentReferenceMaterial,
   clearFolderReferenceMaterial,
   removeDocumentReferenceFile,
   removeFolderReferenceFile
 } from "./api";
-import { ReferenceFileList } from "./components/ReferenceFileList";
+import { ReferenceMaterialPanel } from "./components/ReferenceMaterialPanel";
 import { AudioEditor } from "./AudioEditor";
 import type { Transcription } from "./types";
 import { loadApiKeys, saveApiKeys } from "./apiKeys";
@@ -2636,6 +2638,60 @@ export default function App() {
     }
   };
 
+  const handleAddDocumentReferenceUrl = async (url: string) => {
+    if (selected?.type !== "document") return;
+    setIsReferenceUploading(true);
+    try {
+      const { referenceMaterial } = await addDocumentReferenceUrl(
+        selected.path,
+        url
+      );
+      setDocumentDetails((prev) =>
+        prev ? { ...prev, referenceMaterial } : prev
+      );
+      setStatus({
+        type: "success",
+        message: `Added website reference (${referenceMaterial.files.length} sources total)`
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to import reference from URL";
+      setStatus({ type: "error", message });
+      throw error;
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
+  const handleAddFolderReferenceUrl = async (url: string) => {
+    if (selected?.type !== "folder") return;
+    setIsReferenceUploading(true);
+    try {
+      const { referenceMaterial } = await addFolderReferenceUrl(
+        selected.path,
+        url
+      );
+      setFolderDetails((prev) =>
+        prev ? { ...prev, referenceMaterial } : prev
+      );
+      setStatus({
+        type: "success",
+        message: `Folder website reference added (${referenceMaterial.files.length} sources) — applies to all documents in this folder`
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to import folder reference from URL";
+      setStatus({ type: "error", message });
+      throw error;
+    } finally {
+      setIsReferenceUploading(false);
+    }
+  };
+
   const handleRemoveDocumentReferenceFile = async (filePath: string) => {
     if (selected?.type !== "document") return;
     setIsReferenceUploading(true);
@@ -3531,10 +3587,7 @@ export default function App() {
                   </div>
                 ) : null}
                 {showFolderPanel && folderDetails ? (
-                  <div className="document-reference-controls folder-reference-controls">
-                    <p className="panel-label folder-reference-label">
-                      Folder reference
-                    </p>
+                  <>
                     <input
                       ref={folderReferenceFilesInputRef}
                       type="file"
@@ -3545,39 +3598,62 @@ export default function App() {
                         void handleFolderReferenceFilesSelected(event)
                       }
                     />
-                    <button
-                      type="button"
-                      className="ghost document-reference-upload-btn"
-                      disabled={isReferenceUploading}
-                      onClick={() =>
+                    <ReferenceMaterialPanel
+                      label="Folder reference"
+                      hint="Applies to every document in this folder and subfolders (plus each document’s own references). Upload files or add a website URL."
+                      referenceMaterial={folderDetails.referenceMaterial}
+                      uploading={isReferenceUploading}
+                      uploadButtonLabel={
+                        folderDetails.referenceMaterial?.files.length
+                          ? "Add more files"
+                          : "Upload reference files"
+                      }
+                      onUploadClick={() =>
                         folderReferenceFilesInputRef.current?.click()
                       }
-                    >
-                      {isReferenceUploading
-                        ? "Importing…"
-                        : folderDetails.referenceMaterial
-                        ? "Add more folder reference files"
-                        : "Upload folder reference files"}
-                    </button>
-                    {folderDetails.referenceMaterial ? (
-                      <ReferenceFileList
-                        referenceMaterial={folderDetails.referenceMaterial}
-                        disabled={isReferenceUploading}
-                        onRemove={(filePath) =>
-                          void handleRemoveFolderReferenceFile(filePath)
-                        }
-                        onRemoveAll={() =>
-                          void handleClearFolderReferenceMaterial()
-                        }
-                      />
-                    ) : (
-                      <p className="document-reference-hint">
-                        Reference uploaded here applies to every document in this
-                        folder and its subfolders (together with each document’s
-                        own reference files).
-                      </p>
-                    )}
-                  </div>
+                      onAddUrl={handleAddFolderReferenceUrl}
+                      onRemoveFile={(filePath) =>
+                        void handleRemoveFolderReferenceFile(filePath)
+                      }
+                      onRemoveAll={() =>
+                        void handleClearFolderReferenceMaterial()
+                      }
+                    />
+                  </>
+                ) : null}
+                {showDocumentPanel && documentDetails ? (
+                  <>
+                    <input
+                      ref={referenceFilesInputRef}
+                      type="file"
+                      accept=".zip,.pdf,.txt,.md,.markdown,.json,.html,.htm,.yaml,.yml,application/pdf,application/zip,text/plain,text/markdown"
+                      multiple
+                      className="sr-only"
+                      onChange={(event) =>
+                        void handleReferenceFilesSelected(event)
+                      }
+                    />
+                    <ReferenceMaterialPanel
+                      label="Document reference"
+                      hint="Extra sources for this document only. Parent folder references are included automatically when you generate."
+                      referenceMaterial={documentDetails.referenceMaterial}
+                      disabled={loadingSelection || isDocGenerating}
+                      uploading={isReferenceUploading}
+                      uploadButtonLabel={
+                        documentDetails.referenceMaterial?.files.length
+                          ? "Add more files"
+                          : "Upload reference files"
+                      }
+                      onUploadClick={() =>
+                        referenceFilesInputRef.current?.click()
+                      }
+                      onAddUrl={handleAddDocumentReferenceUrl}
+                      onRemoveFile={(filePath) =>
+                        void handleRemoveDocumentReferenceFile(filePath)
+                      }
+                      onRemoveAll={() => void handleClearReferenceMaterial()}
+                    />
+                  </>
                 ) : null}
               </div>
             </section>
@@ -4315,52 +4391,6 @@ export default function App() {
               <div className="panel-body document-panel-body">
                 {documentDetails ? (
                   <div className="document-generate-row">
-                    <div className="document-reference-controls">
-                      <input
-                        ref={referenceFilesInputRef}
-                        type="file"
-                        accept=".zip,.pdf,.txt,.md,.markdown,.json,.html,.htm,.yaml,.yml,application/pdf,application/zip,text/plain,text/markdown"
-                        multiple
-                        className="sr-only"
-                        onChange={(event) =>
-                          void handleReferenceFilesSelected(event)
-                        }
-                      />
-                      <button
-                        type="button"
-                        className="ghost document-reference-upload-btn"
-                        disabled={
-                          loadingSelection ||
-                          isReferenceUploading ||
-                          isDocGenerating
-                        }
-                        onClick={() => referenceFilesInputRef.current?.click()}
-                      >
-                        {isReferenceUploading
-                          ? "Importing…"
-                          : documentDetails.referenceMaterial
-                          ? "Add more reference files"
-                          : "Upload reference files"}
-                      </button>
-                      {documentDetails.referenceMaterial ? (
-                        <ReferenceFileList
-                          referenceMaterial={documentDetails.referenceMaterial}
-                          disabled={isReferenceUploading}
-                          onRemove={(filePath) =>
-                            void handleRemoveDocumentReferenceFile(filePath)
-                          }
-                          onRemoveAll={() =>
-                            void handleClearReferenceMaterial()
-                          }
-                        />
-                      ) : (
-                        <p className="document-reference-hint">
-                          Add document-specific reference (.pdf, .txt, .md, or
-                          zip). Parent folder reference is included
-                          automatically when you generate.
-                        </p>
-                      )}
-                    </div>
                     <button
                       type="button"
                       className="primary document-generate-btn"

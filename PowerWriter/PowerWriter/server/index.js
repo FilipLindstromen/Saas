@@ -39,7 +39,8 @@ import {
   getReferenceDirAbsolute,
   getFolderReferenceDirAbsolute,
   mergeReferenceFiles,
-  rebuildReferenceManifestFromFiles
+  rebuildReferenceManifestFromFiles,
+  extractReferenceFromUrls
 } from "./referenceMaterial.js";
 import {
   buildGenerationSystemPrompt,
@@ -1008,8 +1009,50 @@ app.post(
   }
 );
 
+app.post("/api/document/reference/url", async (req, res) => {
+  try {
+    const relative =
+      typeof req.body?.path === "string"
+        ? req.body.path
+        : typeof req.query?.path === "string"
+        ? req.query.path
+        : "";
+    if (!relative || !relative.endsWith(".txt")) {
+      return res.status(400).send("Missing or invalid document path");
+    }
+
+    const urls = req.body?.urls ?? req.body?.url;
+    const documentPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(documentPath);
+    if (!stat.isFile()) {
+      return res.status(400).send("Path is not a document file");
+    }
+
+    const previousManifest = await readReferenceSummaryForDocument(documentPath);
+    const existingFiles = await loadReferenceFilesForPrompt(documentPath);
+    const extracted = await extractReferenceFromUrls(urls);
+    const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+    const manifest = buildReferenceManifest({
+      sourceNames: extracted.sourceNames,
+      files: mergedFiles,
+      skippedBinary: extracted.skippedBinary,
+      previousManifest
+    });
+
+    await writeReferenceMaterial(documentPath, {
+      manifest,
+      files: mergedFiles
+    });
+
+    res.json({ success: true, referenceMaterial: manifest });
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error
+        ? error.message
+        : "Unable to import reference from URL"
+    );
   }
-);
+});
 
 app.post(
   "/api/folder/reference",
@@ -1074,6 +1117,53 @@ app.post(
     }
   }
 );
+
+app.post("/api/folder/reference/url", async (req, res) => {
+  try {
+    const relative =
+      typeof req.body?.path === "string"
+        ? req.body.path
+        : typeof req.query?.path === "string"
+        ? req.query.path
+        : "";
+    if (!relative || relative.endsWith(".txt")) {
+      return res.status(400).send("Missing or invalid folder path");
+    }
+
+    const urls = req.body?.urls ?? req.body?.url;
+    const folderPath = resolveMeditationPath(relative);
+    const stat = await fs.stat(folderPath);
+    if (!stat.isDirectory()) {
+      return res.status(400).send("Path is not a folder");
+    }
+
+    const previousManifest = await readReferenceSummaryForFolder(folderPath);
+    const existingFiles = await loadReferenceFilesAtDir(
+      getFolderReferenceDirAbsolute(folderPath)
+    );
+    const extracted = await extractReferenceFromUrls(urls);
+    const mergedFiles = mergeReferenceFiles(existingFiles, extracted.files);
+    const manifest = buildReferenceManifest({
+      sourceNames: extracted.sourceNames,
+      files: mergedFiles,
+      skippedBinary: extracted.skippedBinary,
+      previousManifest
+    });
+
+    await writeFolderReferenceMaterial(folderPath, {
+      manifest,
+      files: mergedFiles
+    });
+
+    res.json({ success: true, referenceMaterial: manifest });
+  } catch (error) {
+    res.status(500).send(
+      error instanceof Error
+        ? error.message
+        : "Unable to import folder reference from URL"
+    );
+  }
+});
 
 app.delete("/api/folder/reference", async (req, res) => {
   try {
