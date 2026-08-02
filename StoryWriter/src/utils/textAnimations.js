@@ -81,7 +81,7 @@ export function resolveAnimationForSentence(sentence, rules, globalFallback = 's
   return normalized.longAnimation;
 }
 
-/** Exit animation mirrors enter — drop-center drops down on exit; fade-words exits per word. */
+/** Exit animation mirrors enter — drop-center drops down on exit; fade-words exits first word to last. */
 export function getExitAnimation(enterAnimation) {
   switch (enterAnimation) {
     case 'drop-center':

@@ -98,10 +98,20 @@
   text-align: center;
 }
 
+.present-view__word-line-wrap {
+  display: block;
+  width: 100%;
+  white-space: pre-line;
+}
+
 .present-view__word-line {
-  display: inline;
+  display: block;
   text-align: center;
   line-height: inherit;
+}
+
+.present-view__word-line--blank {
+  min-height: 0.5em;
 }
 
 .present-view__sentence--idle {

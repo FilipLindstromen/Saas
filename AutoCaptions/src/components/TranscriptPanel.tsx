@@ -6,6 +6,8 @@ interface TranscriptPanelProps {
   onSegmentsChange: (segments: CaptionSegment[]) => void
   onTranscribe: () => void
   isTranscribing: boolean
+  transcribeProgress: number | null
+  transcribeProgressLabel: string
   transcribeError: string | null
 }
 
@@ -14,9 +16,13 @@ export function TranscriptPanel({
   onSegmentsChange,
   onTranscribe,
   isTranscribing = false,
+  transcribeProgress = null,
+  transcribeProgressLabel = '',
   transcribeError = null,
 }: TranscriptPanelProps) {
   const fullText = segments.length > 0 ? segments.map((s) => s.text).join(' ') : ''
+  const progressPct =
+    transcribeProgress != null ? Math.min(100, Math.max(0, Math.round(transcribeProgress))) : 0
 
   const handleTextChange = (value: string) => {
     if (segments.length === 0) return
@@ -36,9 +42,24 @@ export function TranscriptPanel({
           disabled={isTranscribing}
           aria-label="Transcribe video"
         >
-          {isTranscribing ? 'Transcribing…' : 'Transcribe with OpenAI'}
+          {isTranscribing
+            ? `Transcribing… ${progressPct}%`
+            : 'Transcribe with OpenAI'}
         </button>
       </div>
+      {isTranscribing && (
+        <div className={styles.progressBlock} role="status" aria-live="polite">
+          <div className={styles.progressTrack}>
+            <div
+              className={styles.progressFill}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <p className={styles.progressLabel}>
+            {transcribeProgressLabel || 'Working…'} · {progressPct}%
+          </p>
+        </div>
+      )}
       {transcribeError && <p className={styles.error}>{transcribeError}</p>}
       <p className={styles.hint}>Edit text to fix spelling.</p>
       <textarea

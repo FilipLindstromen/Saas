@@ -24,6 +24,8 @@ export default function App() {
 
   const [segments, setSegments] = useState<CaptionSegment[]>([])
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [transcribeProgress, setTranscribeProgress] = useState<number | null>(null)
+  const [transcribeProgressLabel, setTranscribeProgressLabel] = useState('')
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
 
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>('lower-third')
@@ -119,13 +121,20 @@ export default function App() {
     if (!videoBlob) return
     setTranscribeError(null)
     setIsTranscribing(true)
+    setTranscribeProgress(0)
+    setTranscribeProgressLabel('Preparing…')
     try {
-      const result = await transcribeVideo(videoBlob, openaiKey)
+      const result = await transcribeVideo(videoBlob, openaiKey, (update) => {
+        setTranscribeProgress(update.percent)
+        setTranscribeProgressLabel(update.label)
+      })
       setSegments(result)
     } catch (e) {
       setTranscribeError(e instanceof Error ? e.message : 'Transcription failed')
     } finally {
       setIsTranscribing(false)
+      setTranscribeProgress(null)
+      setTranscribeProgressLabel('')
     }
   }, [videoBlob, openaiKey])
 
@@ -252,6 +261,8 @@ export default function App() {
             onSegmentsChange={setSegments}
             onTranscribe={handleTranscribe}
             isTranscribing={isTranscribing}
+            transcribeProgress={transcribeProgress}
+            transcribeProgressLabel={transcribeProgressLabel}
             transcribeError={transcribeError}
           />
         </aside>

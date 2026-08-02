@@ -7,10 +7,9 @@ import {
   getExitDurationMs,
   getExitAnimation,
 } from '../utils/textAnimations';
+import { getSentenceSegments } from '../utils/sentences';
 import PresentSentence from './PresentSentence';
 import './PresentView.css';
-
-const FONT_SIZE_MAP = {
   small: 'clamp(1.2rem, 3vw, 2rem)',
   medium: 'clamp(1.5rem, 4vw, 2.75rem)',
   large: 'clamp(1.8rem, 5vw, 3.5rem)',
@@ -33,15 +32,6 @@ function loadGoogleFont(family) {
   document.head.appendChild(link);
 }
 
-/** Split text into sentences (by . ! ? followed by space or end). */
-function getSentences(text) {
-  if (!text || !String(text).trim()) return [];
-  const trimmed = String(text).trim();
-  return trimmed
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 export default function PresentView({ sectionOrder, sectionsData, onExit, initialIndex = 0, animationRules, settingsVersion = 0 }) {
   const settings = getSettings();
@@ -69,10 +59,11 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     const out = [];
     for (const sectionId of sectionOrder) {
       const content = sectionsData[sectionId]?.content ?? '';
-      const text = String(content).trim().replace(/\n+/g, ' ');
-      const list = getSentences(text);
-      list.forEach((s, sentenceIndexInSection) => {
-        out.push({ text: s, sectionId, sentenceIndexInSection });
+      const sentenceImages = sectionsData[sectionId]?.sentenceImages ?? [];
+      const segments = getSentenceSegments(content, sentenceImages);
+      segments.forEach((seg, sentenceIndexInSection) => {
+        const text = String(content).slice(seg.start, seg.end);
+        out.push({ text, sectionId, sentenceIndexInSection });
       });
     }
     return out;

@@ -2,16 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "mosaic-typography",
+      "name": "deploy-check",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["-y", "serve", "-l", "4173", "MosaicTypography"],
-      "port": 4173
-    },
-    {
-      "name": "autocaptions",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["-y", "serve", "-s", "-l", "4174", "AutoCaptions/dist"],
-      "port": 4174
+      "runtimeArgs": ["-y", "serve", "-l", "4175", "C:\\Users\\Filip Lindström\\AppData\\Local\\Temp\\deploy-check"],
+      "port": 4175
     }
   ]
 }
