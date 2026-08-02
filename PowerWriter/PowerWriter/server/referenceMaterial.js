@@ -156,13 +156,25 @@ export async function extractReferenceFromUploadBuffer(buffer, originalName) {
     return extractReferenceFromZipBuffer(buffer, safeName);
   }
 
-  if (ext === ".pdf") {
-    const text = await extractPdfTextBuffer(buffer);
-    if (!text) {
-      throw new Error(`Could not extract text from PDF: ${safeName}`);
+  const looksLikePdf =
+    ext === ".pdf" ||
+    (buffer.length >= 4 &&
+      buffer[0] === 0x25 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x44 &&
+      buffer[3] === 0x46);
+
+  if (looksLikePdf) {
+    let text;
+    try {
+      text = await extractPdfTextBuffer(buffer);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not read PDF";
+      throw new Error(`${message} (${safeName})`);
     }
     return {
-      files: [{ path: safeName, text }],
+      files: [{ path: safeName.endsWith(".pdf") ? safeName : `${safeName}.pdf`, text }],
       skippedBinary: 0,
       sourceNames: [safeName]
     };
@@ -261,7 +273,11 @@ export async function extractReferenceFromUploads(uploads) {
   let skippedBinary = 0;
 
   for (const upload of uploads) {
-    if (!upload?.buffer?.length) continue;
+    if (!upload?.buffer?.length) {
+      throw new Error(
+        `Could not read uploaded file${upload?.originalname ? `: ${upload.originalname}` : ""}. Try again or use a .txt export.`
+      );
+    }
     if (upload.buffer.length > MAX_REFERENCE_UPLOAD_BYTES) {
       throw new Error(
         `File too large (max ${MAX_REFERENCE_UPLOAD_BYTES / (1024 * 1024)} MB): ${

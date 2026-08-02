@@ -3251,9 +3251,10 @@ export default function App() {
         path: selected?.path ?? null,
         prompt: chatPrompt,
         apiKey: userApiKey || undefined,
-        instructionSections: instructionSections.length
-          ? instructionSections
-          : undefined,
+        instructionSections:
+          selected?.type === "document" || selected?.type === "folder"
+            ? instructionSections
+            : undefined,
         documentContent:
           selected?.type === "document" && documentDetails
             ? documentDetails.content ?? ""

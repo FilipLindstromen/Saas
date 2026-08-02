@@ -2504,8 +2504,8 @@ app.post("/api/generate", async (req, res) => {
     const instructionType =
       pathString.endsWith(".txt") ? "document" : "folder";
 
-    const instructionSections = Array.isArray(instructionSectionsOverride) &&
-      instructionSectionsOverride.length > 0
+    const hasInstructionOverride = Array.isArray(instructionSectionsOverride);
+    const instructionSections = hasInstructionOverride
       ? instructionSectionsOverride.filter(
           (section) =>
             section &&

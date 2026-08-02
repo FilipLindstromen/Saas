@@ -559,8 +559,14 @@ export async function generateAnswer(params: {
       storageGetDocumentDetails(p).instructions || "";
 
     instructionSections =
-      params.instructionSections?.length
-        ? params.instructionSections
+      params.instructionSections !== undefined
+        ? params.instructionSections.filter(
+            (section) =>
+              section &&
+              typeof section.text === "string" &&
+              section.text.trim() &&
+              typeof section.path === "string"
+          )
         : gatherInstructionSectionsFromStorage(
             pathString,
             instructionType,
