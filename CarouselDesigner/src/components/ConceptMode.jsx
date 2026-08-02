@@ -3,6 +3,20 @@ import { getApiKey } from '@shared/apiKeys'
 import { CAROUSEL_TEMPLATES } from '../carousel/constants'
 import { generateCarouselIdeas, generateCarouselVariants } from '../services/carouselAi'
 import SlideRoleBadge from './SlideRoleBadge'
+import ConceptReferenceSection from './ConceptReferenceSection'
+import {
+  buildReferenceManifest,
+  buildReferencePromptContext,
+  extractReferenceFromUploadFiles,
+  extractReferenceFromUrls,
+  mergeReferenceFiles,
+} from '../lib/conceptReferenceMaterial'
+import {
+  clearConceptReferenceState,
+  loadConceptReferenceState,
+  removeConceptReferenceFile,
+  saveConceptReferenceState,
+} from '../lib/conceptReferenceStorage'
 import './ConceptMode.css'
 
 const STORAGE_INSTRUCTIONS = 'carouselDesignerConceptInstructions'
@@ -44,9 +58,85 @@ export default function ConceptMode({
   const [variantLoading, setVariantLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('ideas')
+  const [referenceUploading, setReferenceUploading] = useState(false)
+  const initialReference = loadConceptReferenceState()
+  const [referenceManifest, setReferenceManifest] = useState(initialReference.manifest)
+  const [referenceFiles, setReferenceFiles] = useState(initialReference.files)
 
   const openaiKey = getApiKey('openai')?.trim()
   const template = CAROUSEL_TEMPLATES[selectedTemplate]
+  const referenceContext = buildReferencePromptContext(referenceFiles)
+
+  const hasGenerationInput = Boolean(
+    topic.trim() || instructions.trim() || referenceFiles.length > 0,
+  )
+
+  const persistReference = (manifest, files) => {
+    setReferenceManifest(manifest)
+    setReferenceFiles(files)
+    if (manifest && files.length) {
+      saveConceptReferenceState(manifest, files)
+    } else {
+      clearConceptReferenceState()
+    }
+  }
+
+  const handleReferenceUpload = async (uploads) => {
+    setReferenceUploading(true)
+    setError('')
+    try {
+      const extracted = await extractReferenceFromUploadFiles(uploads)
+      const merged = mergeReferenceFiles(referenceFiles, extracted.files)
+      const manifest = buildReferenceManifest({
+        sourceNames: extracted.sourceNames,
+        files: merged,
+        skippedBinary: extracted.skippedBinary,
+        previousManifest: referenceManifest,
+      })
+      persistReference(manifest, merged)
+    } catch (err) {
+      setError(err?.message || 'Could not import reference files')
+    } finally {
+      setReferenceUploading(false)
+    }
+  }
+
+  const handleReferenceUrl = async (url) => {
+    setReferenceUploading(true)
+    setError('')
+    try {
+      const extracted = await extractReferenceFromUrls(url)
+      const merged = mergeReferenceFiles(referenceFiles, extracted.files)
+      const manifest = buildReferenceManifest({
+        sourceNames: extracted.sourceNames,
+        files: merged,
+        skippedBinary: extracted.skippedBinary,
+        previousManifest: referenceManifest,
+      })
+      persistReference(manifest, merged)
+    } catch (err) {
+      setError(err?.message || 'Could not fetch URL')
+      throw err
+    } finally {
+      setReferenceUploading(false)
+    }
+  }
+
+  const handleRemoveReferenceFile = (filePath) => {
+    try {
+      const next = removeConceptReferenceFile(filePath, referenceFiles, referenceManifest)
+      setReferenceManifest(next.manifest)
+      setReferenceFiles(next.files)
+    } catch (err) {
+      setError(err?.message || 'Could not remove reference')
+    }
+  }
+
+  const handleClearReference = () => {
+    clearConceptReferenceState()
+    setReferenceManifest(null)
+    setReferenceFiles([])
+  }
 
   useEffect(() => {
     localStorage.setItem(STORAGE_INSTRUCTIONS, instructions)
@@ -70,8 +160,8 @@ export default function ConceptMode({
       setError('Add your OpenAI API key on the SaaS Apps screen.')
       return
     }
-    if (!topic.trim() && !instructions.trim()) {
-      setError('Enter a topic or instructions first.')
+    if (!hasGenerationInput) {
+      setError('Enter a topic, instructions, or add reference material.')
       return
     }
 
@@ -85,6 +175,7 @@ export default function ConceptMode({
         slideCount: count,
         templateHint: template ? `${template.name}: ${template.promptHint}. Roles: ${template.roles?.join(', ')}` : '',
         psychologyMode: true,
+        referenceContext,
       })
       setIdeas(generated)
       setActiveTab('ideas')
@@ -100,8 +191,8 @@ export default function ConceptMode({
       setError('Add your OpenAI API key on the SaaS Apps screen.')
       return
     }
-    if (!topic.trim() && !instructions.trim()) {
-      setError('Enter a topic or instructions first.')
+    if (!hasGenerationInput) {
+      setError('Enter a topic, instructions, or add reference material.')
       return
     }
 
@@ -114,6 +205,7 @@ export default function ConceptMode({
         topic,
         slideCount: count,
         variantCount: 3,
+        referenceContext,
       })
       setVariants(result.map((v, i) => ({
         ...v,
@@ -206,6 +298,17 @@ export default function ConceptMode({
             placeholder="Brand voice, audience, offer, tone, things to avoid…"
           />
 
+          <ConceptReferenceSection
+            manifest={referenceManifest}
+            files={referenceFiles}
+            disabled={loading || variantLoading}
+            uploading={referenceUploading}
+            onUploadFiles={handleReferenceUpload}
+            onAddUrl={handleReferenceUrl}
+            onRemoveFile={handleRemoveReferenceFile}
+            onRemoveAll={handleClearReference}
+          />
+
           <label className="concept-label" htmlFor="concept-topic">Topic or hook</label>
           <input
             id="concept-topic"
@@ -223,7 +326,7 @@ export default function ConceptMode({
               type="button"
               className="concept-btn concept-btn-primary"
               onClick={handleGenerate}
-              disabled={loading || variantLoading || !openaiKey}
+              disabled={loading || variantLoading || !openaiKey || !hasGenerationInput}
             >
               {loading ? 'Generating…' : 'Generate carousel copy'}
             </button>
@@ -231,7 +334,7 @@ export default function ConceptMode({
               type="button"
               className="concept-btn concept-btn-secondary"
               onClick={handleGenerateVariants}
-              disabled={loading || variantLoading || !openaiKey}
+              disabled={loading || variantLoading || !openaiKey || !hasGenerationInput}
             >
               {variantLoading ? 'Generating…' : 'Generate 3 A/B variants'}
             </button>

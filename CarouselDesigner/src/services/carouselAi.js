@@ -40,6 +40,7 @@ export async function generateCarouselIdeas({
   slideCount = 5,
   templateHint = '',
   psychologyMode = true,
+  referenceContext = '',
 }) {
   const system = psychologyMode
     ? `You are an Instagram carousel copywriter. Each slide becomes one 1080×1440 image.
@@ -52,6 +53,7 @@ Rules:
     : `Generate Instagram carousel slide ideas. Return ONLY JSON array with "copy", "role".`
 
   const user = [
+    referenceContext.trim() && `Reference material:\n${referenceContext.trim()}`,
     instructions.trim() && `Instructions:\n${instructions.trim()}`,
     topic.trim() && `Topic:\n${topic.trim()}`,
     templateHint.trim() && `Structure:\n${templateHint.trim()}`,
@@ -80,6 +82,7 @@ export async function generateCarouselVariants({
   topic = '',
   slideCount = 5,
   variantCount = 3,
+  referenceContext = '',
 }) {
   const system = `Generate ${variantCount} DISTINCT carousel concept variants for A/B testing.
 Each variant is a complete carousel with ${slideCount} slides.
@@ -87,8 +90,10 @@ Return ONLY JSON: array of variants, each with "label" (A/B/C), "hookAngle" (sho
 Variants must differ in hook angle and CTA framing. Keep copy mobile-readable.`
 
   const user = [
+    referenceContext.trim() && `Reference material:\n${referenceContext.trim()}`,
     instructions.trim() && `Instructions:\n${instructions.trim()}`,
     topic.trim() && `Topic:\n${topic.trim()}`,
+    `Generate exactly ${slideCount} slides per variant.`,
   ].filter(Boolean).join('\n\n')
 
   const text = await chatCompletion({ system, user, temperature: 0.9 })

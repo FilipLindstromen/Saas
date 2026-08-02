@@ -70,6 +70,144 @@
   cursor: pointer;
 }
 
+.concept-btn-ghost {
+  background: transparent;
+}
+
+.concept-reference {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+}
+
+.concept-reference-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.concept-reference-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.concept-reference-upload {
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.concept-reference-upload.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.concept-reference-url-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.concept-reference-url-input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.concept-reference-list-label {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.concept-reference-empty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  padding: 0.4rem 0.5rem;
+  border: 1px dashed var(--border-default);
+  border-radius: 8px;
+}
+
+.concept-reference-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.concept-reference-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.concept-reference-name {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.concept-reference-meta {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.concept-reference-remove {
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.concept-reference-remove:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.concept-reference-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.concept-reference-total {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.concept-reference-clear {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
 .concept-btn-primary {
   border-color: transparent;
   background: var(--accent);
