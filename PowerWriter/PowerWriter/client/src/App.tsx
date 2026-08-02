@@ -37,7 +37,8 @@ import type { Transcription } from "./types";
 import { loadApiKeys, saveApiKeys } from "./apiKeys";
 import ThemeToggle from "@shared/ThemeToggle";
 import { getTheme, setTheme, initThemeSync } from "@shared/theme";
-import { DOCUMENT_GENERATE_TASK } from "./lib/generationPrompt";
+import { DOCUMENT_GENERATE_TASK, gatherInstructionSectionsFromStorage } from "./lib/generationPrompt";
+import { storageGetFolderDetails } from "./storage";
 
 type Selection =
   | {
@@ -2542,14 +2543,85 @@ export default function App() {
     setFolderDetails(null);
   };
 
+  const flushPendingDocumentSave = useCallback(async () => {
+    if (selected?.type !== "document" || !documentDetails) return;
+    clearDocumentSaveTimeout();
+    pendingDocumentSaveRef.current = null;
+    const snapshot = toDocumentSnapshot(documentDetails);
+    const saved = documentLastSavedRef.current;
+    const needsSave =
+      !saved ||
+      saved.content !== snapshot.content ||
+      saved.instructions !== snapshot.instructions ||
+      saved.completed !== snapshot.completed;
+    if (needsSave) {
+      await performDocumentSave(selected.path, snapshot);
+    }
+  }, [
+    selected?.type,
+    selected?.path,
+    documentDetails,
+    clearDocumentSaveTimeout,
+    performDocumentSave
+  ]);
+
+  const flushPendingFolderSave = useCallback(async () => {
+    if (selected?.type !== "folder" || !folderDetails) return;
+    clearFolderSaveTimeout();
+    pendingFolderSaveRef.current = null;
+    const snapshot = toFolderSnapshot(folderDetails);
+    const saved = folderLastSavedRef.current;
+    const needsSave =
+      !saved ||
+      saved.instructions !== snapshot.instructions ||
+      (saved.color ?? null) !== (snapshot.color ?? null);
+    if (needsSave) {
+      await performFolderSave(selected.path, snapshot);
+    }
+  }, [
+    selected?.type,
+    selected?.path,
+    folderDetails,
+    clearFolderSaveTimeout,
+    performFolderSave
+  ]);
+
+  const buildLiveInstructionSections = useCallback(() => {
+    if (!selected?.path) return [];
+    if (selected.type === "document" && documentDetails) {
+      return gatherInstructionSectionsFromStorage(
+        selected.path,
+        "document",
+        (folderPath) => storageGetFolderDetails(folderPath).instructions || "",
+        () => documentDetails.instructions || ""
+      );
+    }
+    if (selected.type === "folder" && folderDetails) {
+      return gatherInstructionSectionsFromStorage(
+        selected.path,
+        "folder",
+        (folderPath) =>
+          folderPath === folderDetails.path
+            ? folderDetails.instructions || ""
+            : storageGetFolderDetails(folderPath).instructions || "",
+        () => ""
+      );
+    }
+    return [];
+  }, [selected, documentDetails, folderDetails]);
+
   const handleGenerateForDocument = async () => {
     if (selected?.type !== "document" || !documentDetails) return;
     setIsDocGenerating(true);
     try {
+      await flushPendingDocumentSave();
+      const instructionSections = buildLiveInstructionSections();
       const response = await generateAnswer({
         path: selected.path,
         prompt: DOCUMENT_GENERATE_TASK,
-        apiKey: userApiKey || undefined
+        apiKey: userApiKey || undefined,
+        instructionSections,
+        documentContent: documentDetails.content ?? ""
       });
       setDocumentDetails((prev) =>
         prev
@@ -3169,10 +3241,23 @@ export default function App() {
     if (!chatPrompt.trim()) return;
     setIsGenerating(true);
     try {
+      if (selected?.type === "document") {
+        await flushPendingDocumentSave();
+      } else if (selected?.type === "folder") {
+        await flushPendingFolderSave();
+      }
+      const instructionSections = buildLiveInstructionSections();
       const response = await generateAnswer({
         path: selected?.path ?? null,
         prompt: chatPrompt,
-        apiKey: userApiKey || undefined
+        apiKey: userApiKey || undefined,
+        instructionSections: instructionSections.length
+          ? instructionSections
+          : undefined,
+        documentContent:
+          selected?.type === "document" && documentDetails
+            ? documentDetails.content ?? ""
+            : undefined
       });
       setChatResponses((prev) => [
         { id: Date.now(), message: response.message },

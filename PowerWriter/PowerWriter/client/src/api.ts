@@ -38,7 +38,8 @@ import {
   buildGenerationUserContent,
   buildVariantSystemPrompt,
   buildVariantUserContent,
-  gatherInstructionSectionsFromStorage
+  gatherInstructionSectionsFromStorage,
+  type InstructionSection
 } from "./lib/generationPrompt";
 import type { ReferenceMaterialSummary } from "./types";
 
@@ -506,6 +507,8 @@ export async function generateAnswer(params: {
   path: string | null;
   prompt: string;
   apiKey?: string;
+  instructionSections?: InstructionSection[];
+  documentContent?: string;
 }): Promise<{ message: string }> {
   let response: Response | null = null;
   try {
@@ -520,7 +523,9 @@ export async function generateAnswer(params: {
       ),
       body: JSON.stringify({
         path: params.path,
-        prompt: params.prompt
+        prompt: params.prompt,
+        instructionSections: params.instructionSections,
+        documentContent: params.documentContent
       })
     });
     if (!isApiUnavailableError(response, null)) {
@@ -553,16 +558,22 @@ export async function generateAnswer(params: {
     const getDocumentInstructions = (p: string) =>
       storageGetDocumentDetails(p).instructions || "";
 
-    instructionSections = gatherInstructionSectionsFromStorage(
-      pathString,
-      instructionType,
-      getFolderInstructions,
-      getDocumentInstructions
-    );
+    instructionSections =
+      params.instructionSections?.length
+        ? params.instructionSections
+        : gatherInstructionSectionsFromStorage(
+            pathString,
+            instructionType,
+            getFolderInstructions,
+            getDocumentInstructions
+          );
 
     if (pathString.endsWith(".txt")) {
       const doc = storageGetDocumentDetails(pathString);
-      documentContent = doc.content || "";
+      documentContent =
+        params.documentContent !== undefined
+          ? params.documentContent
+          : doc.content || "";
       referenceContext = buildReferencePromptContextForDocument(
         pathString,
         storageGetReferenceFiles

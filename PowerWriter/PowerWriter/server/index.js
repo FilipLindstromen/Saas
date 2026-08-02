@@ -2468,7 +2468,12 @@ const envApiKey = process.env.OPENAI_API_KEY?.trim() || null;
 
 app.post("/api/generate", async (req, res) => {
   try {
-    const { path: relative, prompt } = req.body;
+    const {
+      path: relative,
+      prompt,
+      instructionSections: instructionSectionsOverride,
+      documentContent: documentContentOverride
+    } = req.body;
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).send("Prompt is required");
     }
@@ -2496,22 +2501,29 @@ app.post("/api/generate", async (req, res) => {
 
     const client = new OpenAI({ apiKey: effectiveKey });
 
-    const pathString =
-      typeof relative === "string" ? relative : relative ?? "";
-
     const instructionType =
       pathString.endsWith(".txt") ? "document" : "folder";
-    const instructionSections =
-      typeof relative === "string"
-        ? await gatherInstructionSections(pathString, instructionType)
-        : [];
+
+    const instructionSections = Array.isArray(instructionSectionsOverride) &&
+      instructionSectionsOverride.length > 0
+      ? instructionSectionsOverride.filter(
+          (section) =>
+            section &&
+            typeof section.text === "string" &&
+            section.text.trim() &&
+            typeof section.path === "string"
+        )
+      : typeof relative === "string"
+      ? await gatherInstructionSections(pathString, instructionType)
+      : [];
 
     let documentContent = "";
     let referenceContext = "";
     if (typeof relative === "string" && relative.endsWith(".txt")) {
-      documentContent = await readTextIfExists(
-        resolveMeditationPath(relative)
-      );
+      documentContent =
+        typeof documentContentOverride === "string"
+          ? documentContentOverride
+          : await readTextIfExists(resolveMeditationPath(relative));
       referenceContext = await gatherReferencePromptForPath(relative);
     }
 

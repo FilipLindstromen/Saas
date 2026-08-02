@@ -47,6 +47,21 @@ const SKIP_DIR_NAMES = new Set([
   ".ds_store"
 ]);
 
+let pdfWorkerInit: Promise<void> | null = null;
+
+async function ensurePdfWorker(): Promise<void> {
+  if (!pdfWorkerInit) {
+    pdfWorkerInit = (async () => {
+      const pdfjs = await import("pdfjs-dist");
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+        pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      }
+    })();
+  }
+  await pdfWorkerInit;
+}
+
 function getExtension(name: string): string {
   const idx = name.lastIndexOf(".");
   return idx >= 0 ? name.slice(idx).toLowerCase() : "";
@@ -72,12 +87,13 @@ function isLikelyText(bytes: Uint8Array): boolean {
 }
 
 export async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  await ensurePdfWorker();
   const pdfjs = await import("pdfjs-dist");
-  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-  }
-  const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+  const loadingTask = pdfjs.getDocument({
+    data: bytes.slice(),
+    useSystemFonts: true
+  });
+  const doc = await loadingTask.promise;
   const parts: string[] = [];
   for (let pageNum = 1; pageNum <= doc.numPages; pageNum += 1) {
     const page = await doc.getPage(pageNum);
@@ -89,7 +105,14 @@ export async function extractPdfText(bytes: Uint8Array): Promise<string> {
       .trim();
     if (line) parts.push(line);
   }
-  return parts.join("\n\n").replace(/\u0000/g, "").trim();
+  await doc.destroy();
+  const text = parts.join("\n\n").replace(/\u0000/g, "").trim();
+  if (!text) {
+    throw new Error(
+      "Could not extract text from this PDF (it may be scanned/image-only). Try a .txt export or paste the text into a file."
+    );
+  }
+  return text;
 }
 
 export function sanitizeZipEntryPath(entryName: string): string | null {
@@ -197,7 +220,14 @@ export async function extractReferenceFromUploadFile(
   const bytes = new Uint8Array(await file.arrayBuffer());
 
   if (ext === ".pdf" || (ext === "" && bytes[0] === 0x25 && bytes[1] === 0x50)) {
-    const text = await extractPdfText(bytes);
+    let text: string;
+    try {
+      text = await extractPdfText(bytes);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not read PDF";
+      throw new Error(`${message} (${safeName})`);
+    }
     if (!text) {
       throw new Error(`Could not extract text from PDF: ${safeName}`);
     }

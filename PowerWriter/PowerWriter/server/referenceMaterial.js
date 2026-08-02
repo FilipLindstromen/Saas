@@ -68,7 +68,13 @@ export function isLikelyTextBuffer(buffer) {
 
 export async function extractPdfTextBuffer(buffer) {
   const parsed = await pdfParse(buffer);
-  return (parsed.text || "").replace(/\u0000/g, "").trim();
+  const text = (parsed.text || "").replace(/\u0000/g, "").trim();
+  if (!text) {
+    throw new Error(
+      "Could not extract text from this PDF (it may be scanned/image-only)."
+    );
+  }
+  return text;
 }
 
 export function sanitizeZipEntryPath(entryName) {
