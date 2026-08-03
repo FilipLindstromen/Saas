@@ -257,6 +257,26 @@ function App() {
     }));
   }, []);
 
+  const handleRotateLineSpansChange = useCallback((sectionId, rotateLineSpans) => {
+    setPersisted((prev) => ({
+      ...prev,
+      sectionsData: {
+        ...prev.sectionsData,
+        [sectionId]: { ...prev.sectionsData[sectionId], rotateLineSpans },
+      },
+    }));
+  }, []);
+
+  const handleBulletLineSpansChange = useCallback((sectionId, bulletLineSpans) => {
+    setPersisted((prev) => ({
+      ...prev,
+      sectionsData: {
+        ...prev.sectionsData,
+        [sectionId]: { ...prev.sectionsData[sectionId], bulletLineSpans },
+      },
+    }));
+  }, []);
+
   const handleBackgroundOpacityChange = useCallback((value) => {
     saveSettings({ ...getSettings(), presentationBackgroundOpacity: value });
   }, []);
@@ -770,6 +790,8 @@ function App() {
             sectionsData={sectionsData}
             onUnifiedContentChange={handleUnifiedStoryChange}
             onHeadlineSpansChange={handleHeadlineSpansChange}
+            onRotateLineSpansChange={handleRotateLineSpansChange}
+            onBulletLineSpansChange={handleBulletLineSpansChange}
             onSentenceImageChange={handleSentenceImageChange}
             onBackgroundOpacityChange={handleBackgroundOpacityChange}
             onPresentStartChange={setPresentStartIndex}

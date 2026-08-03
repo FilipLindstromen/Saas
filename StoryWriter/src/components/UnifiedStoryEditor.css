@@ -4,12 +4,14 @@
   display: flex;
   flex-direction: column;
   padding: 1.5rem 2rem 2rem;
+  overflow: hidden;
 }
 
 .unified-story-editor__textarea {
   width: 100%;
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
+  height: 100%;
   resize: none;
   border: none;
   background: transparent;
@@ -19,6 +21,8 @@
   line-height: 1.65;
   outline: none;
   white-space: pre-wrap;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .unified-story-editor__textarea::placeholder {

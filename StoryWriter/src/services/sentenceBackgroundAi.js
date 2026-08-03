@@ -1,6 +1,7 @@
 import { generateImage } from '@shared/openai';
 import { searchUnsplashFirst } from '@shared/stockMedia/unsplash';
 import { getSettings } from '../utils/settings';
+import { firstStockHit, isStockMediaSource } from './stockMediaSearch';
 
 export function buildNapkinSketchBackgroundPrompt(sentenceText, instructions = '') {
   const theme = String(sentenceText ?? '').trim().slice(0, 400);
@@ -34,7 +35,7 @@ export async function generateNapkinSketchBackground(sentenceText, apiKey, instr
 }
 
 /**
- * @param {{ sentenceText: string, source: 'unsplash' | 'ai-sketch' | 'import', openaiApiKey?: string, sketchInstructions?: string }} options
+ * @param {{ sentenceText: string, source: string, openaiApiKey?: string, sketchInstructions?: string }} options
  * @returns {Promise<{ url: string, credit: string } | null>}
  */
 export async function resolveSentenceBackgroundImage({ sentenceText, source, openaiApiKey, sketchInstructions }) {
@@ -49,6 +50,10 @@ export async function resolveSentenceBackgroundImage({ sentenceText, source, ope
       sketchInstructions !== undefined ? sketchInstructions : getSettings().editSketchGenerationInstructions;
     const url = await generateNapkinSketchBackground(text, key, instructions);
     return url ? { url, credit: 'AI napkin sketch' } : null;
+  }
+
+  if (isStockMediaSource(source)) {
+    return firstStockHit(source, text);
   }
 
   return searchUnsplashFirst(text);

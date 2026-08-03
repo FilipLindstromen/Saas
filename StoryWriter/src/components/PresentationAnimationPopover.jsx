@@ -170,6 +170,31 @@ export default function PresentationAnimationPopover({ rules, onApply }) {
             </>
           )}
 
+          <label className="presentation-animation-popover__label">
+            Enter animation duration — {draft.enterDurationMs}ms
+            <input
+              type="range"
+              className="presentation-animation-popover__range"
+              min={100}
+              max={1500}
+              step={10}
+              value={draft.enterDurationMs}
+              onChange={(e) => update({ enterDurationMs: Number(e.target.value) })}
+            />
+          </label>
+          <label className="presentation-animation-popover__label">
+            Exit animation duration — {draft.exitDurationMs}ms
+            <input
+              type="range"
+              className="presentation-animation-popover__range"
+              min={100}
+              max={1500}
+              step={10}
+              value={draft.exitDurationMs}
+              onChange={(e) => update({ exitDurationMs: Number(e.target.value) })}
+            />
+          </label>
+
           <div className="presentation-animation-popover__actions">
             <button type="button" className="presentation-animation-popover__btn presentation-animation-popover__btn--primary" onClick={handleApply}>
               Apply

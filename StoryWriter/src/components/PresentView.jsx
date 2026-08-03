@@ -8,7 +8,10 @@ import {
   getExitAnimation,
 } from '../utils/textAnimations';
 import { buildPresentSceneList } from '../utils/sentences';
+import { isVideoBackgroundUrl } from '../utils/stockMediaSource';
+import { buildLineRevealRowsSimple } from '../utils/lineReveal';
 import PresentSentence from './PresentSentence';
+import PresentRotateLines from './PresentRotateLines';
 import './PresentView.css';
 
 const FONT_SIZE_MAP = {
@@ -71,6 +74,8 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   }, [sentences.length, initialIndex]);
 
   const [currentIndex, setCurrentIndex] = useState(safeStartIndex);
+  const [revealStep, setRevealStep] = useState(0);
+  const [rotateAnimKey, setRotateAnimKey] = useState(0);
   const [sentencePhase, setSentencePhase] = useState('enter');
   const transitionLockRef = useRef(false);
   const transitionTimersRef = useRef([]);
@@ -103,6 +108,8 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     const enterMs = getEnterDurationMs(sentence, animation, rules);
     queueTransitionTimer(() => setSentencePhase('idle'), enterMs || 0);
     setCurrentIndex(safeStartIndex);
+    setRevealStep(0);
+    setRotateAnimKey((k) => k + 1);
   }, [safeStartIndex, sentences, settingsVersion, rules, clearTransitionTimers, queueTransitionTimer]);
 
   const [displayBgUrl, setDisplayBgUrl] = useState('');
@@ -141,6 +148,21 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     (currentItem?.imageUrl && String(currentItem.imageUrl).trim()) ||
     (Array.isArray(sentenceImages) ? (sentenceImages[sentenceIndexInSection] || '') : '');
   const currentSectionBgUrl = sentenceImageUrl || (sectionData?.backgroundImageUrl || '');
+  const displayBgIsVideo = isVideoBackgroundUrl(displayBgUrl);
+
+  const sentence = sentences[displayIndex] ?? '';
+  const styledParts = currentItem?.styledParts;
+  const rotateSpans = currentItem?.rotateSpans ?? [];
+  const bulletSpans = currentItem?.bulletSpans ?? [];
+  const useLineRevealPresent =
+    rotateSpans.length > 0 || bulletSpans.length > 0;
+  const lineRevealRows = useMemo(
+    () =>
+      useLineRevealPresent
+        ? buildLineRevealRowsSimple(sentence, rotateSpans, bulletSpans, revealStep)
+        : null,
+    [useLineRevealPresent, sentence, rotateSpans, bulletSpans, revealStep]
+  );
 
   useEffect(() => {
     if (currentSectionBgUrl === displayBgUrl) return;
@@ -159,43 +181,68 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     setBgLayerOpacity(targetUrl ? bgOpacity : 0);
   }, [currentSectionBgUrl, displayBgUrl, bgOpacity]);
 
-  const navigateTo = useCallback((newIndex) => {
-    if (transitionLockRef.current) return;
-    if (newIndex < 0 || newIndex >= sentences.length) return;
-    if (newIndex === currentIndex) return;
+  const navigateTo = useCallback(
+    (newIndex, initialRevealStep = 0) => {
+      if (transitionLockRef.current) return;
+      if (newIndex < 0 || newIndex >= sentences.length) return;
+      if (newIndex === currentIndex && initialRevealStep === revealStep) return;
 
-    transitionLockRef.current = true;
-    clearTransitionTimers();
+      transitionLockRef.current = true;
+      clearTransitionTimers();
 
-    const leavingSentence = sentences[currentIndex] ?? '';
-    const leavingAnimation = resolveAnimationForSentence(leavingSentence, rules);
-    const exitAnimation = getExitAnimation(leavingAnimation);
-    const exitMs = getExitDurationMs(exitAnimation, leavingSentence, rules);
+      const leavingSentence = sentences[currentIndex] ?? '';
+      const leavingAnimation = resolveAnimationForSentence(leavingSentence, rules);
+      const exitAnimation = getExitAnimation(leavingAnimation);
+      const exitMs = getExitDurationMs(exitAnimation, leavingSentence, rules);
 
-    setSentencePhase('exit');
-
-    queueTransitionTimer(() => {
-      setCurrentIndex(newIndex);
-      setSentencePhase('enter');
-
-      const enteringSentence = sentences[newIndex] ?? '';
-      const enterAnimation = resolveAnimationForSentence(enteringSentence, rules);
-      const enterMs = getEnterDurationMs(enteringSentence, enterAnimation, rules);
+      setSentencePhase('exit');
 
       queueTransitionTimer(() => {
-        setSentencePhase('idle');
-        transitionLockRef.current = false;
-      }, enterMs || 0);
-    }, exitMs || 0);
-  }, [currentIndex, sentences, rules, clearTransitionTimers, queueTransitionTimer]);
+        setCurrentIndex(newIndex);
+        setRevealStep(initialRevealStep);
+        setRotateAnimKey((k) => k + 1);
+        setSentencePhase('enter');
+
+        const enteringSentence = sentences[newIndex] ?? '';
+        const enterAnimation = resolveAnimationForSentence(enteringSentence, rules);
+        const enterMs = getEnterDurationMs(enteringSentence, enterAnimation, rules);
+
+        queueTransitionTimer(() => {
+          setSentencePhase('idle');
+          transitionLockRef.current = false;
+        }, enterMs || 0);
+      }, exitMs || 0);
+    },
+    [currentIndex, revealStep, sentences, rules, clearTransitionTimers, queueTransitionTimer]
+  );
 
   const goNext = useCallback(() => {
-    navigateTo(Math.min(currentIndex + 1, sentences.length - 1));
-  }, [navigateTo, currentIndex, sentences.length]);
+    const item = sentencesWithSection[currentIndex];
+    const steps = item?.lineRevealStepCount ?? item?.rotateStepCount ?? 1;
+    const hasLineReveal =
+      (item?.rotateSpans?.length ?? 0) > 0 || (item?.bulletSpans?.length ?? 0) > 0;
+    if (hasLineReveal && revealStep < steps - 1) {
+      setRevealStep((s) => s + 1);
+      setRotateAnimKey((k) => k + 1);
+      return;
+    }
+    navigateTo(Math.min(currentIndex + 1, sentences.length - 1), 0);
+  }, [navigateTo, currentIndex, sentences.length, sentencesWithSection, revealStep]);
 
   const goPrev = useCallback(() => {
-    navigateTo(Math.max(currentIndex - 1, 0));
-  }, [navigateTo, currentIndex]);
+    if (revealStep > 0) {
+      setRevealStep((s) => s - 1);
+      setRotateAnimKey((k) => k + 1);
+      return;
+    }
+    const prevIndex = currentIndex - 1;
+    if (prevIndex < 0) return;
+    const prevItem = sentencesWithSection[prevIndex];
+    const prevSteps = prevItem?.lineRevealStepCount ?? prevItem?.rotateStepCount ?? 1;
+    const hasLineReveal =
+      (prevItem?.rotateSpans?.length ?? 0) > 0 || (prevItem?.bulletSpans?.length ?? 0) > 0;
+    navigateTo(prevIndex, hasLineReveal ? Math.max(0, prevSteps - 1) : 0);
+  }, [navigateTo, currentIndex, revealStep, sentencesWithSection]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -388,12 +435,14 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     );
   }
 
-  const sentence = sentences[displayIndex];
-  const styledParts = currentItem?.styledParts;
-
   return (
-    <div className="present-view present-view--fullscreen" style={{ fontFamily }}>
-      {displayBgUrl && (
+    <div
+      className="present-view present-view--fullscreen present-view--advance-on-click"
+      style={{ fontFamily }}
+      onClick={goNext}
+      role="presentation"
+    >
+      {displayBgUrl && !displayBgIsVideo && (
         <div
           className={`present-view__bg${bgAnimation ? ' present-view__bg--animated' : ''}`}
           style={{
@@ -407,16 +456,44 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
           aria-hidden="true"
         />
       )}
+      {displayBgUrl && displayBgIsVideo && (
+        <video
+          className={`present-view__bg present-view__bg-video${bgAnimation ? ' present-view__bg--animated' : ''}`}
+          src={displayBgUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{
+            opacity: bgLayerOpacity,
+            ...(bgAnimation ? {
+              ['--present-bg-duration']: `${bgAnimationDuration}s`,
+              ['--present-bg-scale-max']: `${bgAnimationScale * 100}%`,
+            } : {}),
+          }}
+          aria-hidden="true"
+        />
+      )}
       <div className="present-view__inner">
         <div className="present-view__sentence-stage">
-          <PresentSentence
-            text={sentence}
-            styledParts={styledParts}
-            animation={currentAnimation}
-            phase={sentencePhase}
-            rules={rules}
-            style={{ fontSize, lineHeight }}
-          />
+          {useLineRevealPresent ? (
+            <PresentRotateLines
+              rows={lineRevealRows}
+              styledParts={styledParts}
+              fontSize={fontSize}
+              lineHeight={lineHeight}
+              animKey={rotateAnimKey}
+            />
+          ) : (
+            <PresentSentence
+              text={sentence}
+              styledParts={styledParts}
+              animation={currentAnimation}
+              phase={sentencePhase}
+              rules={rules}
+              style={{ fontSize, lineHeight }}
+            />
+          )}
         </div>
       </div>
       {recordScreenEnabled && (
@@ -443,6 +520,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
               playsInline
               muted
               aria-label="Webcam"
+              onClick={(e) => e.stopPropagation()}
             />
           )}
         </div>

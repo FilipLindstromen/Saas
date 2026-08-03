@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { splitSentenceWords, getExitAnimation } from '../utils/textAnimations';
+import { splitSentenceWords, getExitAnimation, presentationTimingStyle } from '../utils/textAnimations';
 
 function FadeWordsStyledParts({ parts, phase, stagger, headlineScale }) {
   let wordIndex = 0;
@@ -153,7 +153,11 @@ export default function PresentSentence({
     .filter(Boolean)
     .join(' ');
 
-  const mergedStyle = { ...style, whiteSpace: 'pre-line' };
+  const mergedStyle = {
+    ...presentationTimingStyle(rules),
+    ...style,
+    whiteSpace: 'pre-line',
+  };
   const parts = styledParts?.length ? styledParts : null;
   const headlineScale = '1.45em';
 

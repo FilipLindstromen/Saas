@@ -16,9 +16,18 @@ import {
   removeHeadlineSpanOverlap,
   selectionIsHeadline,
 } from '../utils/headlines';
+import {
+  addRotateSpan,
+  removeRotateSpanOverlap,
+  selectionOverlapsRotate,
+  addBulletSpan,
+  removeBulletSpanOverlap,
+  selectionOverlapsBullet,
+} from '../utils/lineReveal';
 import TextContextMenu from './TextContextMenu';
 import { resolveSentenceBackgroundImage } from '../services/sentenceBackgroundAi';
-import UnsplashPicker from './UnsplashPicker';
+import StockMediaPicker from './StockMediaPicker';
+import { isStockMediaSource, isVideoBackgroundUrl, stockSourceSearchLabel } from '../utils/stockMediaSource';
 import SketchBackgroundPanel from './SketchBackgroundPanel';
 import ImportImagePanel from './ImportImagePanel';
 import './EditView.css';
@@ -29,6 +38,8 @@ function UnifiedEditEditor({
   sectionsData,
   onUnifiedContentChange,
   onHeadlineSpansChange,
+  onRotateLineSpansChange,
+  onBulletLineSpansChange,
   onOpenSentencePicker,
   onSentencePositionChange,
   onActiveSentenceChange,
@@ -42,6 +53,8 @@ function UnifiedEditEditor({
     y: 0,
     range: null,
     isHeadline: false,
+    isRotate: false,
+    isBullet: false,
   });
   const content = joinSectionContents(sectionOrder, sectionsData);
   const mirrorParts = useMemo(
@@ -113,10 +126,24 @@ function UnifiedEditEditor({
         el.selectionEnd
       );
       let isHeadline = false;
+      let isRotate = false;
+      let isBullet = false;
       if (range) {
         const sectionContent = sectionsData[range.sectionId]?.content ?? '';
         isHeadline = selectionIsHeadline(
           sectionsData[range.sectionId]?.headlineSpans ?? [],
+          range.start,
+          range.end,
+          sectionContent.length
+        );
+        isRotate = selectionOverlapsRotate(
+          sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+          range.start,
+          range.end,
+          sectionContent.length
+        );
+        isBullet = selectionOverlapsBullet(
+          sectionsData[range.sectionId]?.bulletLineSpans ?? [],
           range.start,
           range.end,
           sectionContent.length
@@ -128,6 +155,8 @@ function UnifiedEditEditor({
         y: e.clientY,
         range,
         isHeadline,
+        isRotate,
+        isBullet,
       });
     },
     [sectionOrder, sectionsData]
@@ -140,6 +169,8 @@ function UnifiedEditEditor({
         {mirrorParts.map((part, i) => {
           const classes = [
             part.headline && 'edit-step__content-headline',
+            part.rotate && 'edit-step__content-rotate',
+            part.bullet && 'edit-step__content-bullet',
             part.hasImage && 'unified-story-editor__mirror-highlight edit-step__content-highlight',
           ]
             .filter(Boolean)
@@ -213,6 +244,88 @@ function UnifiedEditEditor({
             onHeadlineSpansChange?.(range.sectionId, next);
           },
         },
+        {
+          id: 'rotate-set',
+          label: 'Set as rotating lines (Present)',
+          disabled: !contextMenu.range,
+          onClick: () => {
+            const { range } = contextMenu;
+            if (!range) return;
+            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+            const next = addRotateSpan(
+              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onRotateLineSpansChange?.(range.sectionId, next);
+            const clearedBullets = removeBulletSpanOverlap(
+              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onBulletLineSpansChange?.(range.sectionId, clearedBullets);
+          },
+        },
+        {
+          id: 'rotate-clear',
+          label: 'Remove rotating lines',
+          disabled: !contextMenu.range || !contextMenu.isRotate,
+          onClick: () => {
+            const { range } = contextMenu;
+            if (!range) return;
+            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+            const next = removeRotateSpanOverlap(
+              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onRotateLineSpansChange?.(range.sectionId, next);
+          },
+        },
+        {
+          id: 'bullet-set',
+          label: 'Set as bullet list (Present)',
+          disabled: !contextMenu.range,
+          onClick: () => {
+            const { range } = contextMenu;
+            if (!range) return;
+            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+            const next = addBulletSpan(
+              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onBulletLineSpansChange?.(range.sectionId, next);
+            const clearedRotate = removeRotateSpanOverlap(
+              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onRotateLineSpansChange?.(range.sectionId, clearedRotate);
+          },
+        },
+        {
+          id: 'bullet-clear',
+          label: 'Remove bullet list style',
+          disabled: !contextMenu.range || !contextMenu.isBullet,
+          onClick: () => {
+            const { range } = contextMenu;
+            if (!range) return;
+            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+            const next = removeBulletSpanOverlap(
+              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onBulletLineSpansChange?.(range.sectionId, next);
+          },
+        },
       ]}
     />
     </>
@@ -224,6 +337,8 @@ export default function EditView({
   sectionsData,
   onUnifiedContentChange,
   onHeadlineSpansChange,
+  onRotateLineSpansChange,
+  onBulletLineSpansChange,
   onSentenceImageChange,
   onBackgroundOpacityChange,
   onPresentStartChange,
@@ -245,6 +360,7 @@ export default function EditView({
   );
   const useAiSketch = sentenceImageSource === 'ai-sketch';
   const useImport = sentenceImageSource === 'import';
+  const useStock = isStockMediaSource(sentenceImageSource);
   const [magicLoadingAll, setMagicLoadingAll] = useState(false);
   const [opacity, setOpacity] = useState(() => getSettings().presentationBackgroundOpacity ?? 0.35);
   const [webcamError, setWebcamError] = useState(null);
@@ -343,8 +459,7 @@ export default function EditView({
     saveSettings({ ...getSettings(), editUnsplashResultsCount: next });
   }, []);
 
-  const handleSentenceImageSourceChange = useCallback((e) => {
-    const next = e.target.value;
+  const handleSentenceImageSourceChange = useCallback((next) => {
     setSentenceImageSource(next);
     saveSettings({ ...getSettings(), editSentenceImageSource: next });
     setPickerSentence(null);
@@ -453,6 +568,8 @@ export default function EditView({
           sectionsData={sectionsData}
           onUnifiedContentChange={onUnifiedContentChange}
           onHeadlineSpansChange={onHeadlineSpansChange}
+          onRotateLineSpansChange={onRotateLineSpansChange}
+          onBulletLineSpansChange={onBulletLineSpansChange}
           onOpenSentencePicker={handleOpenSentencePicker}
           onSentencePositionChange={handleSentencePositionChange}
           onActiveSentenceChange={handleActiveSentenceChange}
@@ -463,27 +580,42 @@ export default function EditView({
         className={`edit-view__side${pickerSentence !== null ? ' edit-view__side--picker-open' : ''}`}
         aria-label="Sentence image"
         onMouseDown={(e) => {
-          const focusable = e.target.closest('input, textarea, select, button, [contenteditable="true"], [tabindex]:not([tabindex="-1"])');
+          if (e.target.closest('.edit-view__side-picker, .sketch-bg-panel, .unsplash-picker-inline, .import-image-panel')) {
+            return;
+          }
+          const focusable = e.target.closest(
+            'input, textarea, select, button, label, [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
+          );
           if (!focusable) e.preventDefault();
         }}
       >
         <h2 className="edit-view__side-title">Sentence image</h2>
         <div className="edit-view__side-options">
-          <label className="edit-view__side-option edit-view__side-option--select edit-view__side-option--stack">
-            <span className="edit-view__side-option-label">Background source</span>
-            <select
-              className="edit-view__side-select edit-view__side-select--wide"
-              value={sentenceImageSource}
-              onChange={handleSentenceImageSourceChange}
-              aria-label="Sentence background source"
-            >
-              {SENTENCE_IMAGE_SOURCE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <fieldset className="edit-view__source-field">
+            <legend className="edit-view__side-option-label">Background source</legend>
+            <div className="edit-view__source-grid" role="radiogroup" aria-label="Sentence background source">
+              {SENTENCE_IMAGE_SOURCE_OPTIONS.map((o) => {
+                const checked = sentenceImageSource === o.value;
+                return (
+                  <label
+                    key={o.value}
+                    className={`edit-view__source-pill${checked ? ' edit-view__source-pill--active' : ''}`}
+                    title={o.label}
+                  >
+                    <input
+                      type="radio"
+                      name="sentence-image-source"
+                      className="edit-view__source-pill-input"
+                      value={o.value}
+                      checked={checked}
+                      onChange={() => handleSentenceImageSourceChange(o.value)}
+                    />
+                    <span className="edit-view__source-pill-text">{o.shortLabel ?? o.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <label className="edit-view__side-option">
             <input
               type="checkbox"
@@ -495,17 +627,19 @@ export default function EditView({
                 ? 'Open import when clicking a sentence'
                 : useAiSketch
                   ? 'Generate sketch when clicking a sentence'
-                  : 'Search Unsplash when clicking a sentence'}
+                  : useStock
+                    ? `Search ${stockSourceSearchLabel(sentenceImageSource)} when clicking a sentence`
+                    : 'Search stock media when clicking a sentence'}
             </span>
           </label>
-          {!useAiSketch && !useImport && (
+          {useStock && (
             <label className="edit-view__side-option edit-view__side-option--select">
               <span className="edit-view__side-option-label">Results shown</span>
               <select
                 className="edit-view__side-select"
                 value={unsplashResultsCount}
                 onChange={handleUnsplashResultsCountChange}
-                aria-label="Number of Unsplash results"
+                aria-label="Number of stock results"
               >
                 {UNSPLASH_RESULT_COUNT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -529,6 +663,7 @@ export default function EditView({
             </label>
           )}
         </div>
+        <div className="edit-view__side-body">
         {pickerSentence !== null ? (
           <div className="edit-view__side-picker">
             {useImport ? (
@@ -547,8 +682,9 @@ export default function EditView({
                 autoGenerate={pickerAutoSearch}
                 instructions={sketchInstructions}
               />
-            ) : (
-              <UnsplashPicker
+            ) : useStock ? (
+              <StockMediaPicker
+                stockSource={sentenceImageSource}
                 isOpen={true}
                 inline={true}
                 onClose={() => setPickerSentence(null)}
@@ -557,25 +693,37 @@ export default function EditView({
                 autoSearch={pickerAutoSearch}
                 resultsCount={unsplashResultsCount}
               />
-            )}
+            ) : null}
           </div>
         ) : activeSentence !== null ? (
           <>
             <p className="edit-view__side-sentence">{activeSentenceText || 'This sentence'}</p>
             {activeSentenceImageUrl ? (
               <div className="edit-view__side-preview">
-                <img
-                  className="edit-view__side-thumb"
-                  src={activeSentenceImageUrl}
-                  alt="Sentence background"
-                />
+                {isVideoBackgroundUrl(activeSentenceImageUrl) ? (
+                  <video
+                    className="edit-view__side-thumb edit-view__side-thumb--video"
+                    src={activeSentenceImageUrl}
+                    muted
+                    playsInline
+                    loop
+                    autoPlay
+                    aria-label="Sentence background video"
+                  />
+                ) : (
+                  <img
+                    className="edit-view__side-thumb"
+                    src={activeSentenceImageUrl}
+                    alt="Sentence background"
+                  />
+                )}
                 <div className="edit-view__side-actions">
                   <button
                     type="button"
                     className="edit-view__side-btn edit-view__side-btn--primary"
                     onClick={() => handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex)}
                   >
-                    {useImport ? 'Replace image' : useAiSketch ? 'Regenerate sketch' : 'Swap image'}
+                    {useImport ? 'Replace image' : useAiSketch ? 'Regenerate sketch' : useStock && sentenceImageSource.includes('video') ? 'Swap video' : 'Swap image'}
                   </button>
                   <button
                     type="button"
@@ -593,7 +741,7 @@ export default function EditView({
                   className="edit-view__side-btn edit-view__side-btn--primary"
                   onClick={() => handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex)}
                 >
-                  {useImport ? 'Import image' : useAiSketch ? 'Generate sketch' : 'Select image'}
+                  {useImport ? 'Import image' : useAiSketch ? 'Generate sketch' : useStock && sentenceImageSource.includes('video') ? 'Select video' : 'Select image'}
                 </button>
               </div>
             )}
@@ -601,6 +749,7 @@ export default function EditView({
         ) : (
           <p className="edit-view__side-hint">Click in or select a sentence to set its background image.</p>
         )}
+        </div>
       </aside>
       {webcamEnabled && (
         <div className={`edit-view__webcam-wrap edit-view__webcam-wrap--${webcamSize}`}>

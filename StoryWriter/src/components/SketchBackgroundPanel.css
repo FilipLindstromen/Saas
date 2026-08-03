@@ -77,6 +77,16 @@
   flex-direction: column;
   gap: 0.5rem;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  padding-top: 0.35rem;
+  background: linear-gradient(to top, var(--surface) 70%, transparent);
+  z-index: 2;
+}
+
+.sketch-bg-panel__btn--primary[aria-busy='true'] {
+  opacity: 0.92;
+  cursor: wait;
 }
 
 .sketch-bg-panel__btn {

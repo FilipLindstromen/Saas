@@ -5,6 +5,8 @@ import './SettingsModal.css';
 export default function SettingsModal({ isOpen, onClose }) {
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [unsplashAccessKey, setUnsplashAccessKey] = useState('');
+  const [pexelsApiKey, setPexelsApiKey] = useState('');
+  const [pixabayApiKey, setPixabayApiKey] = useState('');
   const [presentationFont, setPresentationFont] = useState('Poppins');
   const [presentationFontSize, setPresentationFontSize] = useState('medium');
 
@@ -15,6 +17,8 @@ export default function SettingsModal({ isOpen, onClose }) {
       setPresentationFont(s.presentationFont || 'Poppins');
       setPresentationFontSize(s.presentationFontSize || 'medium');
       setUnsplashAccessKey(s.unsplashAccessKey || '');
+      setPexelsApiKey(s.pexelsApiKey || '');
+      setPixabayApiKey(s.pixabayApiKey || '');
     }
   }, [isOpen]);
 
@@ -24,6 +28,8 @@ export default function SettingsModal({ isOpen, onClose }) {
       ...getSettings(),
       openaiApiKey,
       unsplashAccessKey,
+      pexelsApiKey,
+      pixabayApiKey,
       presentationFont,
       presentationFontSize,
     });
@@ -85,9 +91,31 @@ export default function SettingsModal({ isOpen, onClose }) {
             <input
               type="password"
               className="settings-input"
-              placeholder="For section background images (optional)"
+              placeholder="For Unsplash photos"
               value={unsplashAccessKey}
               onChange={(e) => setUnsplashAccessKey(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <label className="settings-label">
+            Pexels API Key
+            <input
+              type="password"
+              className="settings-input"
+              placeholder="For Pexels photos and videos"
+              value={pexelsApiKey}
+              onChange={(e) => setPexelsApiKey(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <label className="settings-label">
+            Pixabay API Key
+            <input
+              type="password"
+              className="settings-input"
+              placeholder="For Pixabay photos and videos"
+              value={pixabayApiKey}
+              onChange={(e) => setPixabayApiKey(e.target.value)}
               autoComplete="off"
             />
           </label>

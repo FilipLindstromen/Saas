@@ -1,4 +1,5 @@
 import { headlinePartsForScene } from './headlines';
+import { rotateSpansForScene, bulletSpansForScene, getLineRevealStepCount } from './lineReveal';
 
 /** Split text into sentences (by . ! ? followed by space or end). */
 export function getSentences(text) {
@@ -136,7 +137,7 @@ const PRESENT_SCENE_BREAK = /\n[\t ]*\n+/g;
  * Present-mode scenes: blocks separated by a blank line (double line break).
  * Preserves single line breaks inside each scene as authored in the editor.
  */
-export function getPresentScenes(content, sentenceImages = [], headlineSpans = []) {
+export function getPresentScenes(content, sentenceImages = [], headlineSpans = [], rotateLineSpans = [], bulletLineSpans = []) {
   const raw = String(content ?? '');
   if (!raw.trim()) return [];
 
@@ -165,6 +166,8 @@ export function getPresentScenes(content, sentenceImages = [], headlineSpans = [
       }
     }
 
+    const rotateSpans = rotateSpansForScene(raw, rawStart, rawEnd, text, rotateLineSpans);
+    const bulletSpans = bulletSpansForScene(raw, rawStart, rawEnd, text, bulletLineSpans);
     scenes.push({
       text,
       start: rawStart,
@@ -173,6 +176,10 @@ export function getPresentScenes(content, sentenceImages = [], headlineSpans = [
       primarySentenceIndex,
       imageUrl,
       styledParts: headlinePartsForScene(raw, rawStart, rawEnd, text, headlineSpans),
+      rotateSpans,
+      bulletSpans,
+      lineRevealStepCount: getLineRevealStepCount(text, rotateSpans, bulletSpans),
+      rotateStepCount: getLineRevealStepCount(text, rotateSpans, bulletSpans),
     });
   };
 
@@ -194,7 +201,9 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
     const content = section?.content ?? '';
     const sentenceImages = section?.sentenceImages ?? [];
     const headlineSpans = section?.headlineSpans ?? [];
-    const scenes = getPresentScenes(content, sentenceImages, headlineSpans);
+    const rotateLineSpans = section?.rotateLineSpans ?? [];
+    const bulletLineSpans = section?.bulletLineSpans ?? [];
+    const scenes = getPresentScenes(content, sentenceImages, headlineSpans, rotateLineSpans, bulletLineSpans);
     for (const scene of scenes) {
       out.push({
         text: scene.text,
@@ -203,6 +212,10 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
         sentenceIndices: scene.sentenceIndices,
         imageUrl: scene.imageUrl,
         styledParts: scene.styledParts,
+        rotateSpans: scene.rotateSpans,
+        bulletSpans: scene.bulletSpans,
+        lineRevealStepCount: scene.lineRevealStepCount,
+        rotateStepCount: scene.rotateStepCount,
       });
     }
   }

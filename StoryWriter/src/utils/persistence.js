@@ -6,6 +6,18 @@ function persistHeadlineSpans(spans, contentLength) {
   return normalizeHeadlineSpans(spans, contentLength).map(({ start, end }) => ({ start, end }));
 }
 
+function persistSpanRanges(spans, contentLength) {
+  return normalizeHeadlineSpans(spans, contentLength).map(({ start, end }) => ({ start, end }));
+}
+
+function persistRotateSpans(spans, contentLength) {
+  return persistSpanRanges(spans, contentLength);
+}
+
+function persistBulletSpans(spans, contentLength) {
+  return persistSpanRanges(spans, contentLength);
+}
+
 const STORAGE_KEY = 'storywriter_content';
 
 let cached = null;
@@ -69,6 +81,8 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
           backgroundImageCredit: typeof sectionsData[id].backgroundImageCredit === 'string' ? sectionsData[id].backgroundImageCredit : undefined,
           sentenceImages: arr,
           headlineSpans: persistHeadlineSpans(sectionsData[id].headlineSpans, String(content).length),
+          rotateLineSpans: persistRotateSpans(sectionsData[id].rotateLineSpans, String(content).length),
+          bulletLineSpans: persistBulletSpans(sectionsData[id].bulletLineSpans, String(content).length),
         };
       }
     }
@@ -113,6 +127,8 @@ export function saveContent(payload) {
           backgroundImageCredit: typeof section.backgroundImageCredit === 'string' ? section.backgroundImageCredit : undefined,
           sentenceImages: arr,
           headlineSpans: persistHeadlineSpans(section.headlineSpans, String(content).length),
+          rotateLineSpans: persistRotateSpans(section.rotateLineSpans, String(content).length),
+          bulletLineSpans: persistBulletSpans(section.bulletLineSpans, String(content).length),
         };
       }
     }

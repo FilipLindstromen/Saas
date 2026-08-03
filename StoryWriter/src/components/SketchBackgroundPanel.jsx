@@ -15,29 +15,47 @@ export default function SketchBackgroundPanel({
   const [error, setError] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const autoRanRef = useRef(false);
+  const generationRef = useRef(0);
 
   const runGenerate = useCallback(async () => {
     const apiKey = getSettings().openaiApiKey?.trim();
     if (!apiKey) {
       setError('Add your OpenAI API key in Settings.');
       setPreviewUrl('');
+      setLoading(false);
       return;
     }
     const text = sentenceText.trim();
     if (!text) {
       setError('No sentence text to illustrate.');
+      setLoading(false);
       return;
     }
+
+    const genId = ++generationRef.current;
     setLoading(true);
     setError('');
+
     try {
-      const dataUrl = await generateNapkinSketchBackground(text, apiKey, instructions);
+      const dataUrl = await Promise.race([
+        generateNapkinSketchBackground(text, apiKey, instructions),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Generation timed out after 2 minutes. Try again.')), 120000);
+        }),
+      ]);
+      if (genId !== generationRef.current) return;
+      if (!dataUrl) {
+        throw new Error('No image was returned. Try again.');
+      }
       setPreviewUrl(dataUrl);
     } catch (err) {
+      if (genId !== generationRef.current) return;
       setError(err?.message || 'Generation failed.');
       setPreviewUrl('');
     } finally {
-      setLoading(false);
+      if (genId === generationRef.current) {
+        setLoading(false);
+      }
     }
   }, [sentenceText, instructions]);
 
@@ -58,7 +76,7 @@ export default function SketchBackgroundPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="sketch-bg-panel">
+    <div className="sketch-bg-panel" onMouseDown={(e) => e.stopPropagation()}>
       <div className="sketch-bg-panel__header">
         <h3 className="sketch-bg-panel__title">Generate napkin sketch</h3>
         <button type="button" className="sketch-bg-panel__close" onClick={onClose} aria-label="Close">
@@ -77,10 +95,10 @@ export default function SketchBackgroundPanel({
         <button
           type="button"
           className="sketch-bg-panel__btn sketch-bg-panel__btn--primary"
-          onClick={runGenerate}
-          disabled={loading}
+          onClick={() => runGenerate()}
+          aria-busy={loading}
         >
-          {previewUrl ? 'Regenerate' : 'Generate'}
+          {loading ? 'Generating…' : previewUrl ? 'Regenerate' : 'Generate'}
         </button>
         {previewUrl && !loading && (
           <button

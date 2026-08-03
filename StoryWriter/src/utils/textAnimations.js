@@ -21,6 +21,8 @@ export const DEFAULT_PRESENTATION_ANIMATION_RULES = {
   mediumAnimation: 'fade-words',
   longAnimation: 'fade-words',
   wordStaggerMs: 70,
+  enterDurationMs: 380,
+  exitDurationMs: 400,
 };
 
 function clampInt(val, min, max, fallback) {
@@ -49,6 +51,8 @@ export function normalizePresentationAnimationRules(raw) {
     mediumAnimation: pickAnim(raw.mediumAnimation, d.mediumAnimation),
     longAnimation: pickAnim(raw.longAnimation, d.longAnimation),
     wordStaggerMs: clampInt(raw.wordStaggerMs, 20, 200, d.wordStaggerMs),
+    enterDurationMs: clampInt(raw.enterDurationMs, 100, 2000, d.enterDurationMs),
+    exitDurationMs: clampInt(raw.exitDurationMs, 100, 2000, d.exitDurationMs),
   };
 }
 
@@ -105,27 +109,31 @@ export function getExitAnimation(enterAnimation) {
   }
 }
 
-const BASE_ENTER_MS = 380;
-const BASE_EXIT_MS = 400;
+/** CSS custom properties for present-mode sentence animations. */
+export function presentationTimingStyle(rules) {
+  const n = normalizePresentationAnimationRules(rules);
+  return {
+    '--present-enter-duration': `${n.enterDurationMs}ms`,
+    '--present-exit-duration': `${n.exitDurationMs}ms`,
+  };
+}
 
 export function getEnterDurationMs(sentence, animation, rules) {
   const normalized = normalizePresentationAnimationRules(rules);
   if (animation === 'fade-words') {
     const words = countWords(sentence);
-    return BASE_ENTER_MS + Math.max(0, words - 1) * normalized.wordStaggerMs;
+    return normalized.enterDurationMs + Math.max(0, words - 1) * normalized.wordStaggerMs;
   }
   if (animation === 'none') return 0;
-  if (animation === 'drop-center') return 520;
-  return BASE_ENTER_MS;
+  return normalized.enterDurationMs;
 }
 
 export function getExitDurationMs(exitAnimation, sentence = '', rules) {
+  const normalized = normalizePresentationAnimationRules(rules);
   if (exitAnimation === 'none') return 0;
-  if (exitAnimation === 'drop-center') return 480;
   if (exitAnimation === 'fade-words') {
-    const normalized = normalizePresentationAnimationRules(rules);
     const words = countWords(sentence);
-    return 300 + Math.max(0, words - 1) * normalized.wordStaggerMs;
+    return normalized.exitDurationMs + Math.max(0, words - 1) * normalized.wordStaggerMs;
   }
-  return BASE_EXIT_MS;
+  return normalized.exitDurationMs;
 }

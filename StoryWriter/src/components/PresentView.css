@@ -15,6 +15,10 @@
   box-sizing: border-box;
 }
 
+.present-view--advance-on-click {
+  cursor: pointer;
+}
+
 .present-view__bg {
   position: absolute;
   inset: 0;
@@ -42,6 +46,11 @@
     background-size: 100%;
     background-position: 52% 52%;
   }
+}
+
+.present-view__bg-video {
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .present-view__inner {
@@ -125,6 +134,57 @@
   line-height: 1.2;
 }
 
+.present-rotate {
+  width: 100%;
+  text-align: center;
+  color: var(--text);
+}
+
+.present-rotate__static {
+  margin: 0 0 0.35em;
+  white-space: pre-line;
+}
+
+.present-rotate__mask {
+  overflow: hidden;
+  margin: 0.15em 0;
+}
+
+.present-rotate__mask--animate .present-rotate__line {
+  animation: present-rotate-line-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.present-rotate__line {
+  display: block;
+  white-space: pre-line;
+  transform: translateY(0);
+}
+
+.present-rotate__line--bullet {
+  text-align: left;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.present-rotate__mask--bullet {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+@keyframes present-rotate-line-in {
+  from {
+    transform: translateY(-105%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .present-view__word-line--blank {
   min-height: 0.5em;
 }
@@ -143,7 +203,7 @@
 .present-view__word {
   display: inline;
   opacity: 0;
-  animation: present-word-fade-in 0.42s ease-out forwards;
+  animation: present-word-fade-in var(--present-enter-duration, 380ms) ease-out forwards;
 }
 
 .present-view__word--visible {
@@ -152,16 +212,16 @@
 }
 
 .present-view__word--out {
-  animation: present-word-fade-out 0.34s ease-in forwards;
+  animation: present-word-fade-out var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 /* Drop from above into center, exit downward off screen */
 .present-view__sentence--drop-center.present-view__sentence--enter {
-  animation: present-drop-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: present-drop-in var(--present-enter-duration, 380ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .present-view__sentence--drop-center.present-view__sentence--exit {
-  animation: present-drop-out 0.48s cubic-bezier(0.55, 0, 0.9, 0.38) forwards;
+  animation: present-drop-out var(--present-exit-duration, 400ms) cubic-bezier(0.55, 0, 0.9, 0.38) forwards;
   will-change: transform, opacity;
 }
 
@@ -180,43 +240,43 @@
 }
 
 .present-view__sentence--slide-up.present-view__sentence--enter {
-  animation: present-sentence-slide-up 0.38s ease-out forwards;
+  animation: present-sentence-slide-up var(--present-enter-duration, 380ms) ease-out forwards;
 }
 
 .present-view__sentence--slide-down.present-view__sentence--exit {
-  animation: present-sentence-slide-down 0.38s ease-in forwards;
+  animation: present-sentence-slide-down var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 .present-view__sentence--fade.present-view__sentence--enter {
-  animation: present-sentence-fade 0.38s ease-out forwards;
+  animation: present-sentence-fade var(--present-enter-duration, 380ms) ease-out forwards;
 }
 
 .present-view__sentence--fade.present-view__sentence--exit {
-  animation: present-sentence-fade-out 0.34s ease-in forwards;
+  animation: present-sentence-fade-out var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 .present-view__sentence--slide-left.present-view__sentence--enter {
-  animation: present-sentence-slide-left 0.38s ease-out forwards;
+  animation: present-sentence-slide-left var(--present-enter-duration, 380ms) ease-out forwards;
 }
 
 .present-view__sentence--slide-right.present-view__sentence--enter {
-  animation: present-sentence-slide-right 0.38s ease-out forwards;
+  animation: present-sentence-slide-right var(--present-enter-duration, 380ms) ease-out forwards;
 }
 
 .present-view__sentence--slide-right.present-view__sentence--exit {
-  animation: present-sentence-slide-right-out 0.38s ease-in forwards;
+  animation: present-sentence-slide-right-out var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 .present-view__sentence--slide-left.present-view__sentence--exit {
-  animation: present-sentence-slide-left-out 0.38s ease-in forwards;
+  animation: present-sentence-slide-left-out var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 .present-view__sentence--scale.present-view__sentence--enter {
-  animation: present-sentence-scale 0.38s ease-out forwards;
+  animation: present-sentence-scale var(--present-enter-duration, 380ms) ease-out forwards;
 }
 
 .present-view__sentence--scale-out.present-view__sentence--exit {
-  animation: present-sentence-scale-out 0.34s ease-in forwards;
+  animation: present-sentence-scale-out var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 .present-view__sentence--none.present-view__sentence--enter,
