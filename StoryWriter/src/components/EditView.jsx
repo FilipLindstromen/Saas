@@ -23,6 +23,7 @@ import {
   addBulletSpan,
   removeBulletSpanOverlap,
   selectionOverlapsBullet,
+  normalizeRotateSpans,
 } from '../utils/lineReveal';
 import TextContextMenu from './TextContextMenu';
 import { resolveSentenceBackgroundImage } from '../services/sentenceBackgroundAi';
@@ -40,7 +41,6 @@ function UnifiedEditEditor({
   onHeadlineSpansChange,
   onRotateLineSpansChange,
   onBulletLineSpansChange,
-  onOpenSentencePicker,
   onSentencePositionChange,
   onActiveSentenceChange,
   onLineClick,
@@ -103,14 +103,13 @@ function UnifiedEditEditor({
     if (located) {
       onSentencePositionChange?.(located.sectionId, located.sentenceIndex);
       updateCursorSentence();
-      onOpenSentencePicker?.(located.sectionId, located.sentenceIndex);
+      onLineClick?.(located.sectionId, located.sentenceIndex);
     }
   }, [
     sectionOrder,
     sectionsData,
     updateCursorSentence,
     onSentencePositionChange,
-    onOpenSentencePicker,
     onLineClick,
   ]);
 
@@ -247,24 +246,26 @@ function UnifiedEditEditor({
         {
           id: 'rotate-set',
           label: 'Set as rotating lines (Present)',
-          disabled: !contextMenu.range,
+          disabled: !contextMenu.range || contextMenu.isRotate,
           onClick: () => {
             const { range } = contextMenu;
             if (!range) return;
             const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const next = addRotateSpan(
-              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
+            const len = sectionContent.length;
+            const nextRotate = normalizeRotateSpans(
+              addRotateSpan(
+                sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+                range.start,
+                range.end,
+                len
+              ),
+              len
             );
-            onRotateLineSpansChange?.(range.sectionId, next);
-            const clearedBullets = removeBulletSpanOverlap(
-              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
-            );
+            onRotateLineSpansChange?.(range.sectionId, nextRotate);
+            let clearedBullets = sectionsData[range.sectionId]?.bulletLineSpans ?? [];
+            for (const s of nextRotate) {
+              clearedBullets = removeBulletSpanOverlap(clearedBullets, s.start, s.end, len);
+            }
             onBulletLineSpansChange?.(range.sectionId, clearedBullets);
           },
         },
@@ -288,24 +289,26 @@ function UnifiedEditEditor({
         {
           id: 'bullet-set',
           label: 'Set as bullet list (Present)',
-          disabled: !contextMenu.range,
+          disabled: !contextMenu.range || contextMenu.isBullet,
           onClick: () => {
             const { range } = contextMenu;
             if (!range) return;
             const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const next = addBulletSpan(
-              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
+            const len = sectionContent.length;
+            const nextBullet = normalizeRotateSpans(
+              addBulletSpan(
+                sectionsData[range.sectionId]?.bulletLineSpans ?? [],
+                range.start,
+                range.end,
+                len
+              ),
+              len
             );
-            onBulletLineSpansChange?.(range.sectionId, next);
-            const clearedRotate = removeRotateSpanOverlap(
-              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
-            );
+            onBulletLineSpansChange?.(range.sectionId, nextBullet);
+            let clearedRotate = sectionsData[range.sectionId]?.rotateLineSpans ?? [];
+            for (const s of nextBullet) {
+              clearedRotate = removeRotateSpanOverlap(clearedRotate, s.start, s.end, len);
+            }
             onRotateLineSpansChange?.(range.sectionId, clearedRotate);
           },
         },
@@ -340,11 +343,12 @@ export default function EditView({
   onRotateLineSpansChange,
   onBulletLineSpansChange,
   onSentenceImageChange,
+  onSentenceImageLockChange,
   onBackgroundOpacityChange,
   onPresentStartChange,
 }) {
   const [pickerSentence, setPickerSentence] = useState(null);
-  const [pickerAutoSearch, setPickerAutoSearch] = useState(true);
+  const [pickerAutoSearch, setPickerAutoSearch] = useState(false);
   const [activeSentence, setActiveSentence] = useState(null);
   const [imageSearchOnLineClick, setImageSearchOnLineClick] = useState(
     () => getSettings().editImageSearchOnLineClick
@@ -427,25 +431,43 @@ export default function EditView({
     [pickerSentence, onSentenceImageChange]
   );
 
-  const handleOpenSentencePicker = useCallback(
+  const isSentenceLocked = useCallback(
     (sectionId, sentenceIndex) => {
-      setPickerAutoSearch(!useImport);
+      const locks = sectionsData[sectionId]?.sentenceImageLocks;
+      return Array.isArray(locks) && Boolean(locks[sentenceIndex]);
+    },
+    [sectionsData]
+  );
+
+  const handleOpenSentencePicker = useCallback(
+    (sectionId, sentenceIndex, { autoSearch = false } = {}) => {
+      if (isSentenceLocked(sectionId, sentenceIndex)) return;
+      setPickerAutoSearch(autoSearch);
       setPickerSentence({ sectionId, sentenceIndex });
     },
-    [useImport]
+    [isSentenceLocked]
   );
 
   const handleLineClick = useCallback(
     (sectionId, sentenceIndex) => {
+      if (isSentenceLocked(sectionId, sentenceIndex)) {
+        setPickerSentence(null);
+        return;
+      }
       if (imageSearchOnLineClick) {
-        setPickerAutoSearch(!useImport);
-        setPickerSentence({ sectionId, sentenceIndex });
+        handleOpenSentencePicker(sectionId, sentenceIndex, { autoSearch: true });
       } else {
         setPickerSentence(null);
       }
     },
-    [imageSearchOnLineClick, useImport]
+    [imageSearchOnLineClick, isSentenceLocked, handleOpenSentencePicker]
   );
+
+  useEffect(() => {
+    if (!imageSearchOnLineClick) {
+      setPickerSentence(null);
+    }
+  }, [imageSearchOnLineClick]);
 
   const handleImageSearchOnLineClickChange = useCallback((e) => {
     const next = e.target.checked;
@@ -474,6 +496,9 @@ export default function EditView({
   const activeSentenceImageUrl = activeSentence
     ? (sectionsData[activeSentence.sectionId]?.sentenceImages?.[activeSentence.sentenceIndex] || '')
     : '';
+  const activeSentenceLocked = activeSentence
+    ? isSentenceLocked(activeSentence.sectionId, activeSentence.sentenceIndex)
+    : false;
   const activeSentenceText = activeSentence
     ? (() => {
         const content = sectionsData[activeSentence.sectionId]?.content ?? '';
@@ -481,6 +506,26 @@ export default function EditView({
         return sentences[activeSentence.sentenceIndex] ?? '';
       })()
     : '';
+
+  const manualActionLabel = useMemo(() => {
+    if (useImport) return 'Import image for sentence';
+    if (useAiSketch) return 'Generate sketch for sentence';
+    if (useStock && sentenceImageSource.includes('video')) return 'Search video for sentence';
+    if (useStock) return 'Search image for sentence';
+    return 'Find background for sentence';
+  }, [useImport, useAiSketch, useStock, sentenceImageSource]);
+
+  const handleToggleActiveSentenceLock = useCallback(() => {
+    if (!activeSentence) return;
+    onSentenceImageLockChange?.(
+      activeSentence.sectionId,
+      activeSentence.sentenceIndex,
+      !activeSentenceLocked
+    );
+    if (!activeSentenceLocked) {
+      setPickerSentence(null);
+    }
+  }, [activeSentence, activeSentenceLocked, onSentenceImageLockChange]);
 
   const handleMagicAIAll = useCallback(async () => {
     setMagicLoadingAll(true);
@@ -492,7 +537,9 @@ export default function EditView({
         const content = section?.content ?? '';
         const { sentences } = getSentenceStarts(content);
         const existing = section?.sentenceImages ?? [];
+        const locks = section?.sentenceImageLocks ?? [];
         for (let i = 0; i < sentences.length; i++) {
+          if (Boolean(locks[i])) continue;
           const hasImage = Array.isArray(existing) && (existing[i] ?? '').toString().trim() !== '';
           if (hasImage) continue;
           const query = sentences[i].slice(0, 80).trim();
@@ -570,7 +617,6 @@ export default function EditView({
           onHeadlineSpansChange={onHeadlineSpansChange}
           onRotateLineSpansChange={onRotateLineSpansChange}
           onBulletLineSpansChange={onBulletLineSpansChange}
-          onOpenSentencePicker={handleOpenSentencePicker}
           onSentencePositionChange={handleSentencePositionChange}
           onActiveSentenceChange={handleActiveSentenceChange}
           onLineClick={handleLineClick}
@@ -616,22 +662,6 @@ export default function EditView({
               })}
             </div>
           </fieldset>
-          <label className="edit-view__side-option">
-            <input
-              type="checkbox"
-              checked={imageSearchOnLineClick}
-              onChange={handleImageSearchOnLineClickChange}
-            />
-            <span>
-              {useImport
-                ? 'Open import when clicking a sentence'
-                : useAiSketch
-                  ? 'Generate sketch when clicking a sentence'
-                  : useStock
-                    ? `Search ${stockSourceSearchLabel(sentenceImageSource)} when clicking a sentence`
-                    : 'Search stock media when clicking a sentence'}
-            </span>
-          </label>
           {useStock && (
             <label className="edit-view__side-option edit-view__side-option--select">
               <span className="edit-view__side-option-label">Results shown</span>
@@ -663,6 +693,114 @@ export default function EditView({
             </label>
           )}
         </div>
+
+        <section className="edit-view__side-section" aria-labelledby="edit-side-selected-image">
+          <h3 id="edit-side-selected-image" className="edit-view__side-section-title">
+            Selected image
+          </h3>
+          {activeSentence ? (
+            <>
+              <p className="edit-view__side-sentence">{activeSentenceText || 'This sentence'}</p>
+              {activeSentenceImageUrl ? (
+                <div className="edit-view__side-preview">
+                  {isVideoBackgroundUrl(activeSentenceImageUrl) ? (
+                    <video
+                      className="edit-view__side-thumb edit-view__side-thumb--video"
+                      src={activeSentenceImageUrl}
+                      muted
+                      playsInline
+                      loop
+                      autoPlay
+                      aria-label="Sentence background video"
+                    />
+                  ) : (
+                    <img
+                      className="edit-view__side-thumb"
+                      src={activeSentenceImageUrl}
+                      alt="Sentence background"
+                    />
+                  )}
+                </div>
+              ) : (
+                <p className="edit-view__side-empty">No background set for this sentence yet.</p>
+              )}
+              <label className="edit-view__side-option edit-view__side-option--lock">
+                <input
+                  type="checkbox"
+                  checked={activeSentenceLocked}
+                  onChange={handleToggleActiveSentenceLock}
+                />
+                <span>Lock image (skip auto-search and bulk fill)</span>
+              </label>
+              <div className="edit-view__side-actions">
+                {!imageSearchOnLineClick && !activeSentenceLocked && (
+                  <button
+                    type="button"
+                    className="edit-view__side-btn edit-view__side-btn--primary"
+                    onClick={() =>
+                      handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex, {
+                        autoSearch: true,
+                      })
+                    }
+                  >
+                    {manualActionLabel}
+                  </button>
+                )}
+                {activeSentenceImageUrl && !activeSentenceLocked && (
+                  <>
+                    <button
+                      type="button"
+                      className="edit-view__side-btn edit-view__side-btn--secondary"
+                      onClick={() =>
+                        handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex, {
+                          autoSearch: true,
+                        })
+                      }
+                    >
+                      {useImport ? 'Replace' : useAiSketch ? 'Regenerate' : 'Replace'}
+                    </button>
+                    <button
+                      type="button"
+                      className="edit-view__side-btn edit-view__side-btn--secondary"
+                      onClick={() =>
+                        onSentenceImageChange?.(activeSentence.sectionId, activeSentence.sentenceIndex, '')
+                      }
+                    >
+                      Remove image
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="edit-view__side-hint">Click a sentence in the story to manage its background.</p>
+          )}
+        </section>
+
+        <section className="edit-view__side-section" aria-labelledby="edit-side-auto-search">
+          <h3 id="edit-side-auto-search" className="edit-view__side-section-title">
+            Automatic search
+          </h3>
+          <label className="edit-view__side-option">
+            <input
+              type="checkbox"
+              checked={imageSearchOnLineClick}
+              onChange={handleImageSearchOnLineClickChange}
+            />
+            <span>
+              Search when clicking a sentence
+              {useStock ? ` (${stockSourceSearchLabel(sentenceImageSource)})` : ''}
+              {useAiSketch ? ' (generate sketch)' : ''}
+              {useImport ? ' (open import)' : ''}
+            </span>
+          </label>
+          <p className="edit-view__side-section-hint">
+            {imageSearchOnLineClick
+              ? 'Clicking or selecting a sentence opens search and runs it automatically (unless locked).'
+              : 'Use the button under Selected image to search or generate manually.'}
+          </p>
+        </section>
+
         <div className="edit-view__side-body">
         {pickerSentence !== null ? (
           <div className="edit-view__side-picker">
@@ -695,59 +833,12 @@ export default function EditView({
               />
             ) : null}
           </div>
-        ) : activeSentence !== null ? (
-          <>
-            <p className="edit-view__side-sentence">{activeSentenceText || 'This sentence'}</p>
-            {activeSentenceImageUrl ? (
-              <div className="edit-view__side-preview">
-                {isVideoBackgroundUrl(activeSentenceImageUrl) ? (
-                  <video
-                    className="edit-view__side-thumb edit-view__side-thumb--video"
-                    src={activeSentenceImageUrl}
-                    muted
-                    playsInline
-                    loop
-                    autoPlay
-                    aria-label="Sentence background video"
-                  />
-                ) : (
-                  <img
-                    className="edit-view__side-thumb"
-                    src={activeSentenceImageUrl}
-                    alt="Sentence background"
-                  />
-                )}
-                <div className="edit-view__side-actions">
-                  <button
-                    type="button"
-                    className="edit-view__side-btn edit-view__side-btn--primary"
-                    onClick={() => handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex)}
-                  >
-                    {useImport ? 'Replace image' : useAiSketch ? 'Regenerate sketch' : useStock && sentenceImageSource.includes('video') ? 'Swap video' : 'Swap image'}
-                  </button>
-                  <button
-                    type="button"
-                    className="edit-view__side-btn edit-view__side-btn--secondary"
-                    onClick={() => onSentenceImageChange?.(activeSentence.sectionId, activeSentence.sentenceIndex, '')}
-                  >
-                    Delete image
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="edit-view__side-actions">
-                <button
-                  type="button"
-                  className="edit-view__side-btn edit-view__side-btn--primary"
-                  onClick={() => handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex)}
-                >
-                  {useImport ? 'Import image' : useAiSketch ? 'Generate sketch' : useStock && sentenceImageSource.includes('video') ? 'Select video' : 'Select image'}
-                </button>
-              </div>
-            )}
-          </>
         ) : (
-          <p className="edit-view__side-hint">Click in or select a sentence to set its background image.</p>
+          <p className="edit-view__side-hint edit-view__side-hint--picker">
+            {imageSearchOnLineClick
+              ? 'Select a sentence to search, or turn off automatic search above.'
+              : 'Use “Search image for sentence” under Selected image.'}
+          </p>
         )}
         </div>
       </aside>

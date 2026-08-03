@@ -57,13 +57,12 @@ export default function UnsplashPicker({
   }, [accessKey, resultsCount]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !autoSearch) return;
     const q = (query || initialQuery).trim();
     if (!q) return;
-    if (!autoSearch && query === initialQuery) return;
     const t = setTimeout(() => searchWithQuery(q), 400);
     return () => clearTimeout(t);
-  }, [isOpen, query, initialQuery, searchWithQuery, autoSearch]);
+  }, [isOpen, autoSearch, query, initialQuery, searchWithQuery]);
 
   useEffect(() => {
     if (!isOpen) {

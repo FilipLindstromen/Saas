@@ -119,7 +119,31 @@ export function getRotateStepCount(sceneText, rotateSpansLocal) {
   return getLineRevealStepCount(sceneText, rotateSpansLocal, []);
 }
 
-/** Cumulative line-by-line reveal for rotate and/or bullet spans in one scene. */
+/** Rotating lines: only the active line is visible at each step. */
+export function appendRotateRevealLines(rows, lines, stepIndex) {
+  const lineIdx = Math.min(stepIndex, lines.length - 1);
+  rows.push({
+    kind: 'line',
+    text: lines[lineIdx],
+    variant: 'rotate',
+    animate: stepIndex < lines.length && lineIdx === stepIndex,
+  });
+}
+
+/** Bullet list: cumulative lines (1, then 1+2, then 1+2+3…); newest line animates in. */
+export function appendBulletRevealLines(rows, lines, stepIndex) {
+  const visible = Math.min(stepIndex + 1, lines.length);
+  for (let i = 0; i < visible; i++) {
+    rows.push({
+      kind: 'line',
+      text: lines[i],
+      variant: 'bullet',
+      animate: i === visible - 1 && stepIndex < lines.length,
+    });
+  }
+}
+
+/** Line-by-line reveal for rotate and/or bullet spans in one scene. */
 export function buildLineRevealRowsSimple(sceneText, rotateSpansLocal, bulletSpansLocal, stepIndex) {
   const text = String(sceneText ?? '');
   const tagged = collectTaggedRevealSpans(text, rotateSpansLocal, bulletSpansLocal);
@@ -135,14 +159,10 @@ export function buildLineRevealRowsSimple(sceneText, rotateSpansLocal, bulletSpa
     }
     const block = text.slice(span.start, span.end);
     const lines = block.split('\n');
-    const visible = Math.min(stepIndex + 1, lines.length);
-    for (let i = 0; i < visible; i++) {
-      rows.push({
-        kind: 'line',
-        text: lines[i],
-        variant: span.variant,
-        animate: i === visible - 1,
-      });
+    if (span.variant === 'bullet') {
+      appendBulletRevealLines(rows, lines, stepIndex);
+    } else {
+      appendRotateRevealLines(rows, lines, stepIndex);
     }
     cursor = span.end;
   }
@@ -154,7 +174,45 @@ export function buildLineRevealRowsSimple(sceneText, rotateSpansLocal, bulletSpa
 }
 
 export function buildRotateRevealRowsSimple(sceneText, rotateSpansLocal, stepIndex) {
-  return buildLineRevealRowsSimple(sceneText, rotateSpansLocal, [], stepIndex);
+  const text = String(sceneText ?? '');
+  const tagged = collectTaggedRevealSpans(text, rotateSpansLocal, []);
+  if (!tagged.length) return null;
+  const rows = [];
+  let cursor = 0;
+  const totalSteps = getLineRevealStepCount(text, rotateSpansLocal, []);
+  for (const span of tagged) {
+    if (span.start > cursor) {
+      rows.push({ kind: 'static', text: text.slice(cursor, span.start) });
+    }
+    const lines = text.slice(span.start, span.end).split('\n');
+    appendRotateRevealLines(rows, lines, stepIndex);
+    cursor = span.end;
+  }
+  if (cursor < text.length && stepIndex >= totalSteps - 1) {
+    rows.push({ kind: 'static', text: text.slice(cursor) });
+  }
+  return rows;
+}
+
+export function buildBulletRevealRowsSimple(sceneText, bulletSpansLocal, stepIndex) {
+  const text = String(sceneText ?? '');
+  const tagged = collectTaggedRevealSpans(text, [], bulletSpansLocal);
+  if (!tagged.length) return null;
+  const rows = [];
+  let cursor = 0;
+  const totalSteps = getLineRevealStepCount(text, [], bulletSpansLocal);
+  for (const span of tagged) {
+    if (span.start > cursor) {
+      rows.push({ kind: 'static', text: text.slice(cursor, span.start) });
+    }
+    const lines = text.slice(span.start, span.end).split('\n');
+    appendBulletRevealLines(rows, lines, stepIndex);
+    cursor = span.end;
+  }
+  if (cursor < text.length && stepIndex >= totalSteps - 1) {
+    rows.push({ kind: 'static', text: text.slice(cursor) });
+  }
+  return rows;
 }
 
 export function applyHeadlineToLineText(lineText, styledParts) {

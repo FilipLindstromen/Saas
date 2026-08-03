@@ -22,6 +22,8 @@
   position: sticky;
   top: 0;
   z-index: 100;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .app-title {
@@ -249,28 +251,6 @@
   min-height: 400px;
   transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
-  /* Firefox: dark scrollbar */
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-hover) var(--surface);
-}
-
-.story-about__input::-webkit-scrollbar {
-  width: 10px;
-}
-
-.story-about__input::-webkit-scrollbar-track {
-  background: var(--surface);
-  border-radius: 0 var(--btn-radius) var(--btn-radius) 0;
-}
-
-.story-about__input::-webkit-scrollbar-thumb {
-  background: var(--border-hover);
-  border-radius: 5px;
-  border: 2px solid var(--surface);
-}
-
-.story-about__input::-webkit-scrollbar-thumb:hover {
-  background: var(--border);
 }
 
 .story-about__input:focus {

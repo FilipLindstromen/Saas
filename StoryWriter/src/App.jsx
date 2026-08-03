@@ -247,6 +247,22 @@ function App() {
     });
   }, []);
 
+  const handleSentenceImageLockChange = useCallback((sectionId, sentenceIndex, locked) => {
+    setPersisted((prev) => {
+      const section = prev.sectionsData[sectionId] ?? {};
+      const locks = Array.isArray(section.sentenceImageLocks) ? [...section.sentenceImageLocks] : [];
+      while (locks.length <= sentenceIndex) locks.push(false);
+      locks[sentenceIndex] = Boolean(locked);
+      return {
+        ...prev,
+        sectionsData: {
+          ...prev.sectionsData,
+          [sectionId]: { ...section, sentenceImageLocks: locks },
+        },
+      };
+    });
+  }, []);
+
   const handleHeadlineSpansChange = useCallback((sectionId, headlineSpans) => {
     setPersisted((prev) => ({
       ...prev,
@@ -793,6 +809,7 @@ function App() {
             onRotateLineSpansChange={handleRotateLineSpansChange}
             onBulletLineSpansChange={handleBulletLineSpansChange}
             onSentenceImageChange={handleSentenceImageChange}
+            onSentenceImageLockChange={handleSentenceImageLockChange}
             onBackgroundOpacityChange={handleBackgroundOpacityChange}
             onPresentStartChange={setPresentStartIndex}
           />

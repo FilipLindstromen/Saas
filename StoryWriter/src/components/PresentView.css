@@ -138,11 +138,15 @@
   width: 100%;
   text-align: center;
   color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .present-rotate__static {
   margin: 0 0 0.35em;
   white-space: pre-line;
+  width: 100%;
 }
 
 .present-rotate__mask {
@@ -162,16 +166,20 @@
 
 .present-rotate__line--bullet {
   text-align: left;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0;
 }
 
 .present-rotate__mask--bullet {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
+}
+
+.present-rotate--bullets {
+  align-items: flex-start;
+  text-align: left;
 }
 
 @keyframes present-rotate-line-in {

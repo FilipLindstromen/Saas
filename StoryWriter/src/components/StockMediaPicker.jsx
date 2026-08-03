@@ -139,13 +139,12 @@ export default function StockMediaPicker({
   );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !autoSearch) return;
     const q = (query || initialQuery).trim();
     if (!q) return;
-    if (!autoSearch && query === initialQuery) return;
     const t = setTimeout(() => searchWithQuery(q), 400);
     return () => clearTimeout(t);
-  }, [isOpen, query, initialQuery, searchWithQuery, autoSearch]);
+  }, [isOpen, autoSearch, query, initialQuery, searchWithQuery]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -185,8 +184,24 @@ export default function StockMediaPicker({
           placeholder={`Search ${providerLabel} ${mediaLabel}…`}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              searchWithQuery(query);
+            }
+          }}
           autoFocus={!inline}
         />
+        {!autoSearch && (
+          <button
+            type="button"
+            className="unsplash-picker-search-btn"
+            onClick={() => searchWithQuery(query)}
+            disabled={loading}
+          >
+            Search
+          </button>
+        )}
       </div>
       {!apiKey && (
         <p className="unsplash-picker-hint">

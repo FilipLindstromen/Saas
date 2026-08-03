@@ -8,16 +8,33 @@ import {
 } from './sentences';
 
 /** Invisible boundary between framework sections in the unified editor (not shown in UI). */
-export const SECTION_SEPARATOR = '\n\n\u001E\n\n';
+export const SECTION_SEPARATOR = '\n\n\u200C\n\n';
+const SECTION_SPLIT_RE = /\n\n[\u001E\u200C]\n\n/;
+
+export function normalizeUnifiedSeparators(unified) {
+  return String(unified ?? '').replace(/\u001E/g, '\u200C');
+}
+
+function includedSectionCount(sectionOrder, sectionsData) {
+  const parts = sectionOrder.map((id) => sectionsData[id]?.content ?? '');
+  if (!parts.some((p) => String(p).trim())) return 0;
+  let end = parts.length;
+  while (end > 1 && !String(parts[end - 1]).trim()) {
+    end -= 1;
+  }
+  return end;
+}
 
 export function joinSectionContents(sectionOrder, sectionsData) {
+  const end = includedSectionCount(sectionOrder, sectionsData);
+  if (end === 0) return '';
   const parts = sectionOrder.map((id) => sectionsData[id]?.content ?? '');
-  if (!parts.some((p) => String(p).trim())) return '';
-  return parts.join(SECTION_SEPARATOR);
+  return parts.slice(0, end).join(SECTION_SEPARATOR);
 }
 
 export function splitIntoSectionContents(unified, sectionOrder) {
-  const parts = String(unified ?? '').split(SECTION_SEPARATOR);
+  const normalized = normalizeUnifiedSeparators(unified);
+  const parts = normalized.split(SECTION_SPLIT_RE);
   const result = {};
   for (let i = 0; i < sectionOrder.length; i++) {
     result[sectionOrder[i]] = parts[i] ?? '';
@@ -40,8 +57,20 @@ function remapSentenceImages(oldContent, newContent, oldImages) {
   });
 }
 
+function remapSentenceLocks(oldContent, newContent, oldLocks) {
+  const { sentences: oldS } = getSentenceStarts(oldContent);
+  const { sentences: newS } = getSentenceStarts(newContent);
+  if (!newS.length) return [];
+  const locks = Array.isArray(oldLocks) ? oldLocks : [];
+  return newS.map((sentence) => {
+    const oldIdx = oldS.indexOf(sentence);
+    return oldIdx >= 0 && Boolean(locks[oldIdx]);
+  });
+}
+
 export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {
-  const split = splitIntoSectionContents(unified, sectionOrder);
+  const cleaned = normalizeUnifiedSeparators(unified).replace(/(\n\n\u200C\n\n)+$/g, '');
+  const split = splitIntoSectionContents(cleaned, sectionOrder);
   const next = { ...sectionsData };
   for (const id of sectionOrder) {
     const old = sectionsData[id] ?? {};
@@ -50,6 +79,7 @@ export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {
       ...old,
       content: newContent,
       sentenceImages: remapSentenceImages(old.content ?? '', newContent, old.sentenceImages ?? []),
+      sentenceImageLocks: remapSentenceLocks(old.content ?? '', newContent, old.sentenceImageLocks ?? []),
       headlineSpans: remapHeadlineSpans(old.content ?? '', newContent, old.headlineSpans ?? []),
       rotateLineSpans: remapRotateSpans(old.content ?? '', newContent, old.rotateLineSpans ?? []),
       bulletLineSpans: remapBulletSpans(old.content ?? '', newContent, old.bulletLineSpans ?? []),
@@ -60,13 +90,14 @@ export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {
 
 export function getUnifiedSectionSpans(sectionOrder, sectionsData) {
   const spans = [];
+  const end = includedSectionCount(sectionOrder, sectionsData);
   let pos = 0;
-  for (let i = 0; i < sectionOrder.length; i++) {
+  for (let i = 0; i < end; i++) {
     const id = sectionOrder[i];
     const content = sectionsData[id]?.content ?? '';
     spans.push({ sectionId: id, start: pos, end: pos + content.length });
     pos += content.length;
-    if (i < sectionOrder.length - 1) pos += SECTION_SEPARATOR.length;
+    if (i < end - 1) pos += SECTION_SEPARATOR.length;
   }
   return spans;
 }
@@ -110,8 +141,9 @@ export function buildUnifiedHighlightParts(sectionOrder, sectionsData) {
   const unified = joinSectionContents(sectionOrder, sectionsData);
   const parts = [];
   let unifiedCursor = 0;
+  const end = includedSectionCount(sectionOrder, sectionsData);
 
-  for (let i = 0; i < sectionOrder.length; i++) {
+  for (let i = 0; i < end; i++) {
     const id = sectionOrder[i];
     const content = sectionsData[id]?.content ?? '';
     const images = sectionsData[id]?.sentenceImages ?? [];
@@ -135,7 +167,7 @@ export function buildUnifiedHighlightParts(sectionOrder, sectionsData) {
       });
     }
     unifiedCursor = spanStart + content.length;
-    if (i < sectionOrder.length - 1) {
+    if (i < end - 1) {
       const sepStart = unifiedCursor;
       unifiedCursor += SECTION_SEPARATOR.length;
       parts.push({ text: unified.slice(sepStart, unifiedCursor), highlight: false });

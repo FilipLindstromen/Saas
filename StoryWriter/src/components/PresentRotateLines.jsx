@@ -3,9 +3,11 @@ import { applyHeadlineToLineText } from '../utils/lineReveal';
 export default function PresentRotateLines({ rows, styledParts, fontSize, lineHeight, animKey }) {
   if (!rows?.length) return null;
 
+  const hasBullets = rows.some((row) => row.kind === 'line' && row.variant === 'bullet');
+
   return (
     <div
-      className="present-rotate"
+      className={['present-rotate', hasBullets && 'present-rotate--bullets'].filter(Boolean).join(' ')}
       style={{ fontSize, lineHeight }}
       aria-live="polite"
     >

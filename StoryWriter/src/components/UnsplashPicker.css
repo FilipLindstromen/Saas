@@ -92,10 +92,18 @@
 
 .unsplash-picker-search {
   padding: 0.75rem 1.25rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.unsplash-picker-inline .unsplash-picker-search {
+  padding: 0.5rem 0.75rem;
 }
 
 .unsplash-picker-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   font-size: 0.9375rem;
   color: var(--text);
@@ -103,6 +111,28 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   outline: none;
+}
+
+.unsplash-picker-search-btn {
+  flex-shrink: 0;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--hover);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.unsplash-picker-search-btn:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.unsplash-picker-search-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .unsplash-picker-input:focus {

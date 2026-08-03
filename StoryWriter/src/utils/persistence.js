@@ -18,6 +18,11 @@ function persistBulletSpans(spans, contentLength) {
   return persistSpanRanges(spans, contentLength);
 }
 
+function persistSentenceImageLocks(locks) {
+  if (!Array.isArray(locks)) return [];
+  return locks.map((x) => Boolean(x));
+}
+
 const STORAGE_KEY = 'storywriter_content';
 
 let cached = null;
@@ -80,6 +85,7 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
           backgroundImageUrl: typeof sectionsData[id].backgroundImageUrl === 'string' ? sectionsData[id].backgroundImageUrl : undefined,
           backgroundImageCredit: typeof sectionsData[id].backgroundImageCredit === 'string' ? sectionsData[id].backgroundImageCredit : undefined,
           sentenceImages: arr,
+          sentenceImageLocks: persistSentenceImageLocks(sectionsData[id].sentenceImageLocks),
           headlineSpans: persistHeadlineSpans(sectionsData[id].headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(sectionsData[id].rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(sectionsData[id].bulletLineSpans, String(content).length),
@@ -126,6 +132,7 @@ export function saveContent(payload) {
           backgroundImageUrl: typeof section.backgroundImageUrl === 'string' ? section.backgroundImageUrl : undefined,
           backgroundImageCredit: typeof section.backgroundImageCredit === 'string' ? section.backgroundImageCredit : undefined,
           sentenceImages: arr,
+          sentenceImageLocks: persistSentenceImageLocks(section.sentenceImageLocks),
           headlineSpans: persistHeadlineSpans(section.headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(section.rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(section.bulletLineSpans, String(content).length),
