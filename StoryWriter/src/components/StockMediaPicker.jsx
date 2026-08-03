@@ -95,7 +95,7 @@ export default function StockMediaPicker({
   initialQuery = '',
   inline = false,
   autoSearch = true,
-  resultsCount = 20,
+  resultsCount = 30,
 }) {
   const parsed = parseStockMediaSource(stockSource) ?? { provider: 'unsplash', media: 'photo' };
   const { provider, media } = parsed;
@@ -169,10 +169,14 @@ export default function StockMediaPicker({
 
   const pickerContent = (
     <div className={inline ? 'unsplash-picker-inline' : 'unsplash-picker-modal'}>
-      <div className="unsplash-picker-header">
-        <h3 className="unsplash-picker-title">
-          {initialQuery ? `Set ${media === 'video' ? 'video' : 'image'} for sentence` : 'Set background'}
-        </h3>
+      <div className={`unsplash-picker-header${inline ? ' unsplash-picker-header--inline' : ''}`}>
+        {!inline ? (
+          <h3 className="unsplash-picker-title">
+            {initialQuery ? `Set ${media === 'video' ? 'video' : 'image'} for sentence` : 'Set background'}
+          </h3>
+        ) : (
+          <span className="unsplash-picker-header-spacer" aria-hidden="true" />
+        )}
         <button type="button" className="unsplash-picker-close" onClick={onClose} aria-label="Close">
           ×
         </button>
@@ -203,7 +207,7 @@ export default function StockMediaPicker({
           </button>
         )}
       </div>
-      {!apiKey && (
+      {!apiKey && !inline && (
         <p className="unsplash-picker-hint">
           Add your {providerLabel} API key in Settings to search {mediaLabel}.
         </p>

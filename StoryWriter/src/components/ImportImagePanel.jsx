@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { readImageFileAsDataUrl } from '../utils/importImage';
 import './ImportImagePanel.css';
 
-export default function ImportImagePanel({ isOpen, onClose, onSelect, sentenceText = '' }) {
+export default function ImportImagePanel({ isOpen, onClose, onSelect, sentenceText = '', compact = false }) {
   const inputRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState('');
@@ -30,14 +30,15 @@ export default function ImportImagePanel({ isOpen, onClose, onSelect, sentenceTe
   if (!isOpen) return null;
 
   return (
-    <div className="import-image-panel">
+    <div className={`import-image-panel${compact ? ' import-image-panel--compact' : ''}`}>
       <div className="import-image-panel__header">
-        <h3 className="import-image-panel__title">Import image</h3>
+        {!compact && <h3 className="import-image-panel__title">Import image</h3>}
+        {compact && <span className="import-image-panel__header-spacer" aria-hidden="true" />}
         <button type="button" className="import-image-panel__close" onClick={onClose} aria-label="Close">
           ×
         </button>
       </div>
-      {sentenceText ? <p className="import-image-panel__sentence">{sentenceText}</p> : null}
+      {!compact && sentenceText ? <p className="import-image-panel__sentence">{sentenceText}</p> : null}
       <input
         ref={inputRef}
         type="file"

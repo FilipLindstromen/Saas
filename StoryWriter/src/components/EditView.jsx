@@ -1,5 +1,5 @@
-import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { getSettings, saveSettings, UNSPLASH_RESULT_COUNT_OPTIONS, SENTENCE_IMAGE_SOURCE_OPTIONS } from '../utils/settings';
+import { useRef, useEffect, useCallback, useState, useMemo, useLayoutEffect } from 'react';
+import { getSettings, saveSettings, SENTENCE_IMAGE_SOURCE_OPTIONS, EDIT_STOCK_RESULTS_COUNT } from '../utils/settings';
 import {
   getSentenceStarts,
   getGlobalSceneIndexForSentence,
@@ -11,6 +11,7 @@ import {
   unifiedSelectionToSectionRange,
 } from '../utils/storyDocument';
 import { buildUnifiedMirrorParts, buildUnifiedLineGutter } from '../utils/unifiedMirror';
+import { measureLineTops } from '../utils/editorLineMeasure';
 import {
   addHeadlineSpan,
   removeHeadlineSpanOverlap,
@@ -28,7 +29,7 @@ import {
 import TextContextMenu from './TextContextMenu';
 import { resolveSentenceBackgroundImage } from '../services/sentenceBackgroundAi';
 import StockMediaPicker from './StockMediaPicker';
-import { isStockMediaSource, isVideoBackgroundUrl, stockSourceSearchLabel } from '../utils/stockMediaSource';
+import { isStockMediaSource, isVideoBackgroundUrl } from '../utils/stockMediaSource';
 import SketchBackgroundPanel from './SketchBackgroundPanel';
 import ImportImagePanel from './ImportImagePanel';
 import './EditView.css';
@@ -47,6 +48,9 @@ function UnifiedEditEditor({
 }) {
   const textareaRef = useRef(null);
   const wrapRef = useRef(null);
+  const bodyRef = useRef(null);
+  const measureRef = useRef(null);
+  const [gutterTops, setGutterTops] = useState([]);
   const [contextMenu, setContextMenu] = useState({
     open: false,
     x: 0,
@@ -78,7 +82,30 @@ function UnifiedEditEditor({
 
   useEffect(() => {
     adjustHeight();
-  }, [content, adjustHeight]);
+    requestAnimationFrame(() => remeasureGutter());
+  }, [content, adjustHeight, remeasureGutter]);
+
+  const remeasureGutter = useCallback(() => {
+    const measureEl = measureRef.current;
+    if (!measureEl) return;
+    setGutterTops(measureLineTops(measureEl, content));
+  }, [content]);
+
+  useLayoutEffect(() => {
+    remeasureGutter();
+  }, [remeasureGutter, gutterLines.length]);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => remeasureGutter());
+    ro.observe(body);
+    window.addEventListener('resize', remeasureGutter);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', remeasureGutter);
+    };
+  }, [remeasureGutter]);
 
   const updateCursorSentence = useCallback(() => {
     const el = textareaRef.current;
@@ -168,9 +195,14 @@ function UnifiedEditEditor({
   return (
     <>
     <div ref={wrapRef} className="unified-story-editor__wrap edit-step__content-wrap">
+      <div ref={bodyRef} className="edit-step__content-body">
       <div className="edit-step__content-gutter" aria-hidden="true">
         {gutterLines.map((line, i) => (
-          <div key={i} className="edit-step__gutter-line">
+          <div
+            key={i}
+            className="edit-step__gutter-line"
+            style={{ top: gutterTops[i] ?? 0 }}
+          >
             {line.headline && (
               <span className="edit-step__gutter-mark edit-step__gutter-mark--headline" title="Headline">
                 H
@@ -194,7 +226,9 @@ function UnifiedEditEditor({
           </div>
         ))}
       </div>
-      <div className="edit-step__content-body">
+      <div ref={measureRef} className="edit-step__line-measure" aria-hidden="true">
+        {content}
+      </div>
       <div className="unified-story-editor__mirror edit-step__content-mirror" aria-hidden="true">
         {mirrorParts.map((part, i) => {
           const classes = [
@@ -221,6 +255,7 @@ function UnifiedEditEditor({
         onChange={(e) => {
           onUnifiedContentChange(e.target.value);
           adjustHeight();
+          requestAnimationFrame(() => remeasureGutter());
         }}
         onContextMenu={handleContextMenu}
         onMouseUp={handleMouseUp}
@@ -385,9 +420,6 @@ export default function EditView({
   const [imageSearchOnLineClick, setImageSearchOnLineClick] = useState(
     () => getSettings().editImageSearchOnLineClick
   );
-  const [unsplashResultsCount, setUnsplashResultsCount] = useState(
-    () => getSettings().editUnsplashResultsCount
-  );
   const [sentenceImageSource, setSentenceImageSource] = useState(
     () => getSettings().editSentenceImageSource
   );
@@ -505,12 +537,6 @@ export default function EditView({
     const next = e.target.checked;
     setImageSearchOnLineClick(next);
     saveSettings({ ...getSettings(), editImageSearchOnLineClick: next });
-  }, []);
-
-  const handleUnsplashResultsCountChange = useCallback((e) => {
-    const next = Number(e.target.value);
-    setUnsplashResultsCount(next);
-    saveSettings({ ...getSettings(), editUnsplashResultsCount: next });
   }, []);
 
   const handleSentenceImageSourceChange = useCallback((next) => {
@@ -656,7 +682,7 @@ export default function EditView({
       </div>
       <aside
         className={`edit-view__side${pickerSentence !== null ? ' edit-view__side--picker-open' : ''}`}
-        aria-label="Sentence image"
+        aria-label="Sentence background"
         onMouseDown={(e) => {
           if (e.target.closest('.edit-view__side-picker, .sketch-bg-panel, .unsplash-picker-inline, .import-image-panel')) {
             return;
@@ -667,10 +693,9 @@ export default function EditView({
           if (!focusable) e.preventDefault();
         }}
       >
-        <h2 className="edit-view__side-title">Sentence image</h2>
         <div className="edit-view__side-options">
           <fieldset className="edit-view__source-field">
-            <legend className="edit-view__side-option-label">Background source</legend>
+            <legend className="edit-view__source-legend">Background source</legend>
             <div className="edit-view__source-grid" role="radiogroup" aria-label="Sentence background source">
               {SENTENCE_IMAGE_SOURCE_OPTIONS.map((o) => {
                 const checked = sentenceImageSource === o.value;
@@ -694,23 +719,6 @@ export default function EditView({
               })}
             </div>
           </fieldset>
-          {useStock && (
-            <label className="edit-view__side-option edit-view__side-option--select">
-              <span className="edit-view__side-option-label">Results shown</span>
-              <select
-                className="edit-view__side-select"
-                value={unsplashResultsCount}
-                onChange={handleUnsplashResultsCountChange}
-                aria-label="Number of stock results"
-              >
-                {UNSPLASH_RESULT_COUNT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           {useAiSketch && (
             <label className="edit-view__side-option edit-view__side-option--stack">
               <span className="edit-view__side-option-label">Sketch instructions (optional)</span>
@@ -726,12 +734,9 @@ export default function EditView({
           )}
         </div>
 
-        <section className="edit-view__side-section" aria-labelledby="edit-side-selected-image">
-          <h3 id="edit-side-selected-image" className="edit-view__side-section-title">
-            Selected image
-          </h3>
-          {activeSentence ? (
-            <>
+        {activeSentence ? (
+        <section className="edit-view__side-section edit-view__side-section--selected" aria-label="Selected background">
+          <>
               <p className="edit-view__side-sentence">{activeSentenceText || 'This sentence'}</p>
               {activeSentenceImageUrl ? (
                 <div className="edit-view__side-preview">
@@ -753,16 +758,14 @@ export default function EditView({
                     />
                   )}
                 </div>
-              ) : (
-                <p className="edit-view__side-empty">No background set for this sentence yet.</p>
-              )}
+              ) : null}
               <label className="edit-view__side-option edit-view__side-option--lock">
                 <input
                   type="checkbox"
                   checked={activeSentenceLocked}
                   onChange={handleToggleActiveSentenceLock}
                 />
-                <span>Lock image (skip auto-search and bulk fill)</span>
+                <span>Lock image</span>
               </label>
               <div className="edit-view__side-actions">
                 {!imageSearchOnLineClick && !activeSentenceLocked && (
@@ -798,39 +801,24 @@ export default function EditView({
                         onSentenceImageChange?.(activeSentence.sectionId, activeSentence.sentenceIndex, '')
                       }
                     >
-                      Remove image
+                      Remove
                     </button>
                   </>
                 )}
               </div>
             </>
-          ) : (
-            <p className="edit-view__side-hint">Click a sentence in the story to manage its background.</p>
-          )}
         </section>
+        ) : null}
 
-        <section className="edit-view__side-section" aria-labelledby="edit-side-auto-search">
-          <h3 id="edit-side-auto-search" className="edit-view__side-section-title">
-            Automatic search
-          </h3>
+        <section className="edit-view__side-section edit-view__side-section--auto" aria-label="Automatic search">
           <label className="edit-view__side-option">
             <input
               type="checkbox"
               checked={imageSearchOnLineClick}
               onChange={handleImageSearchOnLineClickChange}
             />
-            <span>
-              Search when clicking a sentence
-              {useStock ? ` (${stockSourceSearchLabel(sentenceImageSource)})` : ''}
-              {useAiSketch ? ' (generate sketch)' : ''}
-              {useImport ? ' (open import)' : ''}
-            </span>
+            <span>Search when clicking a sentence</span>
           </label>
-          <p className="edit-view__side-section-hint">
-            {imageSearchOnLineClick
-              ? 'Clicking or selecting a sentence opens search and runs it automatically (unless locked).'
-              : 'Use the button under Selected image to search or generate manually.'}
-          </p>
         </section>
 
         <div className="edit-view__side-body">
@@ -839,6 +827,7 @@ export default function EditView({
             {useImport ? (
               <ImportImagePanel
                 isOpen={true}
+                compact
                 sentenceText={pickerSentenceText}
                 onClose={() => setPickerSentence(null)}
                 onSelect={handlePickerSelect}
@@ -846,6 +835,7 @@ export default function EditView({
             ) : useAiSketch ? (
               <SketchBackgroundPanel
                 isOpen={true}
+                compact
                 sentenceText={pickerSentenceText}
                 onClose={() => setPickerSentence(null)}
                 onSelect={handlePickerSelect}
@@ -861,17 +851,11 @@ export default function EditView({
                 onSelect={handlePickerSelect}
                 initialQuery={pickerInitialQuery}
                 autoSearch={pickerAutoSearch}
-                resultsCount={unsplashResultsCount}
+                resultsCount={EDIT_STOCK_RESULTS_COUNT}
               />
             ) : null}
           </div>
-        ) : (
-          <p className="edit-view__side-hint edit-view__side-hint--picker">
-            {imageSearchOnLineClick
-              ? 'Select a sentence to search, or turn off automatic search above.'
-              : 'Use “Search image for sentence” under Selected image.'}
-          </p>
-        )}
+        ) : null}
         </div>
       </aside>
       {webcamEnabled && (

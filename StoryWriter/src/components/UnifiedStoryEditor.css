@@ -54,7 +54,7 @@
 .edit-view .unified-story-editor__mirror {
   position: absolute;
   inset: 0;
-  padding: 0;
+  padding: 0 0 0 1.85rem;
   margin: 0;
   border: none;
   pointer-events: none;
@@ -65,6 +65,7 @@
   font-family: inherit;
   font-size: 1.0625rem;
   line-height: 1.7;
+  box-sizing: border-box;
 }
 
 .edit-view .unified-story-editor__mirror-highlight {

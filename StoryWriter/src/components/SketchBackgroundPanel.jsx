@@ -10,6 +10,7 @@ export default function SketchBackgroundPanel({
   onSelect,
   autoGenerate = false,
   instructions = '',
+  compact = false,
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -76,14 +77,15 @@ export default function SketchBackgroundPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="sketch-bg-panel" onMouseDown={(e) => e.stopPropagation()}>
+    <div className={`sketch-bg-panel${compact ? ' sketch-bg-panel--compact' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
       <div className="sketch-bg-panel__header">
-        <h3 className="sketch-bg-panel__title">Generate napkin sketch</h3>
+        {!compact && <h3 className="sketch-bg-panel__title">Generate napkin sketch</h3>}
+        {compact && <span className="sketch-bg-panel__header-spacer" aria-hidden="true" />}
         <button type="button" className="sketch-bg-panel__close" onClick={onClose} aria-label="Close">
           ×
         </button>
       </div>
-      <p className="sketch-bg-panel__sentence">{sentenceText || 'This sentence'}</p>
+      {!compact && <p className="sketch-bg-panel__sentence">{sentenceText || 'This sentence'}</p>}
       {error && <p className="sketch-bg-panel__error">{error}</p>}
       {loading && <p className="sketch-bg-panel__loading">Generating sketch…</p>}
       {previewUrl && !loading && (

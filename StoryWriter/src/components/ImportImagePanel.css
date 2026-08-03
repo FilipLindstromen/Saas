@@ -6,11 +6,17 @@
   flex: 1;
 }
 
-.import-image-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+.import-image-panel__header-spacer {
+  flex: 1;
+}
+
+.import-image-panel--compact {
+  gap: 0.35rem;
+}
+
+.import-image-panel--compact .import-image-panel__header {
+  justify-content: flex-end;
+  min-height: 1.5rem;
 }
 
 .import-image-panel__title {

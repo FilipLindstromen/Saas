@@ -6,11 +6,17 @@
   flex: 1;
 }
 
-.sketch-bg-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+.sketch-bg-panel__header-spacer {
+  flex: 1;
+}
+
+.sketch-bg-panel--compact {
+  gap: 0.35rem;
+}
+
+.sketch-bg-panel--compact .sketch-bg-panel__header {
+  justify-content: flex-end;
+  min-height: 1.5rem;
 }
 
 .sketch-bg-panel__title {

@@ -51,6 +51,9 @@ export const TEXT_ANIMATION_OPTIONS = [
   { value: 'none', label: 'None' },
 ];
 
+/** Fixed result count for Edit → stock media sentence picker. */
+export const EDIT_STOCK_RESULTS_COUNT = 30;
+
 /** How many Unsplash thumbnails to load in Edit → sentence image picker. */
 export const UNSPLASH_RESULT_COUNT_OPTIONS = [
   { value: 4, label: '4' },
