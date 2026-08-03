@@ -54,6 +54,14 @@ function App() {
   const [error, setError] = useState('');
   const [view, setView] = useState('write');
   const [presentStartIndex, setPresentStartIndex] = useState(0);
+
+  useEffect(() => {
+    if (view === 'present') return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, [view]);
+
   const [inputPanelWidth, setInputPanelWidth] = useState(INPUT_PANEL_DEFAULT);
   const [writePanelVisible, setWritePanelVisible] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
@@ -289,6 +297,16 @@ function App() {
       sectionsData: {
         ...prev.sectionsData,
         [sectionId]: { ...prev.sectionsData[sectionId], bulletLineSpans },
+      },
+    }));
+  }, []);
+
+  const handlePresentStyleSpansChange = useCallback((sectionId, presentStyleSpans) => {
+    setPersisted((prev) => ({
+      ...prev,
+      sectionsData: {
+        ...prev.sectionsData,
+        [sectionId]: { ...prev.sectionsData[sectionId], presentStyleSpans },
       },
     }));
   }, []);
@@ -808,10 +826,12 @@ function App() {
             onHeadlineSpansChange={handleHeadlineSpansChange}
             onRotateLineSpansChange={handleRotateLineSpansChange}
             onBulletLineSpansChange={handleBulletLineSpansChange}
+            onPresentStyleSpansChange={handlePresentStyleSpansChange}
             onSentenceImageChange={handleSentenceImageChange}
             onSentenceImageLockChange={handleSentenceImageLockChange}
             onBackgroundOpacityChange={handleBackgroundOpacityChange}
             onPresentStartChange={setPresentStartIndex}
+            presentationAnimationRules={presentationAnimationRules}
           />
         </main>
       )}

@@ -1,0 +1,38 @@
+.present-preview-panel {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+  flex-shrink: 0;
+}
+
+.present-preview-panel__empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.present-preview-panel__stage {
+  position: relative;
+  min-height: 4.5rem;
+  max-height: 11rem;
+  overflow: hidden;
+  padding: 0.65rem 0.5rem;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  text-align: center;
+  font-weight: 700;
+}
+
+.present-preview-panel__stage--left {
+  text-align: left;
+}
+
+.present-preview-panel__stage .present-rotate {
+  font-size: inherit !important;
+}
+
+.present-preview-panel__stage .present-view__sentence {
+  font-size: inherit !important;
+}

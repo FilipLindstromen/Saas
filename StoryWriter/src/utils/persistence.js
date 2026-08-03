@@ -1,9 +1,18 @@
 import { isValidTargetOutcomeId } from '../constants/targetOutcomes';
 import { normalizePresentationAnimationRules } from './textAnimations';
 import { normalizeHeadlineSpans } from './headlines';
+import { normalizePresentStyleSpans } from './presentStyles';
 
 function persistHeadlineSpans(spans, contentLength) {
   return normalizeHeadlineSpans(spans, contentLength).map(({ start, end }) => ({ start, end }));
+}
+
+function persistPresentStyleSpans(spans, contentLength) {
+  return normalizePresentStyleSpans(spans, contentLength).map(({ start, end, style }) => ({
+    start,
+    end,
+    style,
+  }));
 }
 
 function persistSpanRanges(spans, contentLength) {
@@ -89,6 +98,7 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
           headlineSpans: persistHeadlineSpans(sectionsData[id].headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(sectionsData[id].rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(sectionsData[id].bulletLineSpans, String(content).length),
+          presentStyleSpans: persistPresentStyleSpans(sectionsData[id].presentStyleSpans, String(content).length),
         };
       }
     }
@@ -136,6 +146,7 @@ export function saveContent(payload) {
           headlineSpans: persistHeadlineSpans(section.headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(section.rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(section.bulletLineSpans, String(content).length),
+          presentStyleSpans: persistPresentStyleSpans(section.presentStyleSpans, String(content).length),
         };
       }
     }

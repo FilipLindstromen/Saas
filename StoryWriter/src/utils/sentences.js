@@ -1,4 +1,9 @@
 import { headlinePartsForScene } from './headlines';
+import {
+  presentStyledPartsForScene,
+  presentStyleSpansForScene,
+  resolveSceneLayout,
+} from './presentStyles';
 import { rotateSpansForScene, bulletSpansForScene, getLineRevealStepCount } from './lineReveal';
 
 /** Split text into sentences (by . ! ? followed by space or end). */
@@ -137,7 +142,7 @@ const PRESENT_SCENE_BREAK = /\n[\t ]*\n+/g;
  * Present-mode scenes: blocks separated by a blank line (double line break).
  * Preserves single line breaks inside each scene as authored in the editor.
  */
-export function getPresentScenes(content, sentenceImages = [], headlineSpans = [], rotateLineSpans = [], bulletLineSpans = []) {
+export function getPresentScenes(content, sentenceImages = [], headlineSpans = [], rotateLineSpans = [], bulletLineSpans = [], presentStyleSpans = []) {
   const raw = String(content ?? '');
   if (!raw.trim()) return [];
 
@@ -168,6 +173,7 @@ export function getPresentScenes(content, sentenceImages = [], headlineSpans = [
 
     const rotateSpans = rotateSpansForScene(raw, rawStart, rawEnd, text, rotateLineSpans);
     const bulletSpans = bulletSpansForScene(raw, rawStart, rawEnd, text, bulletLineSpans);
+    const localStyles = presentStyleSpansForScene(raw, rawStart, rawEnd, text, presentStyleSpans);
     scenes.push({
       text,
       start: rawStart,
@@ -175,7 +181,8 @@ export function getPresentScenes(content, sentenceImages = [], headlineSpans = [
       sentenceIndices,
       primarySentenceIndex,
       imageUrl,
-      styledParts: headlinePartsForScene(raw, rawStart, rawEnd, text, headlineSpans),
+      styledParts: presentStyledPartsForScene(raw, rawStart, rawEnd, text, headlineSpans, presentStyleSpans),
+      layout: resolveSceneLayout(localStyles),
       rotateSpans,
       bulletSpans,
       lineRevealStepCount: getLineRevealStepCount(text, rotateSpans, bulletSpans),
@@ -203,7 +210,8 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
     const headlineSpans = section?.headlineSpans ?? [];
     const rotateLineSpans = section?.rotateLineSpans ?? [];
     const bulletLineSpans = section?.bulletLineSpans ?? [];
-    const scenes = getPresentScenes(content, sentenceImages, headlineSpans, rotateLineSpans, bulletLineSpans);
+    const presentStyleSpans = section?.presentStyleSpans ?? [];
+    const scenes = getPresentScenes(content, sentenceImages, headlineSpans, rotateLineSpans, bulletLineSpans, presentStyleSpans);
     for (const scene of scenes) {
       out.push({
         text: scene.text,
@@ -212,6 +220,7 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
         sentenceIndices: scene.sentenceIndices,
         imageUrl: scene.imageUrl,
         styledParts: scene.styledParts,
+        layout: scene.layout,
         rotateSpans: scene.rotateSpans,
         bulletSpans: scene.bulletSpans,
         lineRevealStepCount: scene.lineRevealStepCount,

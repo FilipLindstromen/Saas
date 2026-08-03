@@ -11,8 +11,9 @@
   align-items: center;
   justify-content: center;
   background: var(--bg);
-  padding: 3rem;
+  padding: 0;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .present-view--advance-on-click {
@@ -22,6 +23,8 @@
 .present-view__bg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -35,21 +38,24 @@
 
 @keyframes present-bg-ken-burns {
   0% {
-    background-size: 100%;
+    background-size: cover;
     background-position: 50% 50%;
   }
   50% {
-    background-size: var(--present-bg-scale-max, 115%);
+    background-size: calc(var(--present-bg-scale-max, 115%) * 1);
     background-position: 45% 48%;
   }
   100% {
-    background-size: 100%;
+    background-size: cover;
     background-position: 52% 52%;
   }
 }
 
 .present-view__bg-video {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  object-position: center;
   pointer-events: none;
 }
 
@@ -58,10 +64,14 @@
   z-index: 1;
   max-width: 900px;
   width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: clamp(1.25rem, 4vw, 3rem);
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2rem;
 }
 
@@ -140,6 +150,107 @@
   line-height: 1.2;
 }
 
+.present-view__emphasis {
+  font-style: italic;
+  font-weight: 800;
+}
+
+.present-view__caption {
+  display: block;
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-top: 0.35em;
+}
+
+.present-view__type-large {
+  font-size: 1.35em;
+  line-height: 1.15;
+}
+
+.present-view__type-whisper {
+  font-size: 0.88em;
+  font-weight: 500;
+  opacity: 0.72;
+}
+
+.present-view__inner--layout-left {
+  text-align: left;
+  align-items: flex-start;
+}
+
+.present-view__sentence-stage--layout-left {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.present-view__sentence-stage--layout-left .present-view__sentence--enter,
+.present-view__sentence-stage--layout-left .present-view__sentence--exit {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.present-view__sentence-stage--layout-left .present-rotate {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.present-view__capture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.present-view__export-bar {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 12;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.present-view__export-btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.present-view__export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.present-view__export-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  pointer-events: all;
+}
+
+.present-rotate__mask--animate-bullet .present-rotate__line {
+  animation: present-bullet-line-in var(--present-enter-duration, 380ms) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .present-rotate {
   width: 100%;
   text-align: center;
@@ -165,7 +276,7 @@
 }
 
 .present-rotate__mask--animate-bullet .present-rotate__line {
-  animation: present-bullet-line-in var(--present-enter-duration, 380ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: present-bullet-line-in var(--present-enter-duration, 380ms) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .present-rotate__mask--exit .present-rotate__line--out {

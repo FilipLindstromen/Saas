@@ -1,4 +1,5 @@
 import { normalizeHeadlineSpans, mergeHeadlineSpans } from './headlines';
+import { partsForLineText } from './presentStyles';
 
 export const normalizeRotateSpans = normalizeHeadlineSpans;
 export const mergeRotateSpans = mergeHeadlineSpans;
@@ -139,6 +140,7 @@ export function appendBulletRevealLines(rows, lines, stepIndex) {
       text: lines[i],
       variant: 'bullet',
       animate: i === visible - 1 && stepIndex < lines.length,
+      staggerInMs: i * 55,
     });
   }
 }
@@ -216,15 +218,5 @@ export function buildBulletRevealRowsSimple(sceneText, bulletSpansLocal, stepInd
 }
 
 export function applyHeadlineToLineText(lineText, styledParts) {
-  if (!styledParts?.length || !lineText) {
-    return [{ text: lineText, headline: false }];
-  }
-  const trimmed = lineText.trim();
-  if (!trimmed) return [{ text: lineText, headline: false }];
-  for (const part of styledParts) {
-    if (part.headline && part.text.trim() === trimmed) {
-      return [{ text: lineText, headline: true }];
-    }
-  }
-  return [{ text: lineText, headline: false }];
+  return partsForLineText(lineText, styledParts);
 }

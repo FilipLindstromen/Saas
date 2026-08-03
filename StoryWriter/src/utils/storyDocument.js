@@ -1,4 +1,5 @@
 import { remapHeadlineSpans } from './headlines';
+import { remapPresentStyleSpans } from './presentStyles';
 import { remapRotateSpans, remapBulletSpans } from './lineReveal';
 import {
   getSentenceStarts,
@@ -81,6 +82,7 @@ export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {
       sentenceImages: remapSentenceImages(old.content ?? '', newContent, old.sentenceImages ?? []),
       sentenceImageLocks: remapSentenceLocks(old.content ?? '', newContent, old.sentenceImageLocks ?? []),
       headlineSpans: remapHeadlineSpans(old.content ?? '', newContent, old.headlineSpans ?? []),
+      presentStyleSpans: remapPresentStyleSpans(old.content ?? '', newContent, old.presentStyleSpans ?? []),
       rotateLineSpans: remapRotateSpans(old.content ?? '', newContent, old.rotateLineSpans ?? []),
       bulletLineSpans: remapBulletSpans(old.content ?? '', newContent, old.bulletLineSpans ?? []),
     };

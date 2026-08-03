@@ -622,6 +622,55 @@
   background-position: 0 calc(100% - 1px);
 }
 
+.edit-step__content-emphasis {
+  font-style: italic;
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  border-radius: 2px;
+}
+
+.edit-step__content-caption {
+  font-size: 0.92em;
+  letter-spacing: 0.03em;
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  border-radius: 2px;
+}
+
+.edit-step__content-large {
+  font-size: 1.08em;
+  background: color-mix(in srgb, #6366f1 10%, transparent);
+  border-radius: 2px;
+}
+
+.edit-step__content-whisper {
+  opacity: 0.75;
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+  border-radius: 2px;
+}
+
+.edit-step__content-align-left {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  padding-left: 2px;
+}
+
+.edit-step__gutter-mark--layout,
+.edit-step__gutter-mark--emphasis,
+.edit-step__gutter-mark--caption,
+.edit-step__gutter-mark--large,
+.edit-step__gutter-mark--whisper {
+  font-size: 0.62rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.edit-view__side-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .edit-step__content {
   position: absolute;
   top: 0;
@@ -789,7 +838,65 @@
   background: var(--border);
 }
 
+.edit-view__side-option--auto-search {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+.edit-view__side-preview--selected {
+  margin-bottom: 0.5rem;
+}
+
+.edit-view__side-preview--selected .edit-view__side-thumb {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+}
+
+.edit-view__side-preview--selected .edit-view__side-thumb--video {
+  max-height: 200px;
+}
+
 .edit-step__magic-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.edit-view-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text);
+  min-height: 12rem;
+}
+
+.edit-view-fallback__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.edit-view-fallback__detail {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  max-width: 28rem;
+}
+
+.edit-view-fallback__retry {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--btn-primary-text, #fff);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }

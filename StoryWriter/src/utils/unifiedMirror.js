@@ -1,16 +1,29 @@
 import { getUnifiedSectionSpans, joinSectionContents } from './storyDocument';
 import { getSentenceSegments } from './sentences';
 import { normalizeHeadlineSpans } from './headlines';
+import { normalizePresentStyleSpans } from './presentStyles';
+
+function styleFlagsForRange(styles, start, end) {
+  const emphasis = styles.some((s) => s.style === 'emphasis' && s.start <= start && s.end >= end);
+  const caption = styles.some((s) => s.style === 'caption' && s.start <= start && s.end >= end);
+  const large = styles.some((s) => s.style === 'large' && s.start <= start && s.end >= end);
+  const whisper = styles.some((s) => s.style === 'whisper' && s.start <= start && s.end >= end);
+  const alignLeft = styles.some((s) => s.style === 'align-left' && s.start <= start && s.end >= end);
+  return { emphasis, caption, large, whisper, alignLeft };
+}
 
 export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
   const unified = joinSectionContents(sectionOrder, sectionsData);
-  if (!unified) return [{ text: '', hasImage: false, headline: false, rotate: false, bullet: false }];
+  if (!unified) {
+    return [{ text: '', hasImage: false, headline: false, rotate: false, bullet: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false }];
+  }
 
   const boundaries = new Set([0, unified.length]);
   const imageRanges = [];
   const headlineRanges = [];
   const rotateRanges = [];
   const bulletRanges = [];
+  const presentStyleRanges = [];
 
   for (const span of getUnifiedSectionSpans(sectionOrder, sectionsData)) {
     const content = sectionsData[span.sectionId]?.content ?? '';
@@ -18,6 +31,7 @@ export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
     const headlines = sectionsData[span.sectionId]?.headlineSpans ?? [];
     const rotates = sectionsData[span.sectionId]?.rotateLineSpans ?? [];
     const bullets = sectionsData[span.sectionId]?.bulletLineSpans ?? [];
+    const presentStyles = sectionsData[span.sectionId]?.presentStyleSpans ?? [];
 
     for (const seg of getSentenceSegments(content, images)) {
       if (!seg.hasImage) continue;
@@ -51,6 +65,14 @@ export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
       boundaries.add(start);
       boundaries.add(end);
     }
+
+    for (const ps of normalizePresentStyleSpans(presentStyles, content.length)) {
+      const start = span.start + ps.start;
+      const end = span.start + ps.end;
+      presentStyleRanges.push({ start, end, style: ps.style });
+      boundaries.add(start);
+      boundaries.add(end);
+    }
   }
 
   const points = [...boundaries].sort((a, b) => a - b);
@@ -63,9 +85,20 @@ export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
     const headline = headlineRanges.some((r) => r.start <= start && r.end >= end);
     const bullet = bulletRanges.some((r) => r.start <= start && r.end >= end);
     const rotate = !bullet && rotateRanges.some((r) => r.start <= start && r.end >= end);
-    parts.push({ text: unified.slice(start, end), hasImage, headline, rotate, bullet });
+    const localStyles = presentStyleRanges.filter((r) => r.start <= start && r.end >= end);
+    const flags = styleFlagsForRange(localStyles, start, end);
+    parts.push({
+      text: unified.slice(start, end),
+      hasImage,
+      headline,
+      rotate,
+      bullet,
+      ...flags,
+    });
   }
-  return parts.length ? parts : [{ text: unified, hasImage: false, headline: false, rotate: false, bullet: false }];
+  return parts.length
+    ? parts
+    : [{ text: unified, hasImage: false, headline: false, rotate: false, bullet: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false }];
 }
 
 function rangeOverlapsLine(rangeStart, rangeEnd, lineStart, lineEnd) {
@@ -75,12 +108,13 @@ function rangeOverlapsLine(rangeStart, rangeEnd, lineStart, lineEnd) {
 /** One row per text line (split on \\n) with style flags for the edit gutter. */
 export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
   const unified = joinSectionContents(sectionOrder, sectionsData);
-  if (!unified) return [{ headline: false, rotate: false, bullet: false, hasImage: false }];
+  if (!unified) return [{ headline: false, rotate: false, bullet: false, hasImage: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false }];
 
   const headlineRanges = [];
   const rotateRanges = [];
   const bulletRanges = [];
   const imageRanges = [];
+  const presentStyleRanges = [];
 
   for (const span of getUnifiedSectionSpans(sectionOrder, sectionsData)) {
     const content = sectionsData[span.sectionId]?.content ?? '';
@@ -88,6 +122,7 @@ export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
     const headlines = sectionsData[span.sectionId]?.headlineSpans ?? [];
     const rotates = sectionsData[span.sectionId]?.rotateLineSpans ?? [];
     const bullets = sectionsData[span.sectionId]?.bulletLineSpans ?? [];
+    const presentStyles = sectionsData[span.sectionId]?.presentStyleSpans ?? [];
 
     for (const seg of getSentenceSegments(content, images)) {
       if (!seg.hasImage) continue;
@@ -101,6 +136,9 @@ export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
     }
     for (const b of normalizeHeadlineSpans(bullets, content.length)) {
       bulletRanges.push({ start: span.start + b.start, end: span.start + b.end });
+    }
+    for (const ps of normalizePresentStyleSpans(presentStyles, content.length)) {
+      presentStyleRanges.push({ start: span.start + ps.start, end: span.start + ps.end, style: ps.style });
     }
   }
 
@@ -116,8 +154,69 @@ export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
     const rotate =
       !bullet && rotateRanges.some((r) => rangeOverlapsLine(r.start, r.end, lineStart, lineEnd));
     const hasImage = imageRanges.some((r) => rangeOverlapsLine(r.start, r.end, lineStart, lineEnd));
-    rows.push({ headline, rotate, bullet, hasImage });
+    const emphasis = presentStyleRanges.some(
+      (r) => r.style === 'emphasis' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
+    );
+    const caption = presentStyleRanges.some(
+      (r) => r.style === 'caption' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
+    );
+    const large = presentStyleRanges.some(
+      (r) => r.style === 'large' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
+    );
+    const whisper = presentStyleRanges.some(
+      (r) => r.style === 'whisper' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
+    );
+    const alignLeft = presentStyleRanges.some(
+      (r) => r.style === 'align-left' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
+    );
+    rows.push({ headline, rotate, bullet, hasImage, emphasis, caption, large, whisper, alignLeft });
     offset = lineEnd + 1;
   }
-  return rows.length ? rows : [{ headline: false, rotate: false, bullet: false, hasImage: false }];
+  return rows.length
+    ? rows
+    : [{ headline: false, rotate: false, bullet: false, hasImage: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false }];
+}
+
+export function buildUnifiedMirrorPartsSafe(sectionOrder, sectionsData) {
+  try {
+    return buildUnifiedMirrorParts(sectionOrder, sectionsData);
+  } catch (err) {
+    console.warn('[Edit] Mirror highlight failed:', err);
+    const unified = joinSectionContents(sectionOrder, sectionsData);
+    return [
+      {
+        text: unified,
+        hasImage: false,
+        headline: false,
+        rotate: false,
+        bullet: false,
+        emphasis: false,
+        caption: false,
+        large: false,
+        whisper: false,
+        alignLeft: false,
+      },
+    ];
+  }
+}
+
+export function buildUnifiedLineGutterSafe(sectionOrder, sectionsData) {
+  try {
+    return buildUnifiedLineGutter(sectionOrder, sectionsData);
+  } catch (err) {
+    console.warn('[Edit] Gutter hints failed:', err);
+    const unified = joinSectionContents(sectionOrder, sectionsData);
+    const lineCount = unified ? unified.split('\n').length : 1;
+    return Array.from({ length: lineCount }, () => ({
+      headline: false,
+      rotate: false,
+      bullet: false,
+      hasImage: false,
+      emphasis: false,
+      caption: false,
+      large: false,
+      whisper: false,
+      alignLeft: false,
+    }));
+  }
 }

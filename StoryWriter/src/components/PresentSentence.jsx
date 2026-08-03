@@ -1,5 +1,18 @@
 import { useMemo } from 'react';
 import { splitSentenceWords, getExitAnimation, presentationTimingStyle } from '../utils/textAnimations';
+import { PresentTextParts } from './PresentTextParts';
+
+function partTypographyClass(part) {
+  return [
+    part.headline && 'present-view__headline',
+    part.emphasis && 'present-view__emphasis',
+    part.caption && 'present-view__caption',
+    part.large && 'present-view__type-large',
+    part.whisper && 'present-view__type-whisper',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 function FadeWordsStyledParts({ parts, phase, stagger, headlineScale }) {
   let wordIndex = 0;
@@ -7,6 +20,7 @@ function FadeWordsStyledParts({ parts, phase, stagger, headlineScale }) {
     <span className="present-view__word-line-wrap">
       {parts.map((part, partIndex) => {
         const lines = String(part.text).split('\n');
+        const typoClass = partTypographyClass(part);
         return lines.map((line, lineIndex) => {
           const words = splitSentenceWords(line);
           if (words.length === 0) {
@@ -26,6 +40,7 @@ function FadeWordsStyledParts({ parts, phase, stagger, headlineScale }) {
               className={[
                 'present-view__word-line',
                 part.headline && 'present-view__word-line--headline',
+                typoClass,
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -121,15 +136,7 @@ function FadeWordsContent({ text, phase, stagger }) {
 }
 
 function StyledInlineParts({ parts }) {
-  return parts.map((part, i) =>
-    part.headline ? (
-      <span key={i} className="present-view__headline">
-        {part.text}
-      </span>
-    ) : (
-      <span key={i}>{part.text}</span>
-    )
-  );
+  return <PresentTextParts parts={parts} />;
 }
 
 export default function PresentSentence({

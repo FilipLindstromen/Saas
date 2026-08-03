@@ -1,5 +1,6 @@
 import { applyHeadlineToLineText } from '../utils/lineReveal';
 import { getExitAnimation, presentationTimingStyle } from '../utils/textAnimations';
+import { PresentTextParts } from './PresentTextParts';
 
 export default function PresentRotateLines({
   rows,
@@ -46,6 +47,13 @@ export default function PresentRotateLines({
         const animate = row.animate && phase !== 'exit';
         const isBullet = row.variant === 'bullet';
         const outStagger = phase === 'exit' ? lineOutIndex++ * staggerMs : 0;
+        const inStagger = animate && phase !== 'exit' ? row.staggerInMs ?? 0 : 0;
+        const delayStyle =
+          phase === 'exit'
+            ? { animationDelay: `${outStagger}ms` }
+            : inStagger
+              ? { animationDelay: `${inStagger}ms` }
+              : undefined;
         const stableKey = `l-${index}-${isBullet ? 'b' : 'r'}`;
         return (
           <div
@@ -60,7 +68,7 @@ export default function PresentRotateLines({
             ]
               .filter(Boolean)
               .join(' ')}
-            style={phase === 'exit' ? { animationDelay: `${outStagger}ms` } : undefined}
+            style={delayStyle}
           >
             <div
               className={[
@@ -71,17 +79,9 @@ export default function PresentRotateLines({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={phase === 'exit' ? { animationDelay: `${outStagger}ms` } : undefined}
+              style={delayStyle}
             >
-              {parts.map((part, pi) =>
-                part.headline ? (
-                  <span key={pi} className="present-view__headline">
-                    {part.text}
-                  </span>
-                ) : (
-                  <span key={pi}>{part.text}</span>
-                )
-              )}
+              <PresentTextParts parts={parts} />
             </div>
           </div>
         );
