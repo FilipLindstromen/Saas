@@ -10,7 +10,7 @@ import {
   locateSentenceAtUnifiedOffset,
   unifiedSelectionToSectionRange,
 } from '../utils/storyDocument';
-import { buildUnifiedMirrorParts } from '../utils/unifiedMirror';
+import { buildUnifiedMirrorParts, buildUnifiedLineGutter } from '../utils/unifiedMirror';
 import {
   addHeadlineSpan,
   removeHeadlineSpanOverlap,
@@ -59,6 +59,10 @@ function UnifiedEditEditor({
   const content = joinSectionContents(sectionOrder, sectionsData);
   const mirrorParts = useMemo(
     () => buildUnifiedMirrorParts(sectionOrder, sectionsData),
+    [sectionOrder, sectionsData]
+  );
+  const gutterLines = useMemo(
+    () => buildUnifiedLineGutter(sectionOrder, sectionsData),
     [sectionOrder, sectionsData]
   );
 
@@ -164,6 +168,33 @@ function UnifiedEditEditor({
   return (
     <>
     <div ref={wrapRef} className="unified-story-editor__wrap edit-step__content-wrap">
+      <div className="edit-step__content-gutter" aria-hidden="true">
+        {gutterLines.map((line, i) => (
+          <div key={i} className="edit-step__gutter-line">
+            {line.headline && (
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--headline" title="Headline">
+                H
+              </span>
+            )}
+            {line.rotate && (
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--rotate" title="Rotating lines (Present)">
+                ↻
+              </span>
+            )}
+            {line.bullet && (
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--bullet" title="Bullet list (Present)">
+                •
+              </span>
+            )}
+            {line.hasImage && (
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--image" title="Sentence background">
+                ▣
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="edit-step__content-body">
       <div className="unified-story-editor__mirror edit-step__content-mirror" aria-hidden="true">
         {mirrorParts.map((part, i) => {
           const classes = [
@@ -202,6 +233,7 @@ function UnifiedEditEditor({
         placeholder="Story text…"
         spellCheck
       />
+      </div>
     </div>
     <TextContextMenu
       open={contextMenu.open}

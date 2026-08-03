@@ -475,6 +475,71 @@
   position: relative;
   width: 100%;
   min-height: 80px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.edit-step__content-gutter {
+  flex-shrink: 0;
+  width: 1.75rem;
+  padding-top: 0;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  font-family: inherit;
+  user-select: none;
+  pointer-events: none;
+}
+
+.edit-step__gutter-line {
+  min-height: calc(1.7em);
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 1px;
+  flex-wrap: wrap;
+}
+
+.edit-step__gutter-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.85rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.95;
+}
+
+.edit-step__gutter-mark--headline {
+  color: var(--accent);
+}
+
+.edit-step__gutter-mark--rotate {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+}
+
+.edit-step__gutter-mark--bullet {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--accent) 65%, var(--text));
+}
+
+.edit-step__gutter-mark--image {
+  font-size: 0.55rem;
+  color: color-mix(in srgb, var(--accent) 50%, var(--text-muted));
+}
+
+.edit-step__content-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 80px;
 }
 
 .edit-step__content-mirror {
@@ -501,15 +566,36 @@
 
 .edit-step__content-headline {
   font-weight: 700;
-  font-size: 1.12em;
 }
 
 .edit-step__content-rotate {
-  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--accent) 55%, transparent) 0,
+    color-mix(in srgb, var(--accent) 55%, transparent) 4px,
+    transparent 4px,
+    transparent 7px
+  );
+  background-size: 100% 1px;
+  background-repeat: repeat-x;
+  background-position: 0 calc(100% - 1px);
 }
 
 .edit-step__content-bullet {
-  border-bottom: 1px dotted color-mix(in srgb, var(--accent) 45%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--accent) 45%, transparent) 0,
+    color-mix(in srgb, var(--accent) 45%, transparent) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+  background-size: 100% 1px;
+  background-repeat: repeat-x;
+  background-position: 0 calc(100% - 1px);
 }
 
 .edit-step__content {
