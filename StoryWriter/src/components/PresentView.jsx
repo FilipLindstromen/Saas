@@ -163,6 +163,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         : null,
     [useLineRevealPresent, sentence, rotateSpans, bulletSpans, revealStep]
   );
+  const hasBulletPresent = bulletSpans.length > 0;
 
   useEffect(() => {
     if (currentSectionBgUrl === displayBgUrl) return;
@@ -475,7 +476,14 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         />
       )}
       <div className="present-view__inner">
-        <div className="present-view__sentence-stage">
+        <div
+          className={[
+            'present-view__sentence-stage',
+            hasBulletPresent && 'present-view__sentence-stage--from-top',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           {useLineRevealPresent ? (
             <PresentRotateLines
               rows={lineRevealRows}
@@ -483,6 +491,9 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
               fontSize={fontSize}
               lineHeight={lineHeight}
               animKey={rotateAnimKey}
+              phase={sentencePhase}
+              animation={currentAnimation}
+              rules={rules}
             />
           ) : (
             <PresentSentence

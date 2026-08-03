@@ -74,6 +74,12 @@
   justify-content: center;
 }
 
+.present-view__sentence-stage--from-top {
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: min(72vh, 100%);
+}
+
 .present-view__sentence {
   /* font-size set inline from settings (small/medium/large) */
   line-height: 1.4;
@@ -154,8 +160,30 @@
   margin: 0.15em 0;
 }
 
-.present-rotate__mask--animate .present-rotate__line {
-  animation: present-rotate-line-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+.present-rotate__mask--animate-rotate .present-rotate__line {
+  animation: present-rotate-line-in var(--present-enter-duration, 380ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.present-rotate__mask--animate-bullet .present-rotate__line {
+  animation: present-bullet-line-in var(--present-enter-duration, 380ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.present-rotate__mask--exit .present-rotate__line--out {
+  animation: present-line-out var(--present-exit-duration, 400ms) ease-in forwards;
+}
+
+.present-rotate__mask--exit .present-rotate__line--out-bullet {
+  animation: present-bullet-line-out var(--present-exit-duration, 400ms) ease-in forwards;
+}
+
+.present-rotate--phase-exit.present-rotate--exit-drop-center .present-rotate__line--out,
+.present-rotate--phase-exit.present-rotate--exit-drop-center .present-rotate__line--out-bullet {
+  animation: present-drop-out var(--present-exit-duration, 400ms) cubic-bezier(0.55, 0, 0.9, 0.38) forwards;
+}
+
+.present-rotate--phase-exit.present-rotate--exit-fade .present-rotate__line--out,
+.present-rotate--phase-exit.present-rotate--exit-fade-words .present-rotate__line--out {
+  animation: present-sentence-fade-out var(--present-exit-duration, 400ms) ease-in forwards;
 }
 
 .present-rotate__line {
@@ -179,7 +207,9 @@
 
 .present-rotate--bullets {
   align-items: flex-start;
+  align-self: flex-start;
   text-align: left;
+  width: 100%;
 }
 
 @keyframes present-rotate-line-in {
@@ -190,6 +220,39 @@
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes present-bullet-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes present-bullet-line-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.35em);
+  }
+}
+
+@keyframes present-line-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(0.5em);
   }
 }
 

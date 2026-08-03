@@ -80,16 +80,16 @@ function UnifiedEditEditor({
     if (wrap) wrap.style.minHeight = `${h}px`;
   }, []);
 
-  useEffect(() => {
-    adjustHeight();
-    requestAnimationFrame(() => remeasureGutter());
-  }, [content, adjustHeight, remeasureGutter]);
-
   const remeasureGutter = useCallback(() => {
     const measureEl = measureRef.current;
     if (!measureEl) return;
     setGutterTops(measureLineTops(measureEl, content));
   }, [content]);
+
+  useEffect(() => {
+    adjustHeight();
+    requestAnimationFrame(() => remeasureGutter());
+  }, [content, adjustHeight, remeasureGutter]);
 
   useLayoutEffect(() => {
     remeasureGutter();
