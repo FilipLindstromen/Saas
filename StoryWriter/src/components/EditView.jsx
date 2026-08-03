@@ -1,59 +1,47 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { getSettings } from '../utils/settings';
+import { getSettings, saveSettings, UNSPLASH_RESULT_COUNT_OPTIONS, SENTENCE_IMAGE_SOURCE_OPTIONS } from '../utils/settings';
 import {
   getSentenceStarts,
-  getSentenceSegments,
-  contentOffsetToNormalized,
-  normalizedOffsetToSentenceIndex,
+  getGlobalSceneIndexForSentence,
 } from '../utils/sentences';
-import { searchUnsplashFirst } from '../services/unsplash';
+import {
+  joinSectionContents,
+  applyUnifiedStoryEdit,
+  buildUnifiedHighlightParts,
+  locateSentenceAtUnifiedOffset,
+} from '../utils/storyDocument';
+import { resolveSentenceBackgroundImage } from '../services/sentenceBackgroundAi';
 import UnsplashPicker from './UnsplashPicker';
+import SketchBackgroundPanel from './SketchBackgroundPanel';
+import ImportImagePanel from './ImportImagePanel';
 import './EditView.css';
+import './UnifiedStoryEditor.css';
 
-function EditStep({
-  sectionId,
-  sectionTitle,
-  content,
-  sentenceImages = [],
-  onContentChange,
+function UnifiedEditEditor({
+  sectionOrder,
+  sectionsData,
+  onUnifiedContentChange,
   onOpenSentencePicker,
-  onSentenceImageChange,
   onSentencePositionChange,
   onActiveSentenceChange,
+  onLineClick,
 }) {
   const textareaRef = useRef(null);
   const wrapRef = useRef(null);
-  const [selectedSentenceIndex, setSelectedSentenceIndex] = useState(null);
-  const [cursorSentenceIndex, setCursorSentenceIndex] = useState(null);
-
-  const { sentences, starts } = getSentenceStarts(content);
-  const hasSentences = sentences.length > 0;
-  const segments = getSentenceSegments(content, sentenceImages);
-
-  const highlightParts = useMemo(() => {
-    const parts = [];
-    let last = 0;
-    for (const seg of segments) {
-      if (seg.start > last) {
-        parts.push({ text: content.slice(last, seg.start), highlight: false });
-      }
-      parts.push({ text: content.slice(seg.start, seg.end), highlight: seg.hasImage });
-      last = seg.end;
-    }
-    if (last < content.length) {
-      parts.push({ text: content.slice(last), highlight: false });
-    }
-    return parts.length ? parts : [{ text: content, highlight: false }];
-  }, [content, segments]);
+  const content = joinSectionContents(sectionOrder, sectionsData);
+  const highlightParts = useMemo(
+    () => buildUnifiedHighlightParts(sectionOrder, sectionsData),
+    [sectionOrder, sectionsData]
+  );
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
     const wrap = wrapRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const h = Math.max(el.scrollHeight, 80);
-    el.style.height = h + 'px';
-    if (wrap) wrap.style.minHeight = h + 'px';
+    const h = Math.max(el.scrollHeight, 320);
+    el.style.height = `${h}px`;
+    if (wrap) wrap.style.minHeight = `${h}px`;
   }, []);
 
   useEffect(() => {
@@ -62,95 +50,102 @@ function EditStep({
 
   const updateCursorSentence = useCallback(() => {
     const el = textareaRef.current;
-    if (!el || !hasSentences) {
-      setCursorSentenceIndex(null);
+    if (!el) return;
+    const located = locateSentenceAtUnifiedOffset(sectionOrder, sectionsData, el.selectionStart);
+    if (!located) {
+      onActiveSentenceChange?.(null);
       return;
     }
-    const normStart = contentOffsetToNormalized(content, el.selectionStart);
-    const idx = normalizedOffsetToSentenceIndex(normStart, starts);
-    setCursorSentenceIndex(idx);
-    onSentencePositionChange?.(sectionId, idx);
-    onActiveSentenceChange?.(sectionId, idx);
-  }, [content, hasSentences, starts, sectionId, onSentencePositionChange, onActiveSentenceChange]);
+    onSentencePositionChange?.(located.sectionId, located.sentenceIndex);
+    onActiveSentenceChange?.({ sectionId: located.sectionId, sentenceIndex: located.sentenceIndex });
+  }, [sectionOrder, sectionsData, onSentencePositionChange, onActiveSentenceChange]);
 
   const handleMouseUp = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
     const start = el.selectionStart;
     const end = el.selectionEnd;
-    if (start === end || !hasSentences) {
-      setSelectedSentenceIndex(null);
+    if (start === end) {
       updateCursorSentence();
+      const located = locateSentenceAtUnifiedOffset(sectionOrder, sectionsData, start);
+      if (located) onLineClick?.(located.sectionId, located.sentenceIndex);
       return;
     }
-    const normStart = contentOffsetToNormalized(content, start);
-    const idx = normalizedOffsetToSentenceIndex(normStart, starts);
-    setSelectedSentenceIndex(idx);
-    onSentencePositionChange?.(sectionId, idx);
-    updateCursorSentence();
-    onOpenSentencePicker?.(sectionId, idx);
-  }, [content, hasSentences, starts, sectionId, onSentencePositionChange, onActiveSentenceChange, updateCursorSentence, onOpenSentencePicker]);
-
-  const handleSelectImageForSentence = useCallback(() => {
-    if (selectedSentenceIndex === null) return;
-    onOpenSentencePicker?.(sectionId, selectedSentenceIndex);
-    setSelectedSentenceIndex(null);
-  }, [sectionId, selectedSentenceIndex, onOpenSentencePicker]);
-
-  const cursorImageUrl = cursorSentenceIndex != null ? (sentenceImages[cursorSentenceIndex] || '') : '';
-  const showCursorPreview = cursorSentenceIndex != null && cursorImageUrl;
+    const located = locateSentenceAtUnifiedOffset(sectionOrder, sectionsData, start);
+    if (located) {
+      onSentencePositionChange?.(located.sectionId, located.sentenceIndex);
+      updateCursorSentence();
+      onOpenSentencePicker?.(located.sectionId, located.sentenceIndex);
+    }
+  }, [
+    sectionOrder,
+    sectionsData,
+    updateCursorSentence,
+    onSentencePositionChange,
+    onOpenSentencePicker,
+    onLineClick,
+  ]);
 
   return (
-    <div className="edit-step">
-      <div className="edit-step__header-row">
-        <div className="edit-step__label">{sectionTitle}</div>
+    <div ref={wrapRef} className="unified-story-editor__wrap edit-step__content-wrap">
+      <div className="unified-story-editor__mirror edit-step__content-mirror" aria-hidden="true">
+        {highlightParts.map((part, i) =>
+          part.highlight ? (
+            <span key={i} className="unified-story-editor__mirror-highlight edit-step__content-highlight">
+              {part.text}
+            </span>
+          ) : (
+            <span key={i}>{part.text}</span>
+          )
+        )}
       </div>
-      <div ref={wrapRef} className="edit-step__content-wrap">
-        <div className="edit-step__content-mirror" aria-hidden="true">
-          {highlightParts.map((part, i) =>
-            part.highlight ? (
-              <span key={i} className="edit-step__content-highlight">
-                {part.text}
-              </span>
-            ) : (
-              <span key={i}>{part.text}</span>
-            )
-          )}
-        </div>
-        <textarea
-          ref={textareaRef}
-          className="edit-step__content"
-          value={content}
-          onChange={(e) => {
-            onContentChange(sectionId, e.target.value);
-            adjustHeight();
-          }}
-          onMouseUp={handleMouseUp}
-          onClick={updateCursorSentence}
-          onKeyUp={updateCursorSentence}
-          onFocus={() => {
-            adjustHeight();
-            updateCursorSentence();
-          }}
-          placeholder="Story text for this step…"
-          rows={3}
-        />
-      </div>
+      <textarea
+        ref={textareaRef}
+        className="unified-story-editor__textarea unified-story-editor__textarea--overlay edit-step__content"
+        value={content}
+        onChange={(e) => {
+          onUnifiedContentChange(e.target.value);
+          adjustHeight();
+        }}
+        onMouseUp={handleMouseUp}
+        onClick={updateCursorSentence}
+        onKeyUp={updateCursorSentence}
+        onFocus={() => {
+          adjustHeight();
+          updateCursorSentence();
+        }}
+        placeholder="Story text…"
+        spellCheck
+      />
     </div>
   );
 }
 
 export default function EditView({
   sectionOrder,
-  sectionDefs,
   sectionsData,
-  onContentChange,
+  onUnifiedContentChange,
   onSentenceImageChange,
   onBackgroundOpacityChange,
   onPresentStartChange,
 }) {
   const [pickerSentence, setPickerSentence] = useState(null);
+  const [pickerAutoSearch, setPickerAutoSearch] = useState(true);
   const [activeSentence, setActiveSentence] = useState(null);
+  const [imageSearchOnLineClick, setImageSearchOnLineClick] = useState(
+    () => getSettings().editImageSearchOnLineClick
+  );
+  const [unsplashResultsCount, setUnsplashResultsCount] = useState(
+    () => getSettings().editUnsplashResultsCount
+  );
+  const [sentenceImageSource, setSentenceImageSource] = useState(
+    () => getSettings().editSentenceImageSource
+  );
+  const [sketchInstructions, setSketchInstructions] = useState(
+    () => getSettings().editSketchGenerationInstructions ?? ''
+  );
+  const useAiSketch = sentenceImageSource === 'ai-sketch';
+  const useImport = sentenceImageSource === 'import';
   const [magicLoadingAll, setMagicLoadingAll] = useState(false);
   const [opacity, setOpacity] = useState(() => getSettings().presentationBackgroundOpacity ?? 0.35);
   const [webcamError, setWebcamError] = useState(null);
@@ -164,38 +159,39 @@ export default function EditView({
   const cameraId = settings.presentationCameraId?.trim() || '';
 
   const handleActiveSentenceChange = useCallback((payload) => {
-    setActiveSentence(payload == null ? null : { sectionId: payload.sectionId, sentenceIndex: payload.sentenceIndex });
+    setActiveSentence(
+      payload == null || payload.sectionId == null
+        ? null
+        : { sectionId: payload.sectionId, sentenceIndex: payload.sentenceIndex }
+    );
   }, []);
 
   const handleSentencePositionChange = useCallback(
     (sectionId, sentenceIndexInSection) => {
       if (typeof onPresentStartChange !== 'function') return;
-      let globalIndex = 0;
-      for (const sid of sectionOrder) {
-        if (sid === sectionId) {
-          globalIndex += sentenceIndexInSection;
-          break;
-        }
-        const content = sectionsData[sid]?.content ?? '';
-        const { sentences } = getSentenceStarts(content);
-        globalIndex += sentences.length;
-      }
+      const globalIndex = getGlobalSceneIndexForSentence(
+        sectionOrder,
+        sectionsData,
+        sectionId,
+        sentenceIndexInSection
+      );
       onPresentStartChange(globalIndex);
     },
     [sectionOrder, sectionsData, onPresentStartChange]
   );
 
   const pickerOpen = pickerSentence !== null;
-  const pickerInitialQuery =
+  const pickerSentenceText =
     pickerSentence != null
       ? (() => {
           const section = sectionsData[pickerSentence.sectionId];
           const content = section?.content ?? '';
           const { sentences } = getSentenceStarts(content);
           const s = sentences[pickerSentence.sentenceIndex];
-          return s ? s.slice(0, 60).trim() : '';
+          return s ? s.trim() : '';
         })()
       : '';
+  const pickerInitialQuery = pickerSentenceText.slice(0, 60).trim();
 
   const handleOpacityChange = useCallback(
     (e) => {
@@ -216,8 +212,49 @@ export default function EditView({
     [pickerSentence, onSentenceImageChange]
   );
 
-  const handleOpenSentencePicker = useCallback((sectionId, sentenceIndex) => {
-    setPickerSentence({ sectionId, sentenceIndex });
+  const handleOpenSentencePicker = useCallback(
+    (sectionId, sentenceIndex) => {
+      setPickerAutoSearch(!useImport);
+      setPickerSentence({ sectionId, sentenceIndex });
+    },
+    [useImport]
+  );
+
+  const handleLineClick = useCallback(
+    (sectionId, sentenceIndex) => {
+      if (imageSearchOnLineClick) {
+        setPickerAutoSearch(!useImport);
+        setPickerSentence({ sectionId, sentenceIndex });
+      } else {
+        setPickerSentence(null);
+      }
+    },
+    [imageSearchOnLineClick, useImport]
+  );
+
+  const handleImageSearchOnLineClickChange = useCallback((e) => {
+    const next = e.target.checked;
+    setImageSearchOnLineClick(next);
+    saveSettings({ ...getSettings(), editImageSearchOnLineClick: next });
+  }, []);
+
+  const handleUnsplashResultsCountChange = useCallback((e) => {
+    const next = Number(e.target.value);
+    setUnsplashResultsCount(next);
+    saveSettings({ ...getSettings(), editUnsplashResultsCount: next });
+  }, []);
+
+  const handleSentenceImageSourceChange = useCallback((e) => {
+    const next = e.target.value;
+    setSentenceImageSource(next);
+    saveSettings({ ...getSettings(), editSentenceImageSource: next });
+    setPickerSentence(null);
+  }, []);
+
+  const handleSketchInstructionsChange = useCallback((e) => {
+    const next = e.target.value;
+    setSketchInstructions(next);
+    saveSettings({ ...getSettings(), editSketchGenerationInstructions: next });
   }, []);
 
   const activeSentenceImageUrl = activeSentence
@@ -234,6 +271,8 @@ export default function EditView({
   const handleMagicAIAll = useCallback(async () => {
     setMagicLoadingAll(true);
     try {
+      const source = getSettings().editSentenceImageSource;
+      const openaiApiKey = getSettings().openaiApiKey;
       for (const sectionId of sectionOrder) {
         const section = sectionsData[sectionId];
         const content = section?.content ?? '';
@@ -244,16 +283,25 @@ export default function EditView({
           if (hasImage) continue;
           const query = sentences[i].slice(0, 80).trim();
           if (!query) continue;
-          const result = await searchUnsplashFirst(query);
-          if (result) {
-            onSentenceImageChange?.(sectionId, i, result.url, result.credit);
+          try {
+            const result = await resolveSentenceBackgroundImage({
+              sentenceText: query,
+              source,
+              openaiApiKey,
+              sketchInstructions,
+            });
+            if (result) {
+              onSentenceImageChange?.(sectionId, i, result.url, result.credit);
+            }
+          } catch {
+            /* skip sentence on failure */
           }
         }
       }
     } finally {
       setMagicLoadingAll(false);
     }
-  }, [sectionOrder, sectionsData, onSentenceImageChange]);
+  }, [sectionOrder, sectionsData, onSentenceImageChange, sketchInstructions]);
 
   useEffect(() => {
     if (!webcamEnabled || !navigator.mediaDevices?.getUserMedia) return;
@@ -301,24 +349,15 @@ export default function EditView({
             aria-label="Background image transparency"
           />
         </div>
-        {sectionOrder.map((sectionId) => {
-          const def = sectionDefs[sectionId];
-          const section = sectionsData[sectionId];
-          return (
-            <EditStep
-              key={sectionId}
-              sectionId={sectionId}
-              sectionTitle={def?.title ?? sectionId}
-              content={section?.content ?? ''}
-              sentenceImages={section?.sentenceImages ?? []}
-              onContentChange={onContentChange}
-              onOpenSentencePicker={handleOpenSentencePicker}
-              onSentenceImageChange={onSentenceImageChange}
-              onSentencePositionChange={handleSentencePositionChange}
-              onActiveSentenceChange={(sid, idx) => (sid == null ? handleActiveSentenceChange(null) : handleActiveSentenceChange({ sectionId: sid, sentenceIndex: idx }))}
-            />
-          );
-        })}
+        <UnifiedEditEditor
+          sectionOrder={sectionOrder}
+          sectionsData={sectionsData}
+          onUnifiedContentChange={onUnifiedContentChange}
+          onOpenSentencePicker={handleOpenSentencePicker}
+          onSentencePositionChange={handleSentencePositionChange}
+          onActiveSentenceChange={handleActiveSentenceChange}
+          onLineClick={handleLineClick}
+        />
       </div>
       <aside
         className={`edit-view__side${pickerSentence !== null ? ' edit-view__side--picker-open' : ''}`}
@@ -329,15 +368,96 @@ export default function EditView({
         }}
       >
         <h2 className="edit-view__side-title">Sentence image</h2>
+        <div className="edit-view__side-options">
+          <label className="edit-view__side-option edit-view__side-option--select edit-view__side-option--stack">
+            <span className="edit-view__side-option-label">Background source</span>
+            <select
+              className="edit-view__side-select edit-view__side-select--wide"
+              value={sentenceImageSource}
+              onChange={handleSentenceImageSourceChange}
+              aria-label="Sentence background source"
+            >
+              {SENTENCE_IMAGE_SOURCE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="edit-view__side-option">
+            <input
+              type="checkbox"
+              checked={imageSearchOnLineClick}
+              onChange={handleImageSearchOnLineClickChange}
+            />
+            <span>
+              {useImport
+                ? 'Open import when clicking a sentence'
+                : useAiSketch
+                  ? 'Generate sketch when clicking a sentence'
+                  : 'Search Unsplash when clicking a sentence'}
+            </span>
+          </label>
+          {!useAiSketch && !useImport && (
+            <label className="edit-view__side-option edit-view__side-option--select">
+              <span className="edit-view__side-option-label">Results shown</span>
+              <select
+                className="edit-view__side-select"
+                value={unsplashResultsCount}
+                onChange={handleUnsplashResultsCountChange}
+                aria-label="Number of Unsplash results"
+              >
+                {UNSPLASH_RESULT_COUNT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {useAiSketch && (
+            <label className="edit-view__side-option edit-view__side-option--stack">
+              <span className="edit-view__side-option-label">Sketch instructions (optional)</span>
+              <textarea
+                className="edit-view__side-textarea"
+                value={sketchInstructions}
+                onChange={handleSketchInstructionsChange}
+                placeholder="e.g. two people at a dinner table, warm mood, minimal props…"
+                rows={3}
+                aria-label="Extra instructions for sketch generation"
+              />
+            </label>
+          )}
+        </div>
         {pickerSentence !== null ? (
           <div className="edit-view__side-picker">
-            <UnsplashPicker
-              isOpen={true}
-              inline={true}
-              onClose={() => setPickerSentence(null)}
-              onSelect={handlePickerSelect}
-              initialQuery={pickerInitialQuery}
-            />
+            {useImport ? (
+              <ImportImagePanel
+                isOpen={true}
+                sentenceText={pickerSentenceText}
+                onClose={() => setPickerSentence(null)}
+                onSelect={handlePickerSelect}
+              />
+            ) : useAiSketch ? (
+              <SketchBackgroundPanel
+                isOpen={true}
+                sentenceText={pickerSentenceText}
+                onClose={() => setPickerSentence(null)}
+                onSelect={handlePickerSelect}
+                autoGenerate={pickerAutoSearch}
+                instructions={sketchInstructions}
+              />
+            ) : (
+              <UnsplashPicker
+                isOpen={true}
+                inline={true}
+                onClose={() => setPickerSentence(null)}
+                onSelect={handlePickerSelect}
+                initialQuery={pickerInitialQuery}
+                autoSearch={pickerAutoSearch}
+                resultsCount={unsplashResultsCount}
+              />
+            )}
           </div>
         ) : activeSentence !== null ? (
           <>
@@ -355,7 +475,7 @@ export default function EditView({
                     className="edit-view__side-btn edit-view__side-btn--primary"
                     onClick={() => handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex)}
                   >
-                    Swap image
+                    {useImport ? 'Replace image' : useAiSketch ? 'Regenerate sketch' : 'Swap image'}
                   </button>
                   <button
                     type="button"
@@ -373,7 +493,7 @@ export default function EditView({
                   className="edit-view__side-btn edit-view__side-btn--primary"
                   onClick={() => handleOpenSentencePicker(activeSentence.sectionId, activeSentence.sentenceIndex)}
                 >
-                  Select image
+                  {useImport ? 'Import image' : useAiSketch ? 'Generate sketch' : 'Select image'}
                 </button>
               </div>
             )}

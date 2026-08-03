@@ -14,7 +14,15 @@ function formatUnsplashError(err) {
   return message || 'Search failed.';
 }
 
-export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery = '', inline = false }) {
+export default function UnsplashPicker({
+  isOpen,
+  onClose,
+  onSelect,
+  initialQuery = '',
+  inline = false,
+  autoSearch = true,
+  resultsCount = 20,
+}) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -37,7 +45,8 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery
     setLoading(true);
     setError('');
     try {
-      const data = await searchUnsplashPhotos(accessKey, q, 1, 20);
+      const perPage = Math.min(30, Math.max(1, Number(resultsCount) || 20));
+      const data = await searchUnsplashPhotos(accessKey, q, 1, perPage);
       setResults(Array.isArray(data.results) ? data.results : []);
     } catch (err) {
       setError(formatUnsplashError(err));
@@ -45,15 +54,16 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery
     } finally {
       setLoading(false);
     }
-  }, [accessKey]);
+  }, [accessKey, resultsCount]);
 
   useEffect(() => {
     if (!isOpen) return;
     const q = (query || initialQuery).trim();
     if (!q) return;
+    if (!autoSearch && query === initialQuery) return;
     const t = setTimeout(() => searchWithQuery(q), 400);
     return () => clearTimeout(t);
-  }, [isOpen, query, initialQuery, searchWithQuery]);
+  }, [isOpen, query, initialQuery, searchWithQuery, autoSearch]);
 
   useEffect(() => {
     if (!isOpen) {

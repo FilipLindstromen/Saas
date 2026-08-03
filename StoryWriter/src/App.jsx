@@ -13,12 +13,12 @@ import {
 import { TARGET_OUTCOMES, DEFAULT_TARGET_OUTCOME_ID, getTargetOutcome } from './constants/targetOutcomes';
 import { getSentenceStarts } from './utils/sentences';
 import { generateFullStory } from './services/openai';
-import { searchUnsplashFirst } from '@shared/stockMedia/unsplash';
+import { resolveSentenceBackgroundImage } from './services/sentenceBackgroundAi';
 import SettingsModal from '@shared/SettingsModal/SettingsModal';
 import FontSettingsPopover from './components/FontSettingsPopover';
 import RecordingOptionsPopover from './components/RecordingOptionsPopover';
 import BackgroundAnimationPopover from './components/BackgroundAnimationPopover';
-import SortableSectionList from './components/SortableSectionList';
+import UnifiedStoryEditor from './components/UnifiedStoryEditor';
 import EditView from './components/EditView';
 import PresentView from './components/PresentView';
 import RambleRecorder from './components/RambleRecorder';
@@ -28,6 +28,7 @@ import PresentationAnimationPopover from './components/PresentationAnimationPopo
 import { DEFAULT_PRESENTATION_ANIMATION_RULES } from './utils/textAnimations';
 import { copyTextToClipboard } from './utils/clipboard';
 import { formatStoryForClipboard } from './utils/storyPlainText';
+import { applyUnifiedStoryEdit } from './utils/storyDocument';
 import './App.css';
 
 const INPUT_PANEL_MIN = 280;
@@ -216,6 +217,16 @@ function App() {
     }));
   }, []);
 
+  const handleUnifiedStoryChange = useCallback(
+    (unified) => {
+      setPersisted((prev) => ({
+        ...prev,
+        sectionsData: applyUnifiedStoryEdit(prev.sectionOrder, prev.sectionsData, unified),
+      }));
+    },
+    []
+  );
+
   const handleReorder = useCallback((newOrder) => {
     setPersisted((prev) => ({ ...prev, sectionOrder: newOrder }));
   }, []);
@@ -243,6 +254,9 @@ function App() {
   const handleMagicImages = useCallback(async () => {
     setMagicImageLoading(true);
     try {
+      const source = getSettings().editSentenceImageSource;
+      const openaiApiKey = getSettings().openaiApiKey;
+      const sketchInstructions = getSettings().editSketchGenerationInstructions ?? '';
       for (const sectionId of sectionOrder) {
         const section = sectionsData[sectionId];
         const content = section?.content ?? '';
@@ -253,9 +267,18 @@ function App() {
           if (hasImage) continue;
           const query = sentences[i].slice(0, 80).trim();
           if (!query) continue;
-          const result = await searchUnsplashFirst(query);
-          if (result?.url) {
-            handleSentenceImageChange(sectionId, i, result.url);
+          try {
+            const result = await resolveSentenceBackgroundImage({
+              sentenceText: query,
+              source,
+              openaiApiKey,
+              sketchInstructions,
+            });
+            if (result?.url) {
+              handleSentenceImageChange(sectionId, i, result.url, result.credit);
+            }
+          } catch (err) {
+            setError(err.message || 'Failed to set background image.');
           }
         }
       }
@@ -628,7 +651,7 @@ function App() {
 
           <section className="sections-header">
             <p className="sections-header__desc">
-              Below are the sections your story will contain. Write the story, then drag sections to reorder and edit the text as needed.
+              Choose a framework and length, then generate. Your story appears as one continuous script — section structure is used behind the scenes for generation.
             </p>
             <label className="story-framework-label" htmlFor="story-target-outcome">
               Target outcome
@@ -720,14 +743,12 @@ function App() {
         )}
 
         <div className="sections-panel">
-          <SortableSectionList
-          sectionOrder={sectionOrder}
-          sectionDefs={sectionDefs}
-          sectionsData={sectionsData}
-          onReorder={handleReorder}
-          onContentChange={handleContentChange}
-          isGenerating={isGenerating}
-        />
+          <UnifiedStoryEditor
+            sectionOrder={sectionOrder}
+            sectionsData={sectionsData}
+            onUnifiedChange={handleUnifiedStoryChange}
+            disabled={isGenerating}
+          />
         </div>
       </main>
       )}
@@ -736,9 +757,8 @@ function App() {
         <main className="app-main app-main--single">
           <EditView
             sectionOrder={sectionOrder}
-            sectionDefs={sectionDefs}
             sectionsData={sectionsData}
-            onContentChange={handleContentChange}
+            onUnifiedContentChange={handleUnifiedStoryChange}
             onSentenceImageChange={handleSentenceImageChange}
             onBackgroundOpacityChange={handleBackgroundOpacityChange}
             onPresentStartChange={setPresentStartIndex}

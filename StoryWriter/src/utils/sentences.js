@@ -127,3 +127,94 @@ export function getSentenceHighlightSegments(content, sentenceImages = []) {
     hasImage,
   }));
 }
+
+const PRESENT_SCENE_BREAK = /\n[\t ]*\n+/g;
+
+/**
+ * Present-mode scenes: blocks separated by a blank line (double line break).
+ * Preserves single line breaks inside each scene as authored in the editor.
+ */
+export function getPresentScenes(content, sentenceImages = []) {
+  const raw = String(content ?? '');
+  if (!raw.trim()) return [];
+
+  const images = Array.isArray(sentenceImages) ? sentenceImages : [];
+  const segments = getSentenceSegments(content, images);
+  const scenes = [];
+  let chunkStart = 0;
+  let match;
+
+  const pushScene = (rawStart, rawEnd) => {
+    const text = raw.slice(rawStart, rawEnd).replace(/^\s+|\s+$/g, '');
+    if (!text) return;
+
+    const sentenceIndices = [];
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (seg.end > rawStart && seg.start < rawEnd) sentenceIndices.push(i);
+    }
+    const primarySentenceIndex = sentenceIndices[0] ?? 0;
+    let imageUrl = '';
+    for (const i of sentenceIndices) {
+      const img = images[i];
+      if (img != null && String(img).trim()) {
+        imageUrl = String(img).trim();
+        break;
+      }
+    }
+
+    scenes.push({
+      text,
+      start: rawStart,
+      end: rawEnd,
+      sentenceIndices,
+      primarySentenceIndex,
+      imageUrl,
+    });
+  };
+
+  PRESENT_SCENE_BREAK.lastIndex = 0;
+  while ((match = PRESENT_SCENE_BREAK.exec(raw)) !== null) {
+    pushScene(chunkStart, match.index);
+    chunkStart = match.index + match[0].length;
+  }
+  pushScene(chunkStart, raw.length);
+
+  return scenes;
+}
+
+/** Flat list of present screens across all sections (in story order). */
+export function buildPresentSceneList(sectionOrder, sectionsData) {
+  const out = [];
+  for (const sectionId of sectionOrder) {
+    const section = sectionsData[sectionId];
+    const content = section?.content ?? '';
+    const sentenceImages = section?.sentenceImages ?? [];
+    const scenes = getPresentScenes(content, sentenceImages);
+    for (const scene of scenes) {
+      out.push({
+        text: scene.text,
+        sectionId,
+        sentenceIndexInSection: scene.primarySentenceIndex,
+        sentenceIndices: scene.sentenceIndices,
+        imageUrl: scene.imageUrl,
+      });
+    }
+  }
+  return out;
+}
+
+/** Map a sentence index in a section to the global present-scene index. */
+export function getGlobalSceneIndexForSentence(sectionOrder, sectionsData, sectionId, sentenceIndexInSection) {
+  let global = 0;
+  for (const sid of sectionOrder) {
+    const section = sectionsData[sid];
+    const scenes = getPresentScenes(section?.content ?? '', section?.sentenceImages ?? []);
+    if (sid === sectionId) {
+      const sceneIdx = scenes.findIndex((sc) => sc.sentenceIndices.includes(sentenceIndexInSection));
+      return global + (sceneIdx >= 0 ? sceneIdx : 0);
+    }
+    global += scenes.length;
+  }
+  return global;
+}

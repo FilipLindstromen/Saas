@@ -51,6 +51,22 @@ export const TEXT_ANIMATION_OPTIONS = [
   { value: 'none', label: 'None' },
 ];
 
+/** How many Unsplash thumbnails to load in Edit → sentence image picker. */
+export const UNSPLASH_RESULT_COUNT_OPTIONS = [
+  { value: 4, label: '4' },
+  { value: 8, label: '8' },
+  { value: 12, label: '12' },
+  { value: 20, label: '20' },
+  { value: 30, label: '30' },
+];
+
+/** Sentence background source in Edit mode. */
+export const SENTENCE_IMAGE_SOURCE_OPTIONS = [
+  { value: 'unsplash', label: 'Stock photos (Unsplash)' },
+  { value: 'ai-sketch', label: 'AI napkin sketch' },
+  { value: 'import', label: 'Import image' },
+];
+
 const defaults = {
   openaiApiKey: '',
   presentationFont: 'Poppins',
@@ -67,6 +83,10 @@ const defaults = {
   presentationBackgroundAnimationScale: 1.15,
   presentationTextAnimation: 'slide-up',
   presentationWebcamSize: 'medium',
+  editImageSearchOnLineClick: true,
+  editUnsplashResultsCount: 12,
+  editSentenceImageSource: 'unsplash',
+  editSketchGenerationInstructions: '',
 };
 
 export function getSettings() {
@@ -83,6 +103,24 @@ export function getSettings() {
       unsplashAccessKey: apiKeys.unsplash || '',
       presentationBackgroundOpacity:
         typeof opacity === 'number' && opacity >= 0 && opacity <= 1 ? opacity : defaults.presentationBackgroundOpacity,
+      editImageSearchOnLineClick:
+        parsed.editImageSearchOnLineClick !== undefined
+          ? Boolean(parsed.editImageSearchOnLineClick)
+          : defaults.editImageSearchOnLineClick,
+      editUnsplashResultsCount: UNSPLASH_RESULT_COUNT_OPTIONS.some(
+        (o) => o.value === Number(parsed.editUnsplashResultsCount)
+      )
+        ? Number(parsed.editUnsplashResultsCount)
+        : defaults.editUnsplashResultsCount,
+      editSentenceImageSource: SENTENCE_IMAGE_SOURCE_OPTIONS.some(
+        (o) => o.value === parsed.editSentenceImageSource
+      )
+        ? parsed.editSentenceImageSource
+        : defaults.editSentenceImageSource,
+      editSketchGenerationInstructions:
+        typeof parsed.editSketchGenerationInstructions === 'string'
+          ? parsed.editSketchGenerationInstructions.slice(0, 2000)
+          : defaults.editSketchGenerationInstructions,
     };
   } catch {
     return { ...defaults, openaiApiKey: apiKeys.openai, unsplashAccessKey: apiKeys.unsplash };
@@ -132,6 +170,22 @@ export function saveSettings(settings) {
       ? settings.presentationTextAnimation
       : defaults.presentationTextAnimation,
     presentationWebcamSize: ['small', 'medium', 'large'].includes(settings.presentationWebcamSize) ? settings.presentationWebcamSize : 'medium',
+    editImageSearchOnLineClick:
+      settings.editImageSearchOnLineClick !== undefined
+        ? Boolean(settings.editImageSearchOnLineClick)
+        : defaults.editImageSearchOnLineClick,
+    editUnsplashResultsCount: UNSPLASH_RESULT_COUNT_OPTIONS.some(
+      (o) => o.value === Number(settings.editUnsplashResultsCount)
+    )
+      ? Number(settings.editUnsplashResultsCount)
+      : defaults.editUnsplashResultsCount,
+    editSentenceImageSource: SENTENCE_IMAGE_SOURCE_OPTIONS.some(
+      (o) => o.value === settings.editSentenceImageSource
+    )
+      ? settings.editSentenceImageSource
+      : defaults.editSentenceImageSource,
+    editSketchGenerationInstructions: String(settings.editSketchGenerationInstructions ?? '')
+      .slice(0, 2000),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   return next;

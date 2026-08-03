@@ -7,7 +7,7 @@ import {
   getExitDurationMs,
   getExitAnimation,
 } from '../utils/textAnimations';
-import { getSentenceSegments } from '../utils/sentences';
+import { buildPresentSceneList } from '../utils/sentences';
 import PresentSentence from './PresentSentence';
 import './PresentView.css';
 
@@ -57,19 +57,10 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     loadGoogleFont(settings.presentationFont || 'Poppins');
   }, [settings.presentationFont]);
 
-  const sentencesWithSection = useMemo(() => {
-    const out = [];
-    for (const sectionId of sectionOrder) {
-      const content = sectionsData[sectionId]?.content ?? '';
-      const sentenceImages = sectionsData[sectionId]?.sentenceImages ?? [];
-      const segments = getSentenceSegments(content, sentenceImages);
-      segments.forEach((seg, sentenceIndexInSection) => {
-        const text = seg.text ?? String(content).slice(seg.start, seg.end);
-        out.push({ text, sectionId, sentenceIndexInSection });
-      });
-    }
-    return out;
-  }, [sectionOrder, sectionsData]);
+  const sentencesWithSection = useMemo(
+    () => buildPresentSceneList(sectionOrder, sectionsData),
+    [sectionOrder, sectionsData]
+  );
 
   const sentences = useMemo(() => sentencesWithSection.map((x) => x.text), [sentencesWithSection]);
 
@@ -146,7 +137,9 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   const sentenceIndexInSection = currentItem?.sentenceIndexInSection ?? 0;
   const sectionData = currentSectionId ? sectionsData[currentSectionId] : null;
   const sentenceImages = sectionData?.sentenceImages;
-  const sentenceImageUrl = Array.isArray(sentenceImages) ? (sentenceImages[sentenceIndexInSection] || '') : '';
+  const sentenceImageUrl =
+    (currentItem?.imageUrl && String(currentItem.imageUrl).trim()) ||
+    (Array.isArray(sentenceImages) ? (sentenceImages[sentenceIndexInSection] || '') : '');
   const currentSectionBgUrl = sentenceImageUrl || (sectionData?.backgroundImageUrl || '');
 
   useEffect(() => {
