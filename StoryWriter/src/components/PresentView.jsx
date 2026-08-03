@@ -12,7 +12,6 @@ import { isVideoBackgroundUrl } from '../utils/stockMediaSource';
 import { buildLineRevealRowsSimple } from '../utils/lineReveal';
 import PresentSentence from './PresentSentence';
 import PresentRotateLines from './PresentRotateLines';
-import { downloadNodeAsPng } from '../utils/presentExport';
 import './PresentView.css';
 
 const FONT_SIZE_MAP = {
@@ -91,14 +90,11 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   const [sentencePhase, setSentencePhase] = useState('enter');
   const [displayBgUrl, setDisplayBgUrl] = useState('');
   const [bgLayerOpacity, setBgLayerOpacity] = useState(0);
-  const [exportBusy, setExportBusy] = useState(false);
-  const [exportRenderIndex, setExportRenderIndex] = useState(null);
   const [webcamError, setWebcamError] = useState(null);
   const [webcamActive, setWebcamActive] = useState(false);
   const [screenRecordError, setScreenRecordError] = useState(null);
   const transitionLockRef = useRef(false);
   const transitionTimersRef = useRef([]);
-  const captureRef = useRef(null);
   const videoRef = useRef(null);
 
   const clearTransitionTimers = useCallback(() => {
@@ -149,16 +145,11 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
 
   const displayIndex = sentences.length === 0 ? 0 : Math.min(currentIndex, Math.max(0, sentences.length - 1));
 
-  const renderIndex =
-    exportRenderIndex != null
-      ? Math.min(Math.max(0, exportRenderIndex), Math.max(0, sentences.length - 1))
-      : displayIndex;
-
-  const currentItem = sentencesWithSection[renderIndex];
+  const currentItem = sentencesWithSection[displayIndex];
   const currentAnimation = useMemo(() => {
-    const sentence = sentences[renderIndex] ?? '';
+    const sentence = sentences[displayIndex] ?? '';
     return resolveAnimationForSentence(sentence, rules);
-  }, [sentences, renderIndex, rules]);
+  }, [sentences, displayIndex, rules]);
   const currentSectionId = currentItem?.sectionId;
   const sentenceIndexInSection = currentItem?.sentenceIndexInSection ?? 0;
   const sectionData = currentSectionId ? sectionsData[currentSectionId] : null;
@@ -170,40 +161,27 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   const displayBgIsVideo = isVideoBackgroundUrl(displayBgUrl);
   const sceneLayout = currentItem?.layout ?? 'center';
 
-  const sentence = sentences[renderIndex] ?? '';
+  const sentence = sentences[displayIndex] ?? '';
   const styledParts = currentItem?.styledParts;
   const rotateSpans = currentItem?.rotateSpans ?? [];
   const bulletSpans = currentItem?.bulletSpans ?? [];
   const useLineRevealPresent =
     rotateSpans.length > 0 || bulletSpans.length > 0;
-  const effectiveRevealStep =
-    exportRenderIndex != null
-      ? Math.max(0, (currentItem?.lineRevealStepCount ?? 1) - 1)
-      : revealStep;
   const lineRevealRows = useMemo(
     () =>
       useLineRevealPresent
-        ? buildLineRevealRowsSimple(sentence, rotateSpans, bulletSpans, effectiveRevealStep)
+        ? buildLineRevealRowsSimple(sentence, rotateSpans, bulletSpans, revealStep)
         : null,
-    [useLineRevealPresent, sentence, rotateSpans, bulletSpans, effectiveRevealStep]
+    [useLineRevealPresent, sentence, rotateSpans, bulletSpans, revealStep]
   );
   const hasBulletPresent = bulletSpans.length > 0;
 
   useEffect(() => {
-    if (exportRenderIndex != null) return;
     const item = sentencesWithSection[displayIndex];
     const url = backgroundUrlForSceneItem(item, sectionsData);
     setDisplayBgUrl(url);
     setBgLayerOpacity(url ? bgOpacity : 0);
-  }, [displayIndex, sentencesWithSection, sectionsData, bgOpacity, exportRenderIndex]);
-
-  useEffect(() => {
-    if (exportRenderIndex == null) return;
-    const item = sentencesWithSection[renderIndex];
-    const url = backgroundUrlForSceneItem(item, sectionsData);
-    setDisplayBgUrl(url);
-    setBgLayerOpacity(url ? bgOpacity : 0);
-  }, [exportRenderIndex, renderIndex, sentencesWithSection, sectionsData, bgOpacity]);
+  }, [displayIndex, sentencesWithSection, sectionsData, bgOpacity]);
 
   const navigateTo = useCallback(
     (newIndex, initialRevealStep = 0) => {
@@ -243,39 +221,6 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
       }, exitMs || 0);
     },
     [currentIndex, revealStep, sentences, sentencesWithSection, sectionsData, rules, bgOpacity, clearTransitionTimers, queueTransitionTimer]
-  );
-
-  const handleExportCurrent = useCallback(
-    async (e) => {
-      e.stopPropagation();
-      if (!captureRef.current || exportBusy) return;
-      setExportBusy(true);
-      try {
-        await downloadNodeAsPng(captureRef.current, `slide-${displayIndex + 1}.png`);
-      } finally {
-        setExportBusy(false);
-      }
-    },
-    [displayIndex, exportBusy]
-  );
-
-  const handleExportAll = useCallback(
-    async (e) => {
-      e.stopPropagation();
-      if (!captureRef.current || exportBusy || sentences.length === 0) return;
-      setExportBusy(true);
-      try {
-        for (let i = 0; i < sentences.length; i++) {
-          setExportRenderIndex(i);
-          await new Promise((r) => setTimeout(r, 180));
-          await downloadNodeAsPng(captureRef.current, `slide-${i + 1}.png`);
-        }
-      } finally {
-        setExportRenderIndex(null);
-        setExportBusy(false);
-      }
-    },
-    [exportBusy, sentences.length]
   );
 
   const goNext = useCallback(() => {
@@ -501,10 +446,10 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     <div
       className="present-view present-view--fullscreen present-view--advance-on-click"
       style={{ fontFamily }}
-      onClick={exportBusy ? undefined : goNext}
+      onClick={goNext}
       role="presentation"
     >
-      <div ref={captureRef} className="present-view__capture">
+      <div className="present-view__capture">
       {displayBgUrl && !displayBgIsVideo && (
         <div
           className={`present-view__bg${bgAnimation ? ' present-view__bg--animated' : ''}`}
@@ -548,7 +493,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         <div
           className={[
             'present-view__sentence-stage',
-            hasBulletPresent && 'present-view__sentence-stage--from-top',
+            hasBulletPresent && 'present-view__sentence-stage--bullets',
             sceneLayout === 'left' && 'present-view__sentence-stage--layout-left',
           ]
             .filter(Boolean)
@@ -561,7 +506,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
               fontSize={fontSize}
               lineHeight={lineHeight}
               animKey={rotateAnimKey}
-              phase={exportRenderIndex != null ? 'idle' : sentencePhase}
+              phase={sentencePhase}
               animation={currentAnimation}
               rules={rules}
             />
@@ -570,7 +515,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
               text={sentence}
               styledParts={styledParts}
               animation={currentAnimation}
-              phase={exportRenderIndex != null ? 'idle' : sentencePhase}
+              phase={sentencePhase}
               rules={rules}
               style={{ fontSize, lineHeight }}
             />
@@ -578,19 +523,6 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         </div>
       </div>
       </div>
-      <div className="present-view__export-bar" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="present-view__export-btn" disabled={exportBusy} onClick={handleExportCurrent}>
-          Export slide
-        </button>
-        <button type="button" className="present-view__export-btn" disabled={exportBusy} onClick={handleExportAll}>
-          Export all
-        </button>
-      </div>
-      {exportBusy && (
-        <div className="present-view__export-overlay" aria-live="polite">
-          Exporting…
-        </div>
-      )}
       {recordScreenEnabled && (
         <div className="present-view__recording-badge">
           {screenRecordError ? (
