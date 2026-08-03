@@ -389,6 +389,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   }
 
   const sentence = sentences[displayIndex];
+  const styledParts = currentItem?.styledParts;
 
   return (
     <div className="present-view present-view--fullscreen" style={{ fontFamily }}>
@@ -410,6 +411,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         <div className="present-view__sentence-stage">
           <PresentSentence
             text={sentence}
+            styledParts={styledParts}
             animation={currentAnimation}
             phase={sentencePhase}
             rules={rules}

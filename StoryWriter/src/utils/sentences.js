@@ -1,3 +1,5 @@
+import { headlinePartsForScene } from './headlines';
+
 /** Split text into sentences (by . ! ? followed by space or end). */
 export function getSentences(text) {
   if (!text || !String(text).trim()) return [];
@@ -134,7 +136,7 @@ const PRESENT_SCENE_BREAK = /\n[\t ]*\n+/g;
  * Present-mode scenes: blocks separated by a blank line (double line break).
  * Preserves single line breaks inside each scene as authored in the editor.
  */
-export function getPresentScenes(content, sentenceImages = []) {
+export function getPresentScenes(content, sentenceImages = [], headlineSpans = []) {
   const raw = String(content ?? '');
   if (!raw.trim()) return [];
 
@@ -170,6 +172,7 @@ export function getPresentScenes(content, sentenceImages = []) {
       sentenceIndices,
       primarySentenceIndex,
       imageUrl,
+      styledParts: headlinePartsForScene(raw, rawStart, rawEnd, text, headlineSpans),
     });
   };
 
@@ -190,7 +193,8 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
     const section = sectionsData[sectionId];
     const content = section?.content ?? '';
     const sentenceImages = section?.sentenceImages ?? [];
-    const scenes = getPresentScenes(content, sentenceImages);
+    const headlineSpans = section?.headlineSpans ?? [];
+    const scenes = getPresentScenes(content, sentenceImages, headlineSpans);
     for (const scene of scenes) {
       out.push({
         text: scene.text,
@@ -198,6 +202,7 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
         sentenceIndexInSection: scene.primarySentenceIndex,
         sentenceIndices: scene.sentenceIndices,
         imageUrl: scene.imageUrl,
+        styledParts: scene.styledParts,
       });
     }
   }

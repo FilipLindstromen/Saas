@@ -1,3 +1,4 @@
+import { remapHeadlineSpans } from './headlines';
 import {
   getSentenceStarts,
   getSentenceSegments,
@@ -48,6 +49,7 @@ export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {
       ...old,
       content: newContent,
       sentenceImages: remapSentenceImages(old.content ?? '', newContent, old.sentenceImages ?? []),
+      headlineSpans: remapHeadlineSpans(old.content ?? '', newContent, old.headlineSpans ?? []),
     };
   }
   return next;
@@ -88,6 +90,17 @@ export function locateSentenceAtUnifiedOffset(sectionOrder, sectionsData, unifie
   const norm = contentOffsetToNormalized(content, located.localOffset);
   const sentenceIndex = normalizedOffsetToSentenceIndex(norm, starts);
   return { sectionId: located.sectionId, sentenceIndex };
+}
+
+/** Selection range within a single section, or null if invalid / cross-section. */
+export function unifiedSelectionToSectionRange(sectionOrder, sectionsData, selStart, selEnd) {
+  const a = locateCursorInStory(sectionOrder, sectionsData, selStart);
+  const b = locateCursorInStory(sectionOrder, sectionsData, selEnd);
+  if (!a || !b || a.sectionId !== b.sectionId) return null;
+  const lo = Math.min(a.localOffset, b.localOffset);
+  const hi = Math.max(a.localOffset, b.localOffset);
+  if (hi <= lo) return null;
+  return { sectionId: a.sectionId, start: lo, end: hi };
 }
 
 export function buildUnifiedHighlightParts(sectionOrder, sectionsData) {

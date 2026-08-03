@@ -111,6 +111,20 @@
   line-height: inherit;
 }
 
+.present-view__word-line--headline {
+  font-size: 1.45em;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0.15em 0;
+}
+
+.present-view__headline {
+  display: inline;
+  font-size: 1.45em;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .present-view__word-line--blank {
   min-height: 0.5em;
 }

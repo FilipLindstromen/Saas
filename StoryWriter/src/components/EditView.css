@@ -372,6 +372,11 @@
   border-radius: 2px;
 }
 
+.edit-step__content-headline {
+  font-weight: 700;
+  font-size: 1.12em;
+}
+
 .edit-step__content {
   position: absolute;
   top: 0;

@@ -247,6 +247,16 @@ function App() {
     });
   }, []);
 
+  const handleHeadlineSpansChange = useCallback((sectionId, headlineSpans) => {
+    setPersisted((prev) => ({
+      ...prev,
+      sectionsData: {
+        ...prev.sectionsData,
+        [sectionId]: { ...prev.sectionsData[sectionId], headlineSpans },
+      },
+    }));
+  }, []);
+
   const handleBackgroundOpacityChange = useCallback((value) => {
     saveSettings({ ...getSettings(), presentationBackgroundOpacity: value });
   }, []);
@@ -759,6 +769,7 @@ function App() {
             sectionOrder={sectionOrder}
             sectionsData={sectionsData}
             onUnifiedContentChange={handleUnifiedStoryChange}
+            onHeadlineSpansChange={handleHeadlineSpansChange}
             onSentenceImageChange={handleSentenceImageChange}
             onBackgroundOpacityChange={handleBackgroundOpacityChange}
             onPresentStartChange={setPresentStartIndex}

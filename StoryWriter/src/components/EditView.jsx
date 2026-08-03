@@ -7,9 +7,16 @@ import {
 import {
   joinSectionContents,
   applyUnifiedStoryEdit,
-  buildUnifiedHighlightParts,
   locateSentenceAtUnifiedOffset,
+  unifiedSelectionToSectionRange,
 } from '../utils/storyDocument';
+import { buildUnifiedMirrorParts } from '../utils/unifiedMirror';
+import {
+  addHeadlineSpan,
+  removeHeadlineSpanOverlap,
+  selectionIsHeadline,
+} from '../utils/headlines';
+import TextContextMenu from './TextContextMenu';
 import { resolveSentenceBackgroundImage } from '../services/sentenceBackgroundAi';
 import UnsplashPicker from './UnsplashPicker';
 import SketchBackgroundPanel from './SketchBackgroundPanel';
@@ -21,6 +28,7 @@ function UnifiedEditEditor({
   sectionOrder,
   sectionsData,
   onUnifiedContentChange,
+  onHeadlineSpansChange,
   onOpenSentencePicker,
   onSentencePositionChange,
   onActiveSentenceChange,
@@ -28,9 +36,16 @@ function UnifiedEditEditor({
 }) {
   const textareaRef = useRef(null);
   const wrapRef = useRef(null);
+  const [contextMenu, setContextMenu] = useState({
+    open: false,
+    x: 0,
+    y: 0,
+    range: null,
+    isHeadline: false,
+  });
   const content = joinSectionContents(sectionOrder, sectionsData);
-  const highlightParts = useMemo(
-    () => buildUnifiedHighlightParts(sectionOrder, sectionsData),
+  const mirrorParts = useMemo(
+    () => buildUnifiedMirrorParts(sectionOrder, sectionsData),
     [sectionOrder, sectionsData]
   );
 
@@ -86,18 +101,57 @@ function UnifiedEditEditor({
     onLineClick,
   ]);
 
+  const handleContextMenu = useCallback(
+    (e) => {
+      e.preventDefault();
+      const el = textareaRef.current;
+      if (!el) return;
+      const range = unifiedSelectionToSectionRange(
+        sectionOrder,
+        sectionsData,
+        el.selectionStart,
+        el.selectionEnd
+      );
+      let isHeadline = false;
+      if (range) {
+        const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+        isHeadline = selectionIsHeadline(
+          sectionsData[range.sectionId]?.headlineSpans ?? [],
+          range.start,
+          range.end,
+          sectionContent.length
+        );
+      }
+      setContextMenu({
+        open: true,
+        x: e.clientX,
+        y: e.clientY,
+        range,
+        isHeadline,
+      });
+    },
+    [sectionOrder, sectionsData]
+  );
+
   return (
+    <>
     <div ref={wrapRef} className="unified-story-editor__wrap edit-step__content-wrap">
       <div className="unified-story-editor__mirror edit-step__content-mirror" aria-hidden="true">
-        {highlightParts.map((part, i) =>
-          part.highlight ? (
-            <span key={i} className="unified-story-editor__mirror-highlight edit-step__content-highlight">
+        {mirrorParts.map((part, i) => {
+          const classes = [
+            part.headline && 'edit-step__content-headline',
+            part.hasImage && 'unified-story-editor__mirror-highlight edit-step__content-highlight',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          return classes ? (
+            <span key={i} className={classes}>
               {part.text}
             </span>
           ) : (
             <span key={i}>{part.text}</span>
-          )
-        )}
+          );
+        })}
       </div>
       <textarea
         ref={textareaRef}
@@ -107,6 +161,7 @@ function UnifiedEditEditor({
           onUnifiedContentChange(e.target.value);
           adjustHeight();
         }}
+        onContextMenu={handleContextMenu}
         onMouseUp={handleMouseUp}
         onClick={updateCursorSentence}
         onKeyUp={updateCursorSentence}
@@ -118,6 +173,49 @@ function UnifiedEditEditor({
         spellCheck
       />
     </div>
+    <TextContextMenu
+      open={contextMenu.open}
+      x={contextMenu.x}
+      y={contextMenu.y}
+      onClose={() => setContextMenu((m) => ({ ...m, open: false }))}
+      items={[
+        {
+          id: 'headline-set',
+          label: 'Set as headline',
+          disabled: !contextMenu.range,
+          onClick: () => {
+            const { range } = contextMenu;
+            if (!range) return;
+            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+            const next = addHeadlineSpan(
+              sectionsData[range.sectionId]?.headlineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onHeadlineSpansChange?.(range.sectionId, next);
+          },
+        },
+        {
+          id: 'headline-clear',
+          label: 'Remove headline style',
+          disabled: !contextMenu.range || !contextMenu.isHeadline,
+          onClick: () => {
+            const { range } = contextMenu;
+            if (!range) return;
+            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+            const next = removeHeadlineSpanOverlap(
+              sectionsData[range.sectionId]?.headlineSpans ?? [],
+              range.start,
+              range.end,
+              sectionContent.length
+            );
+            onHeadlineSpansChange?.(range.sectionId, next);
+          },
+        },
+      ]}
+    />
+    </>
   );
 }
 
@@ -125,6 +223,7 @@ export default function EditView({
   sectionOrder,
   sectionsData,
   onUnifiedContentChange,
+  onHeadlineSpansChange,
   onSentenceImageChange,
   onBackgroundOpacityChange,
   onPresentStartChange,
@@ -353,6 +452,7 @@ export default function EditView({
           sectionOrder={sectionOrder}
           sectionsData={sectionsData}
           onUnifiedContentChange={onUnifiedContentChange}
+          onHeadlineSpansChange={onHeadlineSpansChange}
           onOpenSentencePicker={handleOpenSentencePicker}
           onSentencePositionChange={handleSentencePositionChange}
           onActiveSentenceChange={handleActiveSentenceChange}

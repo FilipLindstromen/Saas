@@ -1,5 +1,10 @@
 import { isValidTargetOutcomeId } from '../constants/targetOutcomes';
 import { normalizePresentationAnimationRules } from './textAnimations';
+import { normalizeHeadlineSpans } from './headlines';
+
+function persistHeadlineSpans(spans, contentLength) {
+  return normalizeHeadlineSpans(spans, contentLength).map(({ start, end }) => ({ start, end }));
+}
 
 const STORAGE_KEY = 'storywriter_content';
 
@@ -56,12 +61,14 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
         const arr = Array.isArray(sentenceImages)
           ? sentenceImages.map((x) => (typeof x === 'string' ? x : ''))
           : [];
+        const content = sectionsData[id].content ?? empty[id].content;
         data[id] = {
           input: sectionsData[id].input ?? empty[id].input,
-          content: sectionsData[id].content ?? empty[id].content,
+          content,
           backgroundImageUrl: typeof sectionsData[id].backgroundImageUrl === 'string' ? sectionsData[id].backgroundImageUrl : undefined,
           backgroundImageCredit: typeof sectionsData[id].backgroundImageCredit === 'string' ? sectionsData[id].backgroundImageCredit : undefined,
           sentenceImages: arr,
+          headlineSpans: persistHeadlineSpans(sectionsData[id].headlineSpans, String(content).length),
         };
       }
     }
@@ -98,12 +105,14 @@ export function saveContent(payload) {
         const arr = Array.isArray(sentenceImages)
           ? sentenceImages.map((x) => (typeof x === 'string' ? x : ''))
           : [];
+        const content = section.content ?? '';
         sectionsData[id] = {
           input: section.input ?? '',
-          content: section.content ?? '',
+          content,
           backgroundImageUrl: typeof section.backgroundImageUrl === 'string' ? section.backgroundImageUrl : undefined,
           backgroundImageCredit: typeof section.backgroundImageCredit === 'string' ? section.backgroundImageCredit : undefined,
           sentenceImages: arr,
+          headlineSpans: persistHeadlineSpans(section.headlineSpans, String(content).length),
         };
       }
     }
