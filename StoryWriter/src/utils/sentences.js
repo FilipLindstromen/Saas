@@ -3,9 +3,31 @@ export function getSentences(text) {
   if (!text || !String(text).trim()) return [];
   const trimmed = String(text).trim();
   return trimmed
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[.!?])[\s\n]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Locate a normalized sentence in raw editor text, treating spaces and line breaks as equivalent.
+ */
+function findRawSentenceSpan(raw, normalizedSentence, fromIndex) {
+  const words = normalizedSentence.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return null;
+  const pattern = words.map(escapeRegex).join('[\\s\\n]+');
+  const re = new RegExp(pattern, 'g');
+  re.lastIndex = Math.max(0, fromIndex);
+  const match = re.exec(raw);
+  if (!match) return null;
+  return {
+    start: match.index,
+    end: match.index + match[0].length,
+    text: match[0],
+  };
 }
 
 /** Return { sentences, starts } where starts[i] is the character offset of sentence i in normalized content. */
@@ -59,22 +81,49 @@ export function normalizedOffsetToRawOffset(content, normOff) {
   return s.length;
 }
 
-/** Return segments of raw content for highlight layer: [{ start, end, hasImage }, ...]. */
+/** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
 export function getSentenceSegments(content, sentenceImages = []) {
-  const normalized = String(content ?? '').trim().replace(/\n+/g, ' ');
+  const raw = String(content ?? '');
   const { sentences, starts } = getSentenceStarts(content);
   if (!sentences.length) return [];
+
   const segments = [];
+  let cursor = 0;
+
   for (let i = 0; i < sentences.length; i++) {
-    const normStart = starts[i];
-    const normEnd = normStart + sentences[i].length;
-    const rawStart = normalizedOffsetToRawOffset(content, normStart);
-    const rawEnd = normalizedOffsetToRawOffset(content, normEnd);
+    const span = findRawSentenceSpan(raw, sentences[i], cursor);
+    if (!span) {
+      const normStart = starts[i] ?? 0;
+      const normEnd = normStart + sentences[i].length;
+      const rawStart = normalizedOffsetToRawOffset(content, normStart);
+      const rawEnd = normalizedOffsetToRawOffset(content, normEnd);
+      segments.push({
+        start: rawStart,
+        end: rawEnd,
+        text: raw.slice(rawStart, rawEnd),
+        hasImage: Boolean(sentenceImages[i]),
+      });
+      cursor = rawEnd;
+      continue;
+    }
     segments.push({
-      start: rawStart,
-      end: rawEnd,
+      start: span.start,
+      end: span.end,
+      text: span.text,
       hasImage: Boolean(sentenceImages[i]),
     });
+    cursor = span.end;
+    while (cursor < raw.length && /[\s\n]/.test(raw[cursor])) cursor += 1;
   }
+
   return segments;
+}
+
+/** Segments for edit highlight — same boundaries as present mode. */
+export function getSentenceHighlightSegments(content, sentenceImages = []) {
+  return getSentenceSegments(content, sentenceImages).map(({ start, end, hasImage }) => ({
+    start,
+    end,
+    hasImage,
+  }));
 }

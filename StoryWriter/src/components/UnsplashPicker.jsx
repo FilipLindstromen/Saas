@@ -1,8 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSettings } from '../utils/settings';
+import { searchUnsplashPhotos } from '@shared/stockMedia/unsplash';
 import './UnsplashPicker.css';
 
-const UNSPLASH_SEARCH = 'https://api.unsplash.com/search/photos';
+function formatUnsplashError(err) {
+  const message = err?.message || '';
+  if (message.includes('403')) {
+    return 'Unsplash rejected the request (403). Add a valid Access Key in Settings → Unsplash, and ensure your app is active at unsplash.com/developers.';
+  }
+  if (message.includes('401')) {
+    return 'Invalid Unsplash Access Key. Update it in Settings.';
+  }
+  return message || 'Search failed.';
+}
 
 export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery = '', inline = false }) {
   const [query, setQuery] = useState(initialQuery);
@@ -27,19 +37,10 @@ export default function UnsplashPicker({ isOpen, onClose, onSelect, initialQuery
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({
-        query: q,
-        per_page: '20',
-        client_id: accessKey,
-      });
-      const res = await fetch(`${UNSPLASH_SEARCH}?${params}`);
-      if (!res.ok) {
-        throw new Error(res.status === 401 ? 'Invalid Unsplash key.' : `Error ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await searchUnsplashPhotos(accessKey, q, 1, 20);
       setResults(Array.isArray(data.results) ? data.results : []);
     } catch (err) {
-      setError(err.message || 'Search failed.');
+      setError(formatUnsplashError(err));
       setResults([]);
     } finally {
       setLoading(false);

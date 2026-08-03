@@ -80,6 +80,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
+  white-space: pre-line;
 }
 
 /* Word-by-word: use normal text flow so line breaks match final layout from frame one */
@@ -117,6 +118,7 @@
 .present-view__sentence--idle {
   position: relative;
   text-align: center;
+  white-space: pre-line;
 }
 
 .present-view__sentence--fade-words.present-view__sentence--idle {

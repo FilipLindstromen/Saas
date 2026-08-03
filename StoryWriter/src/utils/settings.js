@@ -1,4 +1,4 @@
-import { loadApiKeys } from '@shared/apiKeys';
+import { loadApiKeys, saveApiKeys } from '@shared/apiKeys';
 
 const STORAGE_KEY = 'storywriter_settings';
 
@@ -94,9 +94,26 @@ export function saveSettings(settings) {
   const size = String(settings.presentationFontSize ?? defaults.presentationFontSize).trim();
   const opacity = settings.presentationBackgroundOpacity;
   const apiKeys = loadApiKeys();
+  const openaiKey =
+    settings.openaiApiKey !== undefined
+      ? String(settings.openaiApiKey ?? '').trim()
+      : apiKeys.openai || '';
+  const unsplashKey =
+    settings.unsplashAccessKey !== undefined
+      ? String(settings.unsplashAccessKey ?? '').trim()
+      : apiKeys.unsplash || '';
+
+  if (settings.openaiApiKey !== undefined || settings.unsplashAccessKey !== undefined) {
+    saveApiKeys({
+      ...apiKeys,
+      openai: openaiKey,
+      unsplash: unsplashKey,
+    });
+  }
+
   const next = {
-    openaiApiKey: apiKeys.openai || '',
-    unsplashAccessKey: apiKeys.unsplash || '',
+    openaiApiKey: openaiKey,
+    unsplashAccessKey: unsplashKey,
     presentationFont: PRESENTATION_FONTS.includes(font) ? font : defaults.presentationFont,
     presentationFontSize: ['small', 'medium', 'large'].includes(size) ? size : defaults.presentationFontSize,
     presentationLineHeight: LINE_HEIGHT_OPTIONS.some((o) => o.value === settings.presentationLineHeight)

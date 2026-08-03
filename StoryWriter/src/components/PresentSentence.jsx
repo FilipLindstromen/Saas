@@ -11,7 +11,15 @@ function FadeWordsContent({ text, phase, stagger }) {
       {lines.map((line, lineIndex) => {
         const words = splitSentenceWords(line);
         if (words.length === 0) {
-          return <span key={`blank-${lineIndex}`} className="present-view__word-line present-view__word-line--blank" aria-hidden="true" />;
+          return (
+            <span
+              key={`blank-${lineIndex}`}
+              className="present-view__word-line present-view__word-line--blank"
+              aria-hidden="true"
+            >
+              {'\u00A0'}
+            </span>
+          );
         }
         return (
           <span key={`line-${lineIndex}`} className="present-view__word-line">

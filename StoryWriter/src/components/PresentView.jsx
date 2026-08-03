@@ -10,6 +10,8 @@ import {
 import { getSentenceSegments } from '../utils/sentences';
 import PresentSentence from './PresentSentence';
 import './PresentView.css';
+
+const FONT_SIZE_MAP = {
   small: 'clamp(1.2rem, 3vw, 2rem)',
   medium: 'clamp(1.5rem, 4vw, 2.75rem)',
   large: 'clamp(1.8rem, 5vw, 3.5rem)',
@@ -62,7 +64,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
       const sentenceImages = sectionsData[sectionId]?.sentenceImages ?? [];
       const segments = getSentenceSegments(content, sentenceImages);
       segments.forEach((seg, sentenceIndexInSection) => {
-        const text = String(content).slice(seg.start, seg.end);
+        const text = seg.text ?? String(content).slice(seg.start, seg.end);
         out.push({ text, sectionId, sentenceIndexInSection });
       });
     }
