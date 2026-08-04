@@ -6,6 +6,7 @@ import {
   getSentenceSegments,
   normalizedOffsetToSentenceIndex,
   contentOffsetToNormalized,
+  buildPresentSceneList,
 } from './sentences';
 
 /** Invisible boundary between framework sections in the unified editor (not shown in UI). */
@@ -137,6 +138,22 @@ export function unifiedSelectionToSectionRange(sectionOrder, sectionsData, selSt
   const hi = Math.max(a.localOffset, b.localOffset);
   if (hi <= lo) return null;
   return { sectionId: a.sectionId, start: lo, end: hi };
+}
+
+/** Unified editor offset for a global present-scene index (start of that slide's text). */
+export function unifiedOffsetForPresentSceneIndex(sectionOrder, sectionsData, globalIndex) {
+  const scenes = buildPresentSceneList(sectionOrder, sectionsData);
+  const idx = Math.max(0, Math.min(globalIndex, Math.max(0, scenes.length - 1)));
+  const scene = scenes[idx];
+  if (!scene) return 0;
+  const spans = getUnifiedSectionSpans(sectionOrder, sectionsData);
+  const span = spans.find((s) => s.sectionId === scene.sectionId);
+  if (!span) return 0;
+  const sectionContent = sectionsData[scene.sectionId]?.content ?? '';
+  const sceneStart = Number(scene.sceneStart);
+  const startInSection = Number.isFinite(sceneStart) ? sceneStart : 0;
+  const clamped = Math.max(0, Math.min(startInSection, sectionContent.length));
+  return span.start + clamped;
 }
 
 export function buildUnifiedHighlightParts(sectionOrder, sectionsData) {

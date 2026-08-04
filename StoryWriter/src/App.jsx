@@ -54,6 +54,15 @@ function App() {
   const [error, setError] = useState('');
   const [view, setView] = useState('write');
   const [presentStartIndex, setPresentStartIndex] = useState(0);
+  const [editScrollPresentIndex, setEditScrollPresentIndex] = useState(null);
+
+  const leavePresentForEdit = useCallback((sceneIndex) => {
+    if (typeof sceneIndex === 'number') {
+      setPresentStartIndex(sceneIndex);
+      setEditScrollPresentIndex(sceneIndex);
+    }
+    setView('edit');
+  }, []);
 
   useEffect(() => {
     if (view === 'present') return;
@@ -563,7 +572,10 @@ function App() {
           <button
             type="button"
             className={`view-btn ${view === 'edit' ? 'view-btn--active' : ''}`}
-            onClick={() => setView('edit')}
+            onClick={() => {
+              if (view === 'present') leavePresentForEdit(presentStartIndex);
+              else setView('edit');
+            }}
           >
             <svg className="view-btn__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -831,6 +843,8 @@ function App() {
             onSentenceImageLockChange={handleSentenceImageLockChange}
             onBackgroundOpacityChange={handleBackgroundOpacityChange}
             onPresentStartChange={setPresentStartIndex}
+            scrollToPresentSceneIndex={editScrollPresentIndex}
+            onPresentSceneScrollDone={() => setEditScrollPresentIndex(null)}
             presentationAnimationRules={presentationAnimationRules}
           />
         </main>
@@ -840,7 +854,8 @@ function App() {
         <PresentView
           sectionOrder={sectionOrder}
           sectionsData={sectionsData}
-          onExit={() => setView('edit')}
+          onExit={leavePresentForEdit}
+          onPresentIndexChange={setPresentStartIndex}
           initialIndex={presentStartIndex}
           animationRules={presentationAnimationRules}
           settingsVersion={settingsVersion}

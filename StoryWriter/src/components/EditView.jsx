@@ -10,9 +10,11 @@ import {
   applyUnifiedStoryEdit,
   locateSentenceAtUnifiedOffset,
   unifiedSelectionToSectionRange,
+  unifiedOffsetForPresentSceneIndex,
 } from '../utils/storyDocument';
 import { buildUnifiedMirrorPartsSafe, buildUnifiedLineGutterSafe } from '../utils/unifiedMirror';
 import { useUnifiedEditGutter } from '../hooks/useUnifiedEditGutter';
+import { measureLineTops } from '../utils/editorLineMeasure';
 import {
   addHeadlineSpan,
   removeHeadlineSpanOverlap,
@@ -54,6 +56,9 @@ function UnifiedEditEditor({
   onSentencePositionChange,
   onActiveSentenceChange,
   onLineClick,
+  scrollToPresentSceneIndex,
+  onPresentSceneScrollDone,
+  mainScrollRef,
 }) {
   const textareaRef = useRef(null);
   const wrapRef = useRef(null);
@@ -91,6 +96,51 @@ function UnifiedEditEditor({
     textareaRef,
     bodyRef,
   });
+
+  useEffect(() => {
+    if (scrollToPresentSceneIndex == null) return;
+    const offset = unifiedOffsetForPresentSceneIndex(
+      sectionOrder,
+      sectionsData,
+      scrollToPresentSceneIndex
+    );
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const run = () => {
+      el.focus({ preventScroll: true });
+      el.setSelectionRange(offset, offset);
+      remeasureGutter();
+      const tops = measureLineTops(measureRef.current, content);
+      const lineIndex = Math.max(0, content.slice(0, offset).split('\n').length - 1);
+      const top = tops[lineIndex] ?? tops[tops.length - 1] ?? 0;
+      const scroller = mainScrollRef?.current;
+      if (scroller) {
+        scroller.scrollTop = Math.max(0, top - scroller.clientHeight * 0.32);
+      }
+      const located = locateSentenceAtUnifiedOffset(sectionOrder, sectionsData, offset);
+      if (located) {
+        onSentencePositionChange?.(located.sectionId, located.sentenceIndex);
+        onActiveSentenceChange?.({
+          sectionId: located.sectionId,
+          sentenceIndex: located.sentenceIndex,
+        });
+      }
+      onPresentSceneScrollDone?.();
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  }, [
+    scrollToPresentSceneIndex,
+    sectionOrder,
+    sectionsData,
+    content,
+    remeasureGutter,
+    mainScrollRef,
+    onSentencePositionChange,
+    onActiveSentenceChange,
+    onPresentSceneScrollDone,
+  ]);
 
   const updateCursorSentence = useCallback(() => {
     const el = textareaRef.current;
@@ -194,6 +244,155 @@ function UnifiedEditEditor({
     [sectionOrder, sectionsData]
   );
 
+  const contextMenuItems = useMemo(() => {
+    const {
+      range,
+      isHeadline,
+      isRotate,
+      isBullet,
+      isEmphasis,
+      isCaption,
+      isLarge,
+      isWhisper,
+      isAlignLeft,
+    } = contextMenu;
+    const hasRange = Boolean(range);
+
+    const styleToggle = (style, active, setLabel, removeLabel) => ({
+      id: `style-${style}`,
+      label: active ? removeLabel : setLabel,
+      disabled: !hasRange,
+      onClick: () => {
+        if (!range) return;
+        const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+        const len = sectionContent.length;
+        const spans = sectionsData[range.sectionId]?.presentStyleSpans ?? [];
+        const next = active
+          ? removePresentStyleOverlap(spans, range.start, range.end, len, style)
+          : addPresentStyleSpan(spans, range.start, range.end, style, len);
+        onPresentStyleSpansChange?.(range.sectionId, next);
+      },
+    });
+
+    return [
+      {
+        id: 'headline',
+        label: isHeadline ? 'Remove headline' : 'Headline',
+        disabled: !hasRange,
+        onClick: () => {
+          if (!range) return;
+          const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+          const len = sectionContent.length;
+          const spans = sectionsData[range.sectionId]?.headlineSpans ?? [];
+          const next = isHeadline
+            ? removeHeadlineSpanOverlap(spans, range.start, range.end, len)
+            : addHeadlineSpan(spans, range.start, range.end, len);
+          onHeadlineSpansChange?.(range.sectionId, next);
+        },
+      },
+      {
+        id: 'rotate',
+        label: isRotate ? 'Remove rotating lines' : 'Rotating lines',
+        disabled: !hasRange,
+        onClick: () => {
+          if (!range) return;
+          const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+          const len = sectionContent.length;
+          if (isRotate) {
+            const next = removeRotateSpanOverlap(
+              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+              range.start,
+              range.end,
+              len
+            );
+            onRotateLineSpansChange?.(range.sectionId, next);
+            return;
+          }
+          const nextRotate = normalizeRotateSpans(
+            addRotateSpan(
+              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
+              range.start,
+              range.end,
+              len
+            ),
+            len
+          );
+          onRotateLineSpansChange?.(range.sectionId, nextRotate);
+          let clearedBullets = sectionsData[range.sectionId]?.bulletLineSpans ?? [];
+          for (const s of nextRotate) {
+            clearedBullets = removeBulletSpanOverlap(clearedBullets, s.start, s.end, len);
+          }
+          onBulletLineSpansChange?.(range.sectionId, clearedBullets);
+        },
+      },
+      {
+        id: 'bullet',
+        label: isBullet ? 'Remove bullet list' : 'Bullet list',
+        disabled: !hasRange,
+        onClick: () => {
+          if (!range) return;
+          const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+          const len = sectionContent.length;
+          if (isBullet) {
+            const next = removeBulletSpanOverlap(
+              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
+              range.start,
+              range.end,
+              len
+            );
+            onBulletLineSpansChange?.(range.sectionId, next);
+            return;
+          }
+          const nextBullet = normalizeRotateSpans(
+            addBulletSpan(
+              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
+              range.start,
+              range.end,
+              len
+            ),
+            len
+          );
+          onBulletLineSpansChange?.(range.sectionId, nextBullet);
+          let clearedRotate = sectionsData[range.sectionId]?.rotateLineSpans ?? [];
+          for (const s of nextBullet) {
+            clearedRotate = removeRotateSpanOverlap(clearedRotate, s.start, s.end, len);
+          }
+          onRotateLineSpansChange?.(range.sectionId, clearedRotate);
+        },
+      },
+      styleToggle('emphasis', isEmphasis, 'Emphasis', 'Remove emphasis'),
+      styleToggle('caption', isCaption, 'Caption', 'Remove caption'),
+      styleToggle('large', isLarge, 'Large type', 'Remove large type'),
+      styleToggle('whisper', isWhisper, 'Whisper', 'Remove whisper'),
+      {
+        id: 'align-left',
+        label: isAlignLeft ? 'Remove align left' : 'Align left',
+        disabled: !hasRange,
+        onClick: () => {
+          if (!range) return;
+          const sectionContent = sectionsData[range.sectionId]?.content ?? '';
+          const len = sectionContent.length;
+          const spans = sectionsData[range.sectionId]?.presentStyleSpans ?? [];
+          if (isAlignLeft) {
+            const next = removePresentStyleOverlap(spans, range.start, range.end, len, 'align-left');
+            onPresentStyleSpansChange?.(range.sectionId, next);
+            return;
+          }
+          let next = removePresentStyleOverlap(spans, range.start, range.end, len, 'align-center');
+          next = addPresentStyleSpan(next, range.start, range.end, 'align-left', len);
+          onPresentStyleSpansChange?.(range.sectionId, next);
+        },
+      },
+    ];
+  }, [
+    contextMenu,
+    sectionsData,
+    onHeadlineSpansChange,
+    onRotateLineSpansChange,
+    onBulletLineSpansChange,
+    onPresentStyleSpansChange,
+  ]);
+
   return (
     <>
     <div ref={wrapRef} className="unified-story-editor__wrap edit-step__content-wrap">
@@ -211,12 +410,12 @@ function UnifiedEditEditor({
               </span>
             )}
             {line.rotate && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--rotate" title="Rotating lines (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--rotate" title="Rotating lines">
                 ↻
               </span>
             )}
             {line.bullet && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--bullet" title="Bullet list (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--bullet" title="Bullet list">
                 •
               </span>
             )}
@@ -226,27 +425,27 @@ function UnifiedEditEditor({
               </span>
             )}
             {line.alignLeft && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--layout" title="Align left (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--layout" title="Align left">
                 ◧
               </span>
             )}
             {line.emphasis && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--emphasis" title="Emphasis (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--emphasis" title="Emphasis">
                 E
               </span>
             )}
             {line.caption && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--caption" title="Caption (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--caption" title="Caption">
                 C
               </span>
             )}
             {line.large && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--large" title="Large type (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--large" title="Large type">
                 L
               </span>
             )}
             {line.whisper && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--whisper" title="Whisper (Present)">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--whisper" title="Whisper">
                 W
               </span>
             )}
@@ -307,217 +506,7 @@ function UnifiedEditEditor({
       x={contextMenu.x}
       y={contextMenu.y}
       onClose={() => setContextMenu((m) => ({ ...m, open: false }))}
-      items={[
-        {
-          id: 'headline-set',
-          label: 'Set as headline',
-          disabled: !contextMenu.range,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const next = addHeadlineSpan(
-              sectionsData[range.sectionId]?.headlineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
-            );
-            onHeadlineSpansChange?.(range.sectionId, next);
-          },
-        },
-        {
-          id: 'headline-clear',
-          label: 'Remove headline style',
-          disabled: !contextMenu.range || !contextMenu.isHeadline,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const next = removeHeadlineSpanOverlap(
-              sectionsData[range.sectionId]?.headlineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
-            );
-            onHeadlineSpansChange?.(range.sectionId, next);
-          },
-        },
-        {
-          id: 'rotate-set',
-          label: 'Set as rotating lines (Present)',
-          disabled: !contextMenu.range || contextMenu.isRotate,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const len = sectionContent.length;
-            const nextRotate = normalizeRotateSpans(
-              addRotateSpan(
-                sectionsData[range.sectionId]?.rotateLineSpans ?? [],
-                range.start,
-                range.end,
-                len
-              ),
-              len
-            );
-            onRotateLineSpansChange?.(range.sectionId, nextRotate);
-            let clearedBullets = sectionsData[range.sectionId]?.bulletLineSpans ?? [];
-            for (const s of nextRotate) {
-              clearedBullets = removeBulletSpanOverlap(clearedBullets, s.start, s.end, len);
-            }
-            onBulletLineSpansChange?.(range.sectionId, clearedBullets);
-          },
-        },
-        {
-          id: 'rotate-clear',
-          label: 'Remove rotating lines',
-          disabled: !contextMenu.range || !contextMenu.isRotate,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const next = removeRotateSpanOverlap(
-              sectionsData[range.sectionId]?.rotateLineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
-            );
-            onRotateLineSpansChange?.(range.sectionId, next);
-          },
-        },
-        {
-          id: 'bullet-set',
-          label: 'Set as bullet list (Present)',
-          disabled: !contextMenu.range || contextMenu.isBullet,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const len = sectionContent.length;
-            const nextBullet = normalizeRotateSpans(
-              addBulletSpan(
-                sectionsData[range.sectionId]?.bulletLineSpans ?? [],
-                range.start,
-                range.end,
-                len
-              ),
-              len
-            );
-            onBulletLineSpansChange?.(range.sectionId, nextBullet);
-            let clearedRotate = sectionsData[range.sectionId]?.rotateLineSpans ?? [];
-            for (const s of nextBullet) {
-              clearedRotate = removeRotateSpanOverlap(clearedRotate, s.start, s.end, len);
-            }
-            onRotateLineSpansChange?.(range.sectionId, clearedRotate);
-          },
-        },
-        {
-          id: 'bullet-clear',
-          label: 'Remove bullet list style',
-          disabled: !contextMenu.range || !contextMenu.isBullet,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const next = removeBulletSpanOverlap(
-              sectionsData[range.sectionId]?.bulletLineSpans ?? [],
-              range.start,
-              range.end,
-              sectionContent.length
-            );
-            onBulletLineSpansChange?.(range.sectionId, next);
-          },
-        },
-        ...['emphasis', 'caption', 'large', 'whisper'].flatMap((style) => {
-          const labels = {
-            emphasis: ['Emphasis (Present)', 'Remove emphasis'],
-            caption: ['Caption (Present)', 'Remove caption'],
-            large: ['Large type (Present)', 'Remove large type'],
-            whisper: ['Whisper (Present)', 'Remove whisper'],
-          };
-          const flagKey = { emphasis: 'isEmphasis', caption: 'isCaption', large: 'isLarge', whisper: 'isWhisper' }[style];
-          return [
-            {
-              id: `${style}-set`,
-              label: labels[style][0],
-              disabled: !contextMenu.range || contextMenu[flagKey],
-              onClick: () => {
-                const { range } = contextMenu;
-                if (!range) return;
-                const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-                const len = sectionContent.length;
-                const next = addPresentStyleSpan(
-                  sectionsData[range.sectionId]?.presentStyleSpans ?? [],
-                  range.start,
-                  range.end,
-                  style,
-                  len
-                );
-                onPresentStyleSpansChange?.(range.sectionId, next);
-              },
-            },
-            {
-              id: `${style}-clear`,
-              label: labels[style][1],
-              disabled: !contextMenu.range || !contextMenu[flagKey],
-              onClick: () => {
-                const { range } = contextMenu;
-                if (!range) return;
-                const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-                const len = sectionContent.length;
-                const next = removePresentStyleOverlap(
-                  sectionsData[range.sectionId]?.presentStyleSpans ?? [],
-                  range.start,
-                  range.end,
-                  len,
-                  style
-                );
-                onPresentStyleSpansChange?.(range.sectionId, next);
-              },
-            },
-          ];
-        }),
-        {
-          id: 'align-left-set',
-          label: 'Align left (Present)',
-          disabled: !contextMenu.range || contextMenu.isAlignLeft,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const len = sectionContent.length;
-            const cleared = removePresentStyleOverlap(
-              sectionsData[range.sectionId]?.presentStyleSpans ?? [],
-              range.start,
-              range.end,
-              len,
-              'align-center'
-            );
-            const next = addPresentStyleSpan(cleared, range.start, range.end, 'align-left', len);
-            onPresentStyleSpansChange?.(range.sectionId, next);
-          },
-        },
-        {
-          id: 'align-center-set',
-          label: 'Align center (Present)',
-          disabled: !contextMenu.range,
-          onClick: () => {
-            const { range } = contextMenu;
-            if (!range) return;
-            const sectionContent = sectionsData[range.sectionId]?.content ?? '';
-            const len = sectionContent.length;
-            let next = removePresentStyleOverlap(
-              sectionsData[range.sectionId]?.presentStyleSpans ?? [],
-              range.start,
-              range.end,
-              len,
-              'align-left'
-            );
-            next = addPresentStyleSpan(next, range.start, range.end, 'align-center', len);
-            onPresentStyleSpansChange?.(range.sectionId, next);
-          },
-        },
-      ]}
+      items={contextMenuItems}
     />
     </>
   );
@@ -536,7 +525,10 @@ export default function EditView({
   onBackgroundOpacityChange,
   onPresentStartChange,
   presentationAnimationRules,
+  scrollToPresentSceneIndex,
+  onPresentSceneScrollDone,
 }) {
+  const mainScrollRef = useRef(null);
   const [pickerAutoSearch, setPickerAutoSearch] = useState(false);
   const [manualPickerOpen, setManualPickerOpen] = useState(false);
   const [activeSentence, setActiveSentence] = useState(null);
@@ -801,7 +793,7 @@ export default function EditView({
   return (
     <EditViewErrorBoundary>
     <div className="edit-view">
-      <div className="edit-view__main">
+      <div ref={mainScrollRef} className="edit-view__main">
         <div className="edit-view__opacity">
           <span className="edit-view__opacity-label">Background image transparency</span>
           <input
@@ -826,6 +818,9 @@ export default function EditView({
           onSentencePositionChange={handleSentencePositionChange}
           onActiveSentenceChange={handleActiveSentenceChange}
           onLineClick={handleLineClick}
+          scrollToPresentSceneIndex={scrollToPresentSceneIndex}
+          onPresentSceneScrollDone={onPresentSceneScrollDone}
+          mainScrollRef={mainScrollRef}
         />
       </div>
       <aside

@@ -49,7 +49,7 @@ function backgroundUrlForSceneItem(item, sectionsData) {
   return sentenceImageUrl || (sectionData?.backgroundImageUrl || '');
 }
 
-export default function PresentView({ sectionOrder, sectionsData, onExit, initialIndex = 0, animationRules, settingsVersion = 0 }) {
+export default function PresentView({ sectionOrder, sectionsData, onExit, onPresentIndexChange, initialIndex = 0, animationRules, settingsVersion = 0 }) {
   const settings = getSettings();
   const fontFamily = `'${settings.presentationFont || 'Poppins'}', sans-serif`;
   const fontSize = FONT_SIZE_MAP[settings.presentationFontSize] ?? FONT_SIZE_MAP.medium;
@@ -177,6 +177,10 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
   const hasBulletPresent = bulletSpans.length > 0;
 
   useEffect(() => {
+    onPresentIndexChange?.(displayIndex);
+  }, [displayIndex, onPresentIndexChange]);
+
+  useEffect(() => {
     const item = sentencesWithSection[displayIndex];
     const url = backgroundUrlForSceneItem(item, sectionsData);
     setDisplayBgUrl(url);
@@ -258,7 +262,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
         if (document.fullscreenElement) {
           document.exitFullscreen().catch(() => {});
         }
-        onExit?.();
+        onExit?.(displayIndex);
         return;
       }
       if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
@@ -272,7 +276,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, initia
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goNext, goPrev, onExit]);
+  }, [goNext, goPrev, onExit, displayIndex]);
 
   useEffect(() => {
     document.documentElement.requestFullscreen().catch(() => {});

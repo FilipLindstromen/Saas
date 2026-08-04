@@ -225,6 +225,8 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
         bulletSpans: scene.bulletSpans,
         lineRevealStepCount: scene.lineRevealStepCount,
         rotateStepCount: scene.rotateStepCount,
+        sceneStart: scene.start,
+        sceneEnd: scene.end,
       });
     }
   }
