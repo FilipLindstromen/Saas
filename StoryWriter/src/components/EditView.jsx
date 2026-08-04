@@ -7,7 +7,6 @@ import {
 } from '../utils/sentences';
 import {
   joinSectionContents,
-  applyUnifiedStoryEdit,
   locateSentenceAtUnifiedOffset,
   unifiedSelectionToSectionRange,
   unifiedOffsetForPresentSceneIndex,

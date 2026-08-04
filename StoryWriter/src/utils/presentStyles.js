@@ -1,4 +1,5 @@
 import { normalizeHeadlineSpans, mergeHeadlineSpans } from './headlines';
+import { remapOffsetSpans } from './textEditMap';
 
 export const PRESENT_TEXT_STYLES = ['emphasis', 'caption', 'large', 'whisper'];
 export const PRESENT_LAYOUT_STYLES = ['align-left', 'align-center'];
@@ -35,17 +36,13 @@ export function mergePresentStyleSpans(spans, contentLength) {
 }
 
 export function remapPresentStyleSpans(oldContent, newContent, spans) {
-  const old = String(oldContent ?? '');
-  const next = String(newContent ?? '');
-  const out = [];
-  for (const span of normalizePresentStyleSpans(spans, old.length)) {
-    const snippet = old.slice(span.start, span.end);
-    if (!snippet) continue;
-    const idx = next.indexOf(snippet);
-    if (idx < 0) continue;
-    out.push({ start: idx, end: idx + snippet.length, style: span.style });
-  }
-  return mergePresentStyleSpans(out, next.length);
+  return remapOffsetSpans(
+    oldContent,
+    newContent,
+    spans,
+    normalizePresentStyleSpans,
+    mergePresentStyleSpans
+  );
 }
 
 export function addPresentStyleSpan(spans, start, end, style, contentLength) {

@@ -6,8 +6,10 @@ import {
   getSentenceSegments,
   normalizedOffsetToSentenceIndex,
   contentOffsetToNormalized,
+  normalizedOffsetToRawOffset,
   buildPresentSceneList,
 } from './sentences';
+import { mapOldIndexToNew } from './textEditMap';
 
 /** Invisible boundary between framework sections in the unified editor (not shown in UI). */
 export const SECTION_SEPARATOR = '\n\n\u200C\n\n';
@@ -49,25 +51,48 @@ export function splitIntoSectionContents(unified, sectionOrder) {
 }
 
 function remapSentenceImages(oldContent, newContent, oldImages) {
-  const { sentences: oldS } = getSentenceStarts(oldContent);
-  const { sentences: newS } = getSentenceStarts(newContent);
+  const old = String(oldContent ?? '');
+  const next = String(newContent ?? '');
+  const { starts: oldStarts } = getSentenceStarts(old);
+  const { sentences: newS, starts: newStarts } = getSentenceStarts(next);
   if (!newS.length) return [];
   const images = Array.isArray(oldImages) ? oldImages : [];
-  return newS.map((sentence) => {
-    const oldIdx = oldS.indexOf(sentence);
-    return oldIdx >= 0 && images[oldIdx] ? images[oldIdx] : '';
-  });
+  const result = newS.map(() => '');
+
+  for (let i = 0; i < oldStarts.length; i++) {
+    const url = images[i];
+    if (!url) continue;
+    const rawStart = normalizedOffsetToRawOffset(old, oldStarts[i]);
+    const mappedRaw = mapOldIndexToNew(old, next, rawStart);
+    const normMapped = contentOffsetToNormalized(next, mappedRaw);
+    const newIdx = normalizedOffsetToSentenceIndex(normMapped, newStarts);
+    if (newIdx >= 0 && newIdx < result.length && !result[newIdx]) {
+      result[newIdx] = url;
+    }
+  }
+  return result;
 }
 
 function remapSentenceLocks(oldContent, newContent, oldLocks) {
-  const { sentences: oldS } = getSentenceStarts(oldContent);
-  const { sentences: newS } = getSentenceStarts(newContent);
+  const old = String(oldContent ?? '');
+  const next = String(newContent ?? '');
+  const { starts: oldStarts } = getSentenceStarts(old);
+  const { sentences: newS, starts: newStarts } = getSentenceStarts(next);
   if (!newS.length) return [];
   const locks = Array.isArray(oldLocks) ? oldLocks : [];
-  return newS.map((sentence) => {
-    const oldIdx = oldS.indexOf(sentence);
-    return oldIdx >= 0 && Boolean(locks[oldIdx]);
-  });
+  const result = newS.map(() => false);
+
+  for (let i = 0; i < oldStarts.length; i++) {
+    if (!locks[i]) continue;
+    const rawStart = normalizedOffsetToRawOffset(old, oldStarts[i]);
+    const mappedRaw = mapOldIndexToNew(old, next, rawStart);
+    const normMapped = contentOffsetToNormalized(next, mappedRaw);
+    const newIdx = normalizedOffsetToSentenceIndex(normMapped, newStarts);
+    if (newIdx >= 0 && newIdx < result.length) {
+      result[newIdx] = true;
+    }
+  }
+  return result;
 }
 
 export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {

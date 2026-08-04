@@ -21,9 +21,18 @@
   background: var(--surface);
   position: sticky;
   top: 0;
-  z-index: 100;
-  overflow: hidden;
+  z-index: 500;
+  overflow: visible;
   flex-shrink: 0;
+}
+
+/* Toolbar popovers/dropdowns must paint above tab bar and main panels */
+.app-header .font-settings-popover,
+.app-header .presentation-animation-popover,
+.app-header .background-animation-popover,
+.app-header .recording-options-popover,
+.app-header .project-selector-dropdown {
+  z-index: 900;
 }
 
 .app-title {
@@ -90,6 +99,7 @@
   align-items: center;
   gap: 0.25rem;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .app-settings-btn {

@@ -1,5 +1,7 @@
 /** @typedef {{ start: number, end: number }} HeadlineSpan */
 
+import { remapOffsetSpans } from './textEditMap';
+
 export function normalizeHeadlineSpans(spans, contentLength) {
   const len = Math.max(0, Number(contentLength) || 0);
   if (!Array.isArray(spans)) return [];
@@ -13,18 +15,7 @@ export function normalizeHeadlineSpans(spans, contentLength) {
 }
 
 export function remapHeadlineSpans(oldContent, newContent, spans) {
-  const old = String(oldContent ?? '');
-  const next = String(newContent ?? '');
-  const normalized = normalizeHeadlineSpans(spans, old.length);
-  const out = [];
-  for (const span of normalized) {
-    const snippet = old.slice(span.start, span.end);
-    if (!snippet) continue;
-    const idx = next.indexOf(snippet);
-    if (idx < 0) continue;
-    out.push({ start: idx, end: idx + snippet.length });
-  }
-  return mergeHeadlineSpans(out, next.length);
+  return remapOffsetSpans(oldContent, newContent, spans, normalizeHeadlineSpans, mergeHeadlineSpans);
 }
 
 export function mergeHeadlineSpans(spans, contentLength) {

@@ -15,6 +15,7 @@ export default function PresentRotateLines({
   if (!rows?.length) return null;
 
   const hasBullets = rows.some((row) => row.kind === 'line' && row.variant === 'bullet');
+  const hasRotateSteps = rows.some((row) => row.kind === 'rotate-step');
   const exitAnimation = phase === 'exit' ? getExitAnimation(animation) : animation;
   const timingStyle = presentationTimingStyle(rules);
   const staggerMs = rules?.wordStaggerMs ?? 70;
@@ -25,6 +26,7 @@ export default function PresentRotateLines({
       className={[
         'present-rotate',
         hasBullets && 'present-rotate--bullets',
+        hasRotateSteps && 'present-rotate--text-rotate',
         phase === 'enter' && 'present-rotate--phase-enter',
         phase === 'exit' && 'present-rotate--phase-exit',
         phase === 'idle' && 'present-rotate--phase-idle',
@@ -36,6 +38,52 @@ export default function PresentRotateLines({
       aria-live="polite"
     >
       {rows.map((row, index) => {
+        if (row.kind === 'rotate-step') {
+          const parts = applyHeadlineToLineText(row.text, styledParts);
+          const prevParts = row.previousText
+            ? applyHeadlineToLineText(row.previousText, styledParts)
+            : null;
+          const runStepAnim = row.animate && phase === 'enter';
+          return (
+            <div
+              key={`rotate-step-${index}-${animKey}`}
+              className={[
+                'present-rotate__slot',
+                phase === 'exit' && 'present-rotate__slot--exit',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <div className="present-rotate__slot-mask">
+                {prevParts && runStepAnim ? (
+                  <div
+                    className={[
+                      'present-rotate__line',
+                      'present-rotate__line--rotate-out',
+                      runStepAnim && 'present-rotate__line--rotate-out-active',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <PresentTextParts parts={prevParts} />
+                  </div>
+                ) : null}
+                <div
+                  className={[
+                    'present-rotate__line',
+                    runStepAnim && 'present-rotate__line--rotate-in',
+                    phase === 'exit' && 'present-rotate__line--out',
+                    phase === 'idle' && 'present-rotate__line--rotate-settled',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  <PresentTextParts parts={parts} />
+                </div>
+              </div>
+            </div>
+          );
+        }
         if (row.kind === 'static') {
           return (
             <p key={`s-${index}`} className="present-rotate__static">

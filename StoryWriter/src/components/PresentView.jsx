@@ -49,6 +49,12 @@ function backgroundUrlForSceneItem(item, sectionsData) {
   return sentenceImageUrl || (sectionData?.backgroundImageUrl || '');
 }
 
+function samePresentBackground(urlA, urlB) {
+  const a = String(urlA ?? '').trim();
+  const b = String(urlB ?? '').trim();
+  return a.length > 0 && a === b;
+}
+
 export default function PresentView({ sectionOrder, sectionsData, onExit, onPresentIndexChange, initialIndex = 0, animationRules, settingsVersion = 0 }) {
   const settings = getSettings();
   const fontFamily = `'${settings.presentationFont || 'Poppins'}', sans-serif`;
@@ -183,9 +189,13 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
   useEffect(() => {
     const item = sentencesWithSection[displayIndex];
     const url = backgroundUrlForSceneItem(item, sectionsData);
-    setDisplayBgUrl(url);
-    setBgLayerOpacity(url ? bgOpacity : 0);
-  }, [displayIndex, sentencesWithSection, sectionsData, bgOpacity]);
+    setDisplayBgUrl((prev) => (samePresentBackground(prev, url) ? prev : url));
+  }, [displayIndex, sentencesWithSection, sectionsData]);
+
+  useEffect(() => {
+    const trimmed = String(displayBgUrl ?? '').trim();
+    setBgLayerOpacity(trimmed ? bgOpacity : 0);
+  }, [displayBgUrl, bgOpacity]);
 
   const navigateTo = useCallback(
     (newIndex, initialRevealStep = 0) => {
@@ -196,22 +206,30 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
       transitionLockRef.current = true;
       clearTransitionTimers();
 
+      const leavingItem = sentencesWithSection[currentIndex];
+      const currentBgUrl = backgroundUrlForSceneItem(leavingItem, sectionsData);
+      const newItem = sentencesWithSection[newIndex];
+      const newBgUrl = backgroundUrlForSceneItem(newItem, sectionsData);
+      const persistBackground = samePresentBackground(currentBgUrl, newBgUrl);
+
       const leavingSentence = sentences[currentIndex] ?? '';
       const leavingAnimation = resolveAnimationForSentence(leavingSentence, rules);
       const exitAnimation = getExitAnimation(leavingAnimation);
       const exitMs = getExitDurationMs(exitAnimation, leavingSentence, rules);
 
-      setBgLayerOpacity(0);
+      if (!persistBackground) {
+        setBgLayerOpacity(0);
+      }
       setSentencePhase('exit');
 
       queueTransitionTimer(() => {
-        const newItem = sentencesWithSection[newIndex];
-        const newBgUrl = backgroundUrlForSceneItem(newItem, sectionsData);
         setCurrentIndex(newIndex);
         setRevealStep(initialRevealStep);
         setRotateAnimKey((k) => k + 1);
-        setDisplayBgUrl(newBgUrl);
-        requestAnimationFrame(() => setBgLayerOpacity(newBgUrl ? bgOpacity : 0));
+        if (!persistBackground) {
+          setDisplayBgUrl(newBgUrl);
+          requestAnimationFrame(() => setBgLayerOpacity(newBgUrl ? bgOpacity : 0));
+        }
         setSentencePhase('enter');
 
         const enteringSentence = sentences[newIndex] ?? '';
@@ -490,6 +508,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
         className={[
           'present-view__inner',
           sceneLayout === 'left' && 'present-view__inner--layout-left',
+          hasBulletPresent && 'present-view__inner--bullets',
         ]
           .filter(Boolean)
           .join(' ')}

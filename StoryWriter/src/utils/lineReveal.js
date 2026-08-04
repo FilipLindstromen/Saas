@@ -1,5 +1,6 @@
 import { normalizeHeadlineSpans, mergeHeadlineSpans } from './headlines';
 import { partsForLineText } from './presentStyles';
+import { remapOffsetSpans } from './textEditMap';
 
 export const normalizeRotateSpans = normalizeHeadlineSpans;
 export const mergeRotateSpans = mergeHeadlineSpans;
@@ -9,18 +10,7 @@ export const removeRotateSpanOverlap = removeRotateSpanOverlapImpl;
 export const selectionIsRotate = selectionIsRotateImpl;
 
 function remapRotateSpansImpl(oldContent, newContent, spans) {
-  const old = String(oldContent ?? '');
-  const next = String(newContent ?? '');
-  const normalized = normalizeRotateSpans(spans, old.length);
-  const out = [];
-  for (const span of normalized) {
-    const snippet = old.slice(span.start, span.end);
-    if (!snippet) continue;
-    const idx = next.indexOf(snippet);
-    if (idx < 0) continue;
-    out.push({ start: idx, end: idx + snippet.length });
-  }
-  return mergeRotateSpans(out, next.length);
+  return remapOffsetSpans(oldContent, newContent, spans, normalizeRotateSpans, mergeRotateSpans);
 }
 
 function addRotateSpanImpl(spans, start, end, contentLength) {
@@ -120,14 +110,14 @@ export function getRotateStepCount(sceneText, rotateSpansLocal) {
   return getLineRevealStepCount(sceneText, rotateSpansLocal, []);
 }
 
-/** Rotating lines: only the active line is visible at each step. */
+/** Rotating lines: one slot; previous line exits down, next enters from top. */
 export function appendRotateRevealLines(rows, lines, stepIndex) {
   const lineIdx = Math.min(stepIndex, lines.length - 1);
   rows.push({
-    kind: 'line',
+    kind: 'rotate-step',
     text: lines[lineIdx],
-    variant: 'rotate',
-    animate: stepIndex < lines.length && lineIdx === stepIndex,
+    previousText: stepIndex > 0 ? lines[Math.max(0, lineIdx - 1)] : null,
+    animate: stepIndex < lines.length,
   });
 }
 
