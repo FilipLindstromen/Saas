@@ -9,6 +9,7 @@ import ResultView from './components/ResultView'
 import ImportPanel from './components/ImportPanel'
 import HistoryGallery from './components/HistoryGallery'
 import LayersPanel from './components/LayersPanel'
+import ImageContextMenu from './components/ImageContextMenu'
 import SettingsModal from '@shared/SettingsModal/SettingsModal'
 import TabBar from '@shared/TabBar/TabBar'
 import { getTheme, setTheme as persistTheme, initThemeSync } from '@shared/theme'
@@ -20,6 +21,7 @@ import {
   addStyleReference, getAllStyleReferences, deleteStyleReference,
 } from './utils/db'
 import { loadCustomStyles, addCustomStyle, deleteCustomStyle } from './utils/customStyles'
+import { copyImageToClipboard } from './utils/clipboard'
 import {
   generateProjectId, drawingKeyFor,
   loadProjects, saveProjects,
@@ -100,6 +102,7 @@ export default function App() {
   const [placing, setPlacing] = useState(null)
   const [layers, setLayers] = useState([])
   const [activeLayerId, setActiveLayerId] = useState(null)
+  const [imageContextMenu, setImageContextMenu] = useState(null)
 
   const [projects, setProjects] = useState([])
   const [currentProjectId, setCurrentProjectId] = useState(null)
@@ -266,6 +269,55 @@ export default function App() {
     if (!generatedImage) return
     loadImageOntoCanvas(generatedImage)
   }, [generatedImage, loadImageOntoCanvas])
+
+  // Paste an image from the OS clipboard (e.g. a screenshot, or an image copied
+  // from another app or browser tab) straight onto the canvas. Skipped while an
+  // editable field is focused so normal text pasting still works everywhere else.
+  useEffect(() => {
+    const onPaste = (e) => {
+      const target = e.target
+      const isEditable = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+      if (isEditable) return
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (file) handleImportFile(file)
+          break
+        }
+      }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [handleImportFile])
+
+  const handleImageContextMenu = useCallback((e, dataUrl) => {
+    e.preventDefault()
+    setImageContextMenu({ x: e.clientX, y: e.clientY, dataUrl })
+  }, [])
+
+  const handleCopyImageFromMenu = useCallback(async () => {
+    const dataUrl = imageContextMenu?.dataUrl
+    setImageContextMenu(null)
+    if (!dataUrl) return
+    try {
+      await copyImageToClipboard(dataUrl)
+    } catch {
+      setError('Could not copy image to clipboard.')
+    }
+  }, [imageContextMenu])
+
+  const handleDownloadImageFromMenu = useCallback(() => {
+    const dataUrl = imageContextMenu?.dataUrl
+    setImageContextMenu(null)
+    if (!dataUrl) return
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = 'sketchgen-result.png'
+    link.click()
+  }, [imageContextMenu])
 
   const handleStartPlacing = useCallback(async ({ url, maxDim, label }) => {
     setError('')
@@ -611,6 +663,7 @@ export default function App() {
               sketchDataUrl={sketchSnapshot}
               generatedDataUrl={generatedImage}
               onUseAsSketch={handleUseAsSketch}
+              onImageContextMenu={handleImageContextMenu}
             />
           )}
         </main>
@@ -662,6 +715,16 @@ export default function App() {
       </div>
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {imageContextMenu && (
+        <ImageContextMenu
+          x={imageContextMenu.x}
+          y={imageContextMenu.y}
+          onCopy={handleCopyImageFromMenu}
+          onDownload={handleDownloadImageFromMenu}
+          onClose={() => setImageContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

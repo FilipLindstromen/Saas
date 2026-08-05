@@ -4,16 +4,18 @@ import { BUILT_IN_CATEGORIES, CUSTOM_CATEGORY, DEFAULT_POSTS, accentOf, labelOf 
 import { buildFeed, nextDue } from './utils/spacedRepetition.js'
 import { extractTextFromFile, guessFileType } from './utils/fileParsing.js'
 import { generateLessonBatch, BATCH_SIZE, REFILL_THRESHOLD, MAX_TOTAL_LESSONS } from './utils/generateLessons.js'
+import { transformCopy } from './utils/transformCopy.js'
 import {
   isCloudEnabled, getWorkspaceCode, setWorkspaceCode,
   subscribeState, saveState, subscribeSources, createSource, updateSource, deleteSource,
-  subscribePosts, addPosts,
+  subscribePosts, addPosts, subscribeTransforms, addTransform, deleteTransform,
 } from './utils/storage.js'
 import TopBar from './components/TopBar.jsx'
 import PostCard from './components/PostCard.jsx'
 import SwipeStage from './components/SwipeStage.jsx'
 import SettingsSheet from './components/SettingsSheet.jsx'
 import EmptyState from './components/EmptyState.jsx'
+import TransformView from './components/TransformView.jsx'
 
 const ALL_CATEGORIES = [...BUILT_IN_CATEGORIES, CUSTOM_CATEGORY]
 const cloudEnabled = isCloudEnabled()
@@ -30,6 +32,7 @@ export default function App() {
   const [progress, setProgress] = useState({})
   const [sources, setSources] = useState([])
   const [customPosts, setCustomPosts] = useState([])
+  const [transforms, setTransforms] = useState([])
   const [showSettings, setShowSettings] = useState(false)
   const [view, setView] = useState('feed')
   const [postIdx, setPostIdx] = useState(0)
@@ -67,7 +70,8 @@ export default function App() {
       setSources(withCounts)
     })
     const unsubPosts = subscribePosts((list) => setCustomPosts(list))
-    return () => { unsubState(); unsubSources(); unsubPosts() }
+    const unsubTransforms = subscribeTransforms((list) => setTransforms(list))
+    return () => { unsubState(); unsubSources(); unsubPosts(); unsubTransforms() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceCode])
 
@@ -78,6 +82,7 @@ export default function App() {
   const allPosts = useMemo(() => [...DEFAULT_POSTS, ...customPosts], [customPosts])
 
   const feed = useMemo(() => {
+    if (view === 'transform') return []
     if (view === 'favorites') return allPosts.filter((p) => favorites.includes(p.id))
     return buildFeed(allPosts, selectedCats.length ? selectedCats : BUILT_IN_CATEGORIES.map((c) => c.id), progress)
   }, [view, allPosts, selectedCats, progress, favorites])
@@ -197,6 +202,14 @@ export default function App() {
 
   const onDeleteSource = (id) => deleteSource(id)
 
+  const onSubmitTransform = async ({ copy, instructions }) => {
+    const standingInstructions = transforms.map((t) => t.instructions).filter(Boolean)
+    const output = await transformCopy({ copy, instructions, standingInstructions })
+    await addTransform({ copy, instructions, output })
+  }
+
+  const onDeleteTransform = (id) => deleteTransform(id)
+
   const onJoinWorkspace = (code) => {
     setWorkspaceCode(code)
     setWorkspaceCodeState(code)
@@ -212,10 +225,20 @@ export default function App() {
 
   return (
     <div style={{ height: '100dvh', width: '100%', background: '#0B0B0C', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <TopBar view={view} setView={setView} favCount={favorites.length} onOpenSettings={() => setShowSettings(true)} />
+      <TopBar
+        view={view}
+        setView={setView}
+        favCount={favorites.length}
+        onOpenSettings={() => setShowSettings(true)}
+        categories={ALL_CATEGORIES}
+        selectedCats={selectedCats}
+        onToggleCat={toggleCat}
+      />
 
       <div style={{ flex: 1, position: 'relative', padding: '4px 12px 12px', minHeight: 0 }}>
-        {!post ? (
+        {view === 'transform' ? (
+          <TransformView transforms={transforms} onSubmit={onSubmitTransform} onDelete={onDeleteTransform} />
+        ) : !post ? (
           <EmptyState view={view} onOpenSettings={() => setShowSettings(true)} onGoFeed={() => setView('feed')} />
         ) : (
           <SwipeStage
@@ -243,7 +266,7 @@ export default function App() {
         )}
       </div>
 
-      {post && (
+      {view !== 'transform' && post && (
         <div style={{ textAlign: 'center', paddingBottom: 10 }}>
           <button onClick={() => goPost(1)} style={{ background: 'none', border: 'none', color: '#5C5C61', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
             swipe down for a new learning <ChevronDown size={14} />

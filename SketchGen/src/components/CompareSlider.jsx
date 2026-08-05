@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import './CompareSlider.css'
 
-export default function CompareSlider({ beforeSrc, afterSrc }) {
+export default function CompareSlider({ beforeSrc, afterSrc, onAfterContextMenu }) {
   const containerRef = useRef(null)
   const [position, setPosition] = useState(50)
   const draggingRef = useRef(false)
@@ -31,7 +31,12 @@ export default function CompareSlider({ beforeSrc, afterSrc }) {
     <div className="compare-slider" ref={containerRef}>
       <img className="compare-slider-image compare-slider-before" src={beforeSrc} alt="Sketch" />
       <div className="compare-slider-after-wrap" style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}>
-        <img className="compare-slider-image" src={afterSrc} alt="Generated illustration" />
+        <img
+          className="compare-slider-image"
+          src={afterSrc}
+          alt="Generated illustration"
+          onContextMenu={(e) => onAfterContextMenu?.(e, afterSrc)}
+        />
       </div>
       <span className="compare-slider-label compare-slider-label-left">Sketch</span>
       <span className="compare-slider-label compare-slider-label-right">Generated</span>
