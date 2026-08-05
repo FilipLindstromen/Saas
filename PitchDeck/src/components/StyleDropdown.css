@@ -365,3 +365,20 @@
 .font-preview-select-option[aria-selected="true"] {
   background: var(--accent-subtle, rgba(249, 115, 22, 0.15));
 }
+
+.style-dropdown-link-btn {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent, #f97316);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.style-dropdown-link-btn:hover {
+  text-decoration: underline;
+}

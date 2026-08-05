@@ -13,6 +13,7 @@ import { normalizeInspectorTab } from './components/InspectorIcons'
 import TypographyOptions, { SERIF_OPTIONS } from './components/TypographyOptions'
 import InstagramCarouselExportModal from './components/InstagramCarouselExportModal'
 import { formatTimeAgo } from './utils/formatTimeAgo'
+import { DEFAULT_DRAWING_PEN_COLORS, normalizeDrawingPenColors } from './utils/drawingDefaults'
 import { isInstagramCarouselFormat } from './utils/slideFormats'
 import { normalizeSlide } from './utils/normalizeSlide'
 import { normalizeWebcamSizePercent } from './utils/webcamSize'
@@ -295,6 +296,13 @@ function App() {
       pexelsKey: apiKeys.pexels || '',
       pixabayKey: apiKeys.pixabay || '',
       showBullets: localStorage.getItem('showBullets') !== 'false',
+      drawingPenColors: (() => {
+        try {
+          const raw = localStorage.getItem('pitchDeckDrawingPenColors')
+          if (raw) return normalizeDrawingPenColors(JSON.parse(raw))
+        } catch (e) {}
+        return [...DEFAULT_DRAWING_PEN_COLORS]
+      })(),
     }
     return savedSettings
   })
@@ -647,6 +655,12 @@ function App() {
     if (settings.contentEdgeOffset !== undefined) localStorage.setItem('contentEdgeOffset', settings.contentEdgeOffset.toString())
     localStorage.setItem('contentVerticalAlign', settings.contentVerticalAlign || 'bottom')
     localStorage.setItem('showBullets', settings.showBullets !== false ? 'true' : 'false')
+    try {
+      localStorage.setItem(
+        'pitchDeckDrawingPenColors',
+        JSON.stringify(normalizeDrawingPenColors(settings.drawingPenColors))
+      )
+    } catch (e) {}
     if (settings.defaultFontWeight !== undefined) localStorage.setItem('defaultFontWeight', settings.defaultFontWeight.toString())
     if (settings.h1Weight !== undefined) localStorage.setItem('h1Weight', settings.h1Weight.toString())
     if (settings.h2Weight !== undefined) localStorage.setItem('h2Weight', settings.h2Weight.toString())
@@ -803,6 +817,7 @@ function App() {
       imagePositionY: slide.imagePositionY !== undefined ? slide.imagePositionY : 50,
       textHeadingLevel: slide.textHeadingLevel ?? null,
       subtitleHeadingLevel: slide.subtitleHeadingLevel ?? null,
+      drawingLayer: slide.drawingLayer ?? undefined,
     })
     const normalizedChapters = (chapters || []).map(ch => ({
       id: ch.id,
@@ -1173,6 +1188,11 @@ function App() {
       }
     }, 1000)
   }
+
+  const handleDrawingPersist = useCallback((slideId, drawingLayer) => {
+    if (!slideId) return
+    updateSlide(slideId, { drawingLayer: drawingLayer || undefined })
+  }, [])
 
   const updateSlidesBatch = (updatesById) => {
     setSlides(prevSlides => {
@@ -2086,6 +2106,9 @@ function App() {
             lastRecordingBlobRef.current = blob
             setLastRecordingBlobVersion((v) => v + 1)
           }}
+          projectName={projectName}
+          drawingPenColors={settings.drawingPenColors}
+          onDrawingPersist={handleDrawingPersist}
         />
       </Suspense>
     )
@@ -2246,6 +2269,9 @@ function App() {
           h2LineHeight={settings.h2LineHeight ?? 1.2}
           h3LineHeight={settings.h3LineHeight ?? 1.2}
           recordSettings={recordSettings}
+          projectName={projectName}
+          drawingPenColors={settings.drawingPenColors}
+          onDrawingPersist={handleDrawingPersist}
         />
             </div>
             {mode === 'edit' && (

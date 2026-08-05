@@ -11,6 +11,13 @@ import { createSubSlide } from '../utils/subSlides'
 import { resolveMotionSettings } from '../utils/motionPresets'
 import { generateMediaSearchQuery } from '../utils/mediaSearchQuery'
 import { searchStockVideo } from '../api/videoSearch'
+import { getExportCanvasSize } from '../utils/slideFormats'
+import DrawingLayer, { DrawingToolbar } from './DrawingLayer'
+import {
+  DEFAULT_DRAWING_BRUSH_SIZE,
+  normalizeDrawingPenColors,
+} from '../utils/drawingDefaults'
+import { drawingRelativePath } from '../utils/drawingStorage'
 import './SlidePreview.css'
 
 const CAPTION_PREVIEW_STYLES = {
@@ -22,7 +29,7 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, selectedSubSlideId, onSelectSubSlide, onDeselectSubSlide, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings, slideFormat = '16:9' }) {
+function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, selectedSubSlideId, onSelectSubSlide, onDeselectSubSlide, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings, slideFormat = '16:9', projectName = '', drawingPenColors, onDrawingPersist }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', webcamFlipHorizontal: false, webcamFlipVertical: false }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -53,6 +60,13 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     resolvedMotion.textAnimation && resolvedMotion.textAnimation !== 'none'
   )
   const fileInputRef = useRef(null)
+  const drawingLayerRef = useRef(null)
+  const penColors = normalizeDrawingPenColors(drawingPenColors ?? settings?.drawingPenColors)
+  const canvasSize = getExportCanvasSize(slideFormat || '16:9')
+  const [drawingEnabled, setDrawingEnabled] = useState(false)
+  const [drawTool, setDrawTool] = useState('pen')
+  const [drawColor, setDrawColor] = useState(penColors[0])
+  const [drawBrushSize, setDrawBrushSize] = useState(DEFAULT_DRAWING_BRUSH_SIZE)
 
   useEffect(() => {
     try {
@@ -315,6 +329,30 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             />
             <span className="preview-zoom-value">{Math.round(previewZoom * 100)}%</span>
           </div>
+          <button
+            type="button"
+            className={`preview-toolbar-group-btn ${drawingEnabled ? 'preview-toolbar-group-btn--active' : ''}`}
+            onClick={() => setDrawingEnabled((v) => !v)}
+            title="Draw on slide (top layer)"
+          >
+            Draw
+          </button>
+          {drawingEnabled && (
+            <div className="preview-drawing-toolbar-wrap">
+              <DrawingToolbar
+                drawingEnabled={drawingEnabled}
+                onToggleDrawing={() => setDrawingEnabled(false)}
+                penColors={penColors}
+                tool={drawTool}
+                onToolChange={setDrawTool}
+                color={drawColor}
+                onColorChange={setDrawColor}
+                brushSize={drawBrushSize}
+                onBrushSizeChange={setDrawBrushSize}
+                onClear={() => drawingLayerRef.current?.clear()}
+              />
+            </div>
+          )}
           {previewAnimationConfigured && (
             <button
               type="button"
@@ -495,6 +533,23 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             onSelectSubSlide={onSelectSubSlide}
             onDeselectSubSlide={onDeselectSubSlide}
           />
+          <div className="slide-preview__drawing-wrap">
+            <DrawingLayer
+              ref={drawingLayerRef}
+              slideId={slide.id}
+              width={canvasSize.w}
+              height={canvasSize.h}
+              penColors={penColors}
+              projectName={projectName}
+              drawingEnabled={drawingEnabled}
+              tool={drawTool}
+              color={drawColor}
+              brushSize={drawBrushSize}
+              onDrawingPersist={(slideId, path) => {
+                onDrawingPersist?.(slideId, path ? drawingRelativePath(slideId) : null)
+              }}
+            />
+          </div>
           {safeRecordSettings.captionsEnabled && (
             <div className="caption-preview-in-slide">
               <span

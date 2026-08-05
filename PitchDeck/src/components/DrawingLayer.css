@@ -1,0 +1,120 @@
+.drawing-layer__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 200;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.drawing-layer__canvas--active {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.drawing-layer__toolbar--play {
+  position: fixed;
+  left: 50%;
+  bottom: 4.5rem;
+  transform: translateX(-50%);
+  z-index: 10002;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: min(96vw, 720px);
+  padding: 0.45rem 0.65rem;
+  background: rgba(12, 12, 16, 0.88);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+}
+
+.drawing-layer__tool-toggle,
+.drawing-layer__tool,
+.drawing-layer__clear {
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text, #fff);
+  cursor: pointer;
+}
+
+.drawing-layer__tool-toggle.active {
+  background: var(--btn-primary-bg, #e67e22);
+  border-color: transparent;
+  color: var(--btn-primary-text, #fff);
+}
+
+.drawing-layer__tool.active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.drawing-layer__tool:disabled,
+.drawing-layer__clear:disabled,
+.drawing-layer__tool-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.drawing-layer__brush {
+  width: 88px;
+  accent-color: var(--btn-primary-bg, #e67e22);
+}
+
+.drawing-layer__colors {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.drawing-layer__swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.drawing-layer__swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.drawing-layer__swatch:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Edit preview overlay */
+.slide-preview__drawing-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+}
+
+.preview-drawing-toolbar-wrap .drawing-layer__toolbar--play {
+  position: static;
+  transform: none;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  max-width: none;
+  margin-top: 0.35rem;
+}
+
+.preview-drawing-toolbar-wrap {
+  flex: 1 1 100%;
+}
+
+.preview-toolbar-group-btn--active {
+  background: var(--accent-subtle, rgba(249, 115, 22, 0.2));
+  border-color: var(--accent, #f97316);
+}

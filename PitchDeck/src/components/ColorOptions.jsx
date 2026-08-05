@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { DEFAULT_DRAWING_PEN_COLORS, normalizeDrawingPenColors } from '../utils/drawingDefaults'
 import './StyleDropdown.css'
 
 function ColorOptions({
@@ -45,6 +46,7 @@ function ColorOptions({
 
   const deckBackgroundColor = settings.backgroundColor || backgroundColor || '#1a1a1a'
   const deckTextColor = settings.textColor || '#ffffff'
+  const penColors = normalizeDrawingPenColors(settings.drawingPenColors)
   const slideBackgroundColor = slide?.backgroundColorOverrideValue || deckBackgroundColor
   const slideTextColor = slide?.textColorOverrideValue || deckTextColor
 
@@ -105,6 +107,46 @@ function ColorOptions({
               />
             </div>
           </div>
+
+          <div className="style-dropdown-section-title">Drawing pen colors</div>
+          <p className="style-dropdown-hint">Used by the drawing layer in Present and Edit preview.</p>
+          {penColors.map((c, i) => (
+            <div className="style-dropdown-field" key={`pen-${i}`}>
+              <label>Pen {i + 1}</label>
+              <div className="style-dropdown-color-group">
+                <input
+                  type="color"
+                  value={c}
+                  onChange={(e) => {
+                    const next = [...penColors]
+                    next[i] = e.target.value
+                    handleChange('drawingPenColors', next)
+                  }}
+                  className="style-dropdown-color-picker"
+                />
+                <input
+                  type="text"
+                  value={c}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+                      const next = [...penColors]
+                      next[i] = v
+                      handleChange('drawingPenColors', next)
+                    }
+                  }}
+                  className="style-dropdown-input"
+                />
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="style-dropdown-link-btn"
+            onClick={() => handleChange('drawingPenColors', [...DEFAULT_DRAWING_PEN_COLORS])}
+          >
+            Reset pen colors
+          </button>
 
           <div className="style-dropdown-section-title">Slide colors</div>
           {!slide || !onUpdateSlide ? (

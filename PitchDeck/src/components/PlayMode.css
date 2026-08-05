@@ -56,7 +56,7 @@
 }
 
 /* Present mode layer order (back to front):
-   0 = background color, 1 = background image/video, 2 = webcam, 3 = gradient, 4 = graphic overlays, 5 = text */
+   0 = background color, 1 = background image/video, 2 = webcam, 3 = gradient, 4 = graphic overlays, 5 = text, 6 = drawing ink */
 
 /* Layer 0: Background color - base of canvas */
 .play-layer-bg-color {

@@ -11,6 +11,12 @@ import { getBulletPointsFromSlide } from '../utils/slidePlainText'
 import { resolveMotionSettings, resolveCanvasPushDirection, resolveTransitionStyle, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
 import { getSubSlides, getActiveSubSlideRect, getSubSlideCameraStyle } from '../utils/subSlides'
 import { markVideoUrlReady } from '../utils/videoReadyCache'
+import DrawingLayer, { DrawingToolbar } from './DrawingLayer'
+import {
+  DEFAULT_DRAWING_BRUSH_SIZE,
+  normalizeDrawingPenColors,
+} from '../utils/drawingDefaults'
+import { drawingRelativePath } from '../utils/drawingStorage'
 import './PlayMode.css'
 
 const VIDEO_TRANSITION_MS = 500
@@ -670,7 +676,7 @@ function burnCaptionsIntoVideo(blob, segments, captionStyle, captionFont = 'Popp
   })
 }
 
-function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, canvasPushDirection = 'left', motionPreset = 'custom', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone }) {
+function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, showMenu = false, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, initialSlideId, transitionStyle = 'default', transitionSpeed = 1, canvasPushDirection = 'left', motionPreset = 'custom', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings = { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', captionsEnabled: false, captionStyle: 'bottom-black' }, isRecording = false, initialScreenStreamRef, textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', openaiKey = '', slideFormat = '16:9', onRecordingDone, projectName = '', drawingPenColors, onDrawingPersist }) {
   // Filter out section slides for presentation
   const presentationSlides = slides.filter(slide => (slide.layout || 'default') !== 'section')
   
@@ -689,6 +695,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [transitionPhase, setTransitionPhase] = useState('idle') // 'idle', 'fade-out', 'fade-in'
   const [visibleBulletIndex, setVisibleBulletIndex] = useState(0)
   const [preloadReady, setPreloadReady] = useState(false) // Defer preload until after first paint to avoid overlapping text on play start
+  const penColors = normalizeDrawingPenColors(drawingPenColors)
+  const [drawingEnabled, setDrawingEnabled] = useState(false)
+  const [drawTool, setDrawTool] = useState('pen')
+  const [drawColor, setDrawColor] = useState(penColors[0])
+  const [drawBrushSize, setDrawBrushSize] = useState(DEFAULT_DRAWING_BRUSH_SIZE)
+  const drawingLayerRef = useRef(null)
   // Video persistence: when transitioning from video slide to non-video, slide video off to right
   const [isSlidingOff, setIsSlidingOff] = useState(false)
   const [isSlidingIn, setIsSlidingIn] = useState(false)
@@ -1400,16 +1412,16 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
           onExit()
         }
         return
-      } else if ((e.key === 'ArrowRight' || e.key === ' ') && !isTransitioning) {
+      } else if ((e.key === 'ArrowRight' || e.key === ' ') && !isTransitioning && !drawingEnabled) {
         e.preventDefault()
         advancePresentation()
-      } else if (e.key === 'ArrowLeft' && !isTransitioning) {
+      } else if (e.key === 'ArrowLeft' && !isTransitioning && !drawingEnabled) {
         e.preventDefault()
         retreatPresentation()
-      } else if (e.key === 'ArrowDown' && !isTransitioning) {
+      } else if (e.key === 'ArrowDown' && !isTransitioning && !drawingEnabled) {
         e.preventDefault()
         advancePresentation()
-      } else if (e.key === 'ArrowUp' && !isTransitioning) {
+      } else if (e.key === 'ArrowUp' && !isTransitioning && !drawingEnabled) {
         e.preventDefault()
         retreatPresentation()
       }
@@ -1417,10 +1429,10 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isTransitioning, onExit, advancePresentation, retreatPresentation, recordingState, stopRecording])
+  }, [isTransitioning, onExit, advancePresentation, retreatPresentation, recordingState, stopRecording, drawingEnabled])
 
   const handleClick = (e) => {
-    if (isTransitioning) return
+    if (isTransitioning || drawingEnabled) return
     
     const rect = e.currentTarget.getBoundingClientRect()
     const clickX = e.clientX - rect.left
@@ -1803,6 +1815,21 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       </div>
       )}
       {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory). Only render after first paint to avoid overlapping text on play start. */}
+      <DrawingLayer
+        ref={drawingLayerRef}
+        slideId={currentSlide?.id}
+        width={canvasSize.w}
+        height={canvasSize.h}
+        penColors={penColors}
+        projectName={projectName}
+        drawingEnabled={drawingEnabled}
+        tool={drawTool}
+        color={drawColor}
+        brushSize={drawBrushSize}
+        onDrawingPersist={(slideId, path) => {
+          onDrawingPersist?.(slideId, path ? drawingRelativePath(slideId) : null)
+        }}
+      />
       {preloadReady && (
       <div className="play-preload-zone" aria-hidden="true">
         {Array.from({ length: PRELOAD_AHEAD }, (_, i) => currentIndex + i + 1).map((idx) => {
@@ -1849,6 +1876,18 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         </div>
       )}
       <div className={`play-controls ${showMenu ? 'play-controls-bar' : ''}`}>
+          <DrawingToolbar
+            drawingEnabled={drawingEnabled}
+            onToggleDrawing={() => setDrawingEnabled((v) => !v)}
+            penColors={penColors}
+            tool={drawTool}
+            onToolChange={setDrawTool}
+            color={drawColor}
+            onColorChange={setDrawColor}
+            brushSize={drawBrushSize}
+            onBrushSizeChange={setDrawBrushSize}
+            onClear={() => drawingLayerRef.current?.clear()}
+          />
           <div className="play-slide-indicator">
             {currentIndex + 1} / {presentationSlides.length}
             {subSlides.length > 0 && subSlideIndex >= 0 && (
