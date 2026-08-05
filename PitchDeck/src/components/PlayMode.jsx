@@ -12,9 +12,11 @@ import { slideUsesLineStepReveal, getLineStepLineCount } from '../utils/contentL
 import { resolveMotionSettings, resolveCanvasPushDirection, resolveTransitionStyle, getTextExitClass, KEN_BURNS_DURATION_S } from '../utils/motionPresets'
 import { getSubSlides, getActiveSubSlideRect, getSubSlideCameraStyle } from '../utils/subSlides'
 import { markVideoUrlReady } from '../utils/videoReadyCache'
-import DrawingLayer, { DrawingToolbar } from './DrawingLayer'
+import DrawingLayer, { DrawingSettingsPanel, DrawingToolbar } from './DrawingLayer'
 import {
   DEFAULT_DRAWING_BRUSH_SIZE,
+  DEFAULT_DRAWING_SMOOTHING,
+  DEFAULT_DRAWING_WOBBLE,
   normalizeDrawingPenColors,
 } from '../utils/drawingDefaults'
 import { drawingRelativePath } from '../utils/drawingStorage'
@@ -702,6 +704,13 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const [drawTool, setDrawTool] = useState('pen')
   const [drawColor, setDrawColor] = useState(penColors[0])
   const [drawBrushSize, setDrawBrushSize] = useState(DEFAULT_DRAWING_BRUSH_SIZE)
+  const [drawSmoothing, setDrawSmoothing] = useState(DEFAULT_DRAWING_SMOOTHING)
+  const [drawWobble, setDrawWobble] = useState(DEFAULT_DRAWING_WOBBLE)
+  const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false })
+  const [drawingLayerLoaded, setDrawingLayerLoaded] = useState(false)
+  const handleDrawingLoadComplete = useCallback(() => setDrawingLayerLoaded(true), [])
+  const handleDrawingHistoryChange = useCallback((state) => setDrawHistory(state), [])
+  const [drawingLayerRevealed, setDrawingLayerRevealed] = useState(false)
   const drawingLayerRef = useRef(null)
   // Video persistence: when transitioning from video slide to non-video, slide video off to right
   const [isSlidingOff, setIsSlidingOff] = useState(false)
@@ -779,6 +788,31 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const canvasSize = getExportCanvasSize(slideFormat)
 
   const currentSlide = presentationSlides[currentIndex]
+
+  useEffect(() => {
+    setDrawingLayerLoaded(false)
+    setDrawingLayerRevealed(false)
+  }, [currentSlide?.id])
+
+  useEffect(() => {
+    if (drawingEnabled) {
+      setDrawingLayerRevealed(true)
+      return
+    }
+    const bgTransitionBusy =
+      isTransitioning ||
+      transitionPhase === 'fade-out' ||
+      transitionPhase === 'background-transition' ||
+      transitionPhase === 'canvas-push'
+
+    if (bgTransitionBusy || !drawingLayerLoaded) {
+      setDrawingLayerRevealed(false)
+      return
+    }
+
+    const id = requestAnimationFrame(() => setDrawingLayerRevealed(true))
+    return () => cancelAnimationFrame(id)
+  }, [currentSlide?.id, isTransitioning, transitionPhase, drawingLayerLoaded, drawingEnabled])
 
   useEffect(() => {
     slideEnteredAtRef.current = Date.now()
@@ -1604,6 +1638,7 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
   const transitionDurationMs = getTransitionDuration(resolvedTransitionStyle)
   const textExitDurationMs = getTextExitDuration(transitionDurationMs)
   const activeTransitionStyle = normalizeTransitionStyle(resolvedTransitionStyle)
+  const drawingFadeMs = Math.round(Math.min(700, Math.max(320, transitionDurationMs * 0.9)))
 
   const canvasPushActive = transitionPhase === 'canvas-push' && targetSlide
   const activeCanvasPushDirection = targetSlide
@@ -1845,7 +1880,16 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
       </div>
       )}
       {/* Preload next slides' videos so they play immediately when entering (bounded to PRELOAD_AHEAD to limit memory). Only render after first paint to avoid overlapping text on play start. */}
-      <div className="play-drawing-layer">
+      <div
+        className={[
+          'play-drawing-layer',
+          (drawingLayerRevealed || drawingEnabled) && 'play-drawing-layer--revealed',
+          drawingEnabled && 'play-drawing-layer--drawing',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        style={{ '--drawing-fade-duration': `${drawingFadeMs}ms` }}
+      >
       <DrawingLayer
         ref={drawingLayerRef}
         slideId={currentSlide?.id}
@@ -1857,11 +1901,44 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         tool={drawTool}
         color={drawColor}
         brushSize={drawBrushSize}
+        lineSmoothing={drawSmoothing}
+        lineWobble={drawWobble}
+        onHistoryChange={handleDrawingHistoryChange}
+        onLoadComplete={handleDrawingLoadComplete}
         onDrawingPersist={(slideId, path) => {
           onDrawingPersist?.(slideId, path ? drawingRelativePath(slideId) : null)
         }}
       />
       </div>
+      {drawingEnabled && (
+        <aside
+          className="play-drawing-sidebar"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <h2 className="play-drawing-sidebar__title">Drawing</h2>
+          <DrawingSettingsPanel
+            layout="sidebar"
+            penColors={penColors}
+            tool={drawTool}
+            onToolChange={setDrawTool}
+            color={drawColor}
+            onColorChange={setDrawColor}
+            brushSize={drawBrushSize}
+            onBrushSizeChange={setDrawBrushSize}
+            lineSmoothing={drawSmoothing}
+            onLineSmoothingChange={setDrawSmoothing}
+            lineWobble={drawWobble}
+            onLineWobbleChange={setDrawWobble}
+            canUndo={drawHistory.canUndo}
+            canRedo={drawHistory.canRedo}
+            onUndo={() => drawingLayerRef.current?.undo()}
+            onRedo={() => drawingLayerRef.current?.redo()}
+            onClear={() => drawingLayerRef.current?.clear()}
+            onDone={() => setDrawingEnabled(false)}
+          />
+        </aside>
+      )}
       {preloadReady && (
       <div className="play-preload-zone" aria-hidden="true">
         {Array.from({ length: PRELOAD_AHEAD }, (_, i) => currentIndex + i + 1).map((idx) => {
@@ -1908,18 +1985,12 @@ function PlayMode({ slides, onExit, backgroundColor = '#1a1a1a', textColor = '#f
         </div>
       )}
       <div className={`play-controls ${showMenu ? 'play-controls-bar' : ''}`}>
-          <DrawingToolbar
-            drawingEnabled={drawingEnabled}
-            onToggleDrawing={() => setDrawingEnabled((v) => !v)}
-            penColors={penColors}
-            tool={drawTool}
-            onToolChange={setDrawTool}
-            color={drawColor}
-            onColorChange={setDrawColor}
-            brushSize={drawBrushSize}
-            onBrushSizeChange={setDrawBrushSize}
-            onClear={() => drawingLayerRef.current?.clear()}
-          />
+          {!drawingEnabled && (
+            <DrawingToolbar
+              drawingEnabled={drawingEnabled}
+              onToggleDrawing={() => setDrawingEnabled(true)}
+            />
+          )}
           <div className="play-slide-indicator">
             {currentIndex + 1} / {presentationSlides.length}
             {subSlides.length > 0 && subSlideIndex >= 0 && (

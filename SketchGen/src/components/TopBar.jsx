@@ -1,10 +1,24 @@
 import ThemeToggle from '@shared/ThemeToggle'
+import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
 import './TopBar.css'
 
-export default function TopBar({ view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onDownload }) {
+export default function TopBar({
+  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onDownload,
+  projects, currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject,
+}) {
   return (
     <header className="sketchgen-top-bar">
       <span className="sketchgen-logo">✏️ SketchGen</span>
+
+      <ProjectSelector
+        projects={projects}
+        currentProjectId={currentProjectId}
+        currentProjectName={currentProjectName}
+        onSwitchProject={onSwitchProject}
+        onCreateProject={onCreateProject}
+        onRenameProject={onRenameProject}
+        onDeleteProject={onDeleteProject}
+      />
 
       <div className="sketchgen-view-switch">
         <button

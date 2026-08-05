@@ -23,6 +23,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | InfoGraphics | `/InfoGraphics` | Infographic generator |
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
 | SketchGen | `/SketchGen` | Draw a sketch, generate a styled illustration with AI |
+| CopyLearner | `/CopyLearner` | Swipeable micro-lessons generated from your own uploaded content, with spaced repetition |
 | Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |
 | Reel Recorder | `/ReelRecorder` | Reel/short-form video recorder |

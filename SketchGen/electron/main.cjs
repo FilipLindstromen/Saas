@@ -47,14 +47,29 @@ function getUserDataDistDir() {
   return path.join(app.getPath('userData'), 'www')
 }
 
+// fs.cpSync's recursive directory copy has been observed to throw a bogus
+// EIO "Access is denied" on some Windows setups (non-ASCII profile paths
+// hitting a `\\?\` long-path edge case). Walking the tree manually avoids it.
+function copyDirRecursive(src, dest) {
+  fs.mkdirSync(dest, { recursive: true })
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name)
+    const destPath = path.join(dest, entry.name)
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath)
+    } else if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath)
+    }
+  }
+}
+
 function ensureUserDataDist() {
   const target = getUserDataDistDir()
   if (fs.existsSync(path.join(target, 'index.html'))) return target
 
   const bundled = getBundledDistDir()
   if (fs.existsSync(path.join(bundled, 'index.html'))) {
-    fs.mkdirSync(target, { recursive: true })
-    fs.cpSync(bundled, target, { recursive: true })
+    copyDirRecursive(bundled, target)
   }
   return target
 }

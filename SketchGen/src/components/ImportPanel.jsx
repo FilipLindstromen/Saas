@@ -47,12 +47,12 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
   }
 
   return (
-    <div className="import-panel-section">
-      <h3 className="import-panel-title">Import</h3>
-
+    <div className="import-panel-section side-panel">
+      <div className="side-panel-header">Import</div>
+      <div className="side-panel-body">
       {placing ? (
         <div className="import-placing-banner">
-          <span>Click on the canvas to place "{placing.label}" (Esc to cancel)</span>
+          <span>Click on the canvas to place "{placing.label}", then drag out before releasing to size it (Esc to cancel)</span>
           <button type="button" onClick={onCancelPlacing}>Cancel</button>
         </div>
       ) : (
@@ -63,7 +63,7 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
           </div>
 
           <div className="import-stamp-size">
-            <label htmlFor="stamp-size">Stamp size</label>
+            <label htmlFor="stamp-size">Default size (for a plain click)</label>
             <input
               id="stamp-size"
               type="range"
@@ -136,6 +136,7 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
           )}
         </>
       )}
+      </div>
     </div>
   )
 }

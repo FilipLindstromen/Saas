@@ -2,8 +2,9 @@ import './PromptBar.css'
 
 export default function PromptBar({ value, onChange, onGenerate, isGenerating, error, variations, onVariationsChange }) {
   return (
-    <div className="prompt-bar-section">
-      <h3 className="prompt-bar-title">Instructions (optional)</h3>
+    <div className="prompt-bar-section side-panel">
+      <div className="side-panel-header">Instructions (optional)</div>
+      <div className="side-panel-body">
       <textarea
         className="prompt-bar-input"
         placeholder="e.g. make the cat orange, add a sunset background..."
@@ -37,6 +38,7 @@ export default function PromptBar({ value, onChange, onGenerate, isGenerating, e
       >
         {isGenerating ? 'Generating…' : variations > 1 ? `Generate ${variations} variations` : 'Generate'}
       </button>
+      </div>
     </div>
   )
 }

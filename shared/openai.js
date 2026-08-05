@@ -171,6 +171,9 @@ export async function generateImage({
  * @param {Object} options
  * @param {string} options.prompt
  * @param {string} options.imageDataUrl - reference image as data URL
+ * @param {string[]} [options.additionalImages] - extra reference images (e.g. a style
+ *   reference) sent alongside the primary image via gpt-image-1's multi-image edit
+ *   support. Omitted by default so every existing caller is unaffected.
  * @param {string} [options.size]
  * @param {string} [options.model]
  * @param {string} [options.quality]
@@ -180,6 +183,7 @@ export async function generateImage({
 export async function editImage({
   prompt,
   imageDataUrl,
+  additionalImages = [],
   size = '1536x1024',
   model = 'gpt-image-1',
   quality = 'high',
@@ -190,14 +194,24 @@ export async function editImage({
   if (!prompt?.trim()) throw new Error('Prompt is required.');
   if (!imageDataUrl) throw new Error('Reference image is required.');
 
-  const blob = await dataUrlToBlob(imageDataUrl);
   const form = new FormData();
   form.append('model', model);
   form.append('prompt', prompt.trim());
   form.append('size', size);
   form.append('quality', quality);
   form.append('input_fidelity', 'high');
-  form.append('image', blob, 'reference.png');
+
+  if (additionalImages.length > 0) {
+    const primaryBlob = await dataUrlToBlob(imageDataUrl);
+    form.append('image[]', primaryBlob, 'reference-0.png');
+    for (let i = 0; i < additionalImages.length; i++) {
+      const blob = await dataUrlToBlob(additionalImages[i]);
+      form.append('image[]', blob, `reference-${i + 1}.png`);
+    }
+  } else {
+    const blob = await dataUrlToBlob(imageDataUrl);
+    form.append('image', blob, 'reference.png');
+  }
 
   const res = await fetch(`${OPENAI_API}/images/edits`, {
     method: 'POST',

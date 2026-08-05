@@ -6,7 +6,7 @@
  * output to `npm run build:electron` — so running this after either one keeps
  * an already-installed SketchGen.exe in sync without repackaging or reinstalling.
  */
-import { existsSync, mkdirSync, cpSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, copyFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
@@ -26,17 +26,39 @@ function getUserDataDir() {
   return join(process.env.XDG_CONFIG_HOME || join(os.homedir(), '.config'), APP_FOLDER_NAME)
 }
 
+// fs.cpSync's recursive directory copy has been observed to throw a bogus
+// EIO "Access is denied" on some Windows setups (non-ASCII user profile paths
+// hitting a `\\?\` long-path edge case in the cpSyncCopyDir binding), even
+// though the destination is fully writable. Walking the tree with plain
+// mkdirSync/copyFileSync avoids that code path entirely and is just as fast
+// for a project this size.
+function copyDirRecursive(src, dest) {
+  mkdirSync(dest, { recursive: true })
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    const srcPath = join(src, entry.name)
+    const destPath = join(dest, entry.name)
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath)
+    } else if (entry.isFile()) {
+      copyFileSync(srcPath, destPath)
+    }
+  }
+}
+
 function main() {
   if (!existsSync(join(distDir, 'index.html'))) {
     console.warn('[sync-desktop] Skipped — no dist/index.html found yet.')
     return
   }
   const target = join(getUserDataDir(), 'www')
-  rmSync(target, { recursive: true, force: true })
-  mkdirSync(target, { recursive: true })
-  cpSync(distDir, target, { recursive: true })
-  console.log(`[sync-desktop] Synced dist/ -> ${target}`)
-  console.log('[sync-desktop] Restart SketchGen.exe (if open) to see the update.')
+  try {
+    copyDirRecursive(distDir, target)
+    console.log(`[sync-desktop] Synced dist/ -> ${target}`)
+    console.log('[sync-desktop] Restart SketchGen.exe (if open) to see the update.')
+  } catch (err) {
+    console.warn('[sync-desktop] Could not sync to', target, '-', err.message)
+    console.warn('[sync-desktop] The installed exe will keep running its last-synced version.')
+  }
 }
 
 main()

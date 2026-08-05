@@ -7,6 +7,11 @@ export const BACKGROUND_COLOR = '#ffffff'
 const MAX_HISTORY = 40
 const FILL_TOLERANCE = 40
 const SHAPE_TOOLS = new Set(['line', 'rect', 'circle'])
+const FREEHAND_INK_TOOLS = new Set(['pen', 'eraser'])
+
+function lerp(a, b, t) {
+  return a + (b - a) * t
+}
 
 function hexToRgb(hex) {
   const clean = String(hex || '#000000').replace('#', '')
@@ -188,7 +193,18 @@ function loadHtmlImage(dataUrl) {
   })
 }
 
-const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 1, placing, onPlaced, onHistoryChange, onCommit, onDropFile }, ref) {
+function createLayerCanvas() {
+  const canvas = document.createElement('canvas')
+  canvas.width = CANVAS_WIDTH
+  canvas.height = CANVAS_HEIGHT
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  return { canvas, ctx }
+}
+
+const CanvasBoard = forwardRef(function CanvasBoard(
+  { tool, color, size, smoothing = 0, wobble = 0, zoom = 1, placing, onPlaced, onHistoryChange, onLayersChange, onCommit, onDropFile },
+  ref
+) {
   const canvasRef = useRef(null)
   const ctxRef = useRef(null)
   const drawingRef = useRef(false)
@@ -199,14 +215,36 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
   const toolRef = useRef(tool)
   const colorRef = useRef(color)
   const sizeRef = useRef(size)
+  const smoothingRef = useRef(smoothing)
+  const wobbleRef = useRef(wobble)
   const placingRef = useRef(placing)
   const shapeSnapshotRef = useRef(null)
   const shapeStartRef = useRef(null)
+  const smoothPointRef = useRef(null)
+  const wobblePhaseRef = useRef(0)
+  const wobbleDirRef = useRef({ x: 1, y: 0 })
+  const lastRawPointRef = useRef(null)
+  const lastStrokeWidthRef = useRef(null)
+
+  // Layer stack: bottom-to-top array of { id, name, visible, canvas, ctx }.
+  // `canvasRef`/`ctxRef` above are the single VISIBLE canvas — tools never draw
+  // on it directly, they draw on the active layer's offscreen canvas, then
+  // renderComposite() flattens all visible layers onto the visible canvas.
+  const layersRef = useRef([])
+  const activeLayerIdRef = useRef(null)
+  const layerIdCounterRef = useRef(0)
+  const moveSnapshotRef = useRef(null)
+  const moveStartRef = useRef(null)
 
   useEffect(() => { toolRef.current = tool }, [tool])
   useEffect(() => { colorRef.current = color }, [color])
   useEffect(() => { sizeRef.current = size }, [size])
+  useEffect(() => { smoothingRef.current = smoothing }, [smoothing])
+  useEffect(() => { wobbleRef.current = wobble }, [wobble])
   useEffect(() => { placingRef.current = placing }, [placing])
+
+  const getActiveLayer = () => layersRef.current.find((l) => l.id === activeLayerIdRef.current) || layersRef.current[layersRef.current.length - 1]
+  const getActiveCtx = () => getActiveLayer()?.ctx
 
   const notifyHistory = () => {
     onHistoryChange?.({
@@ -215,10 +253,34 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
     })
   }
 
-  const pushHistory = () => {
+  const notifyLayers = () => {
+    onLayersChange?.({
+      layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible })),
+      activeLayerId: activeLayerIdRef.current,
+    })
+  }
+
+  const renderComposite = () => {
     const ctx = ctxRef.current
     if (!ctx) return
-    const snapshot = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.fillStyle = BACKGROUND_COLOR
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    for (const layer of layersRef.current) {
+      if (layer.visible) ctx.drawImage(layer.canvas, 0, 0)
+    }
+  }
+
+  const pushHistory = () => {
+    if (!layersRef.current.length) return
+    const snapshot = {
+      layers: layersRef.current.map((l) => ({
+        id: l.id,
+        name: l.name,
+        visible: l.visible,
+        imageData: l.ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT),
+      })),
+      activeLayerId: activeLayerIdRef.current,
+    }
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1)
     historyRef.current.push(snapshot)
     if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift()
@@ -227,19 +289,37 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
     onCommit?.()
   }
 
-  const clearToBackground = (ctx) => {
-    ctx.fillStyle = BACKGROUND_COLOR
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+  const restoreHistoryEntry = (entry) => {
+    layersRef.current = entry.layers.map((saved) => {
+      const { canvas, ctx } = createLayerCanvas()
+      ctx.putImageData(saved.imageData, 0, 0)
+      return { id: saved.id, name: saved.name, visible: saved.visible, canvas, ctx }
+    })
+    activeLayerIdRef.current = entry.activeLayerId
+    renderComposite()
+    notifyLayers()
   }
 
   useEffect(() => {
     const canvas = canvasRef.current
     canvas.width = CANVAS_WIDTH
     canvas.height = CANVAS_HEIGHT
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    ctxRef.current = ctx
-    clearToBackground(ctx)
-    pushHistory()
+    ctxRef.current = canvas.getContext('2d', { willReadFrequently: true })
+
+    // Guard against React StrictMode's dev-only double-invoke of mount effects:
+    // without this, a second invocation would silently replace "Layer 1" with
+    // a fresh "Layer 2" (layerIdCounterRef survives the simulated remount).
+    if (layersRef.current.length === 0) {
+      const { canvas: layerCanvas, ctx: layerCtx } = createLayerCanvas()
+      layerIdCounterRef.current += 1
+      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas: layerCanvas, ctx: layerCtx }
+      layersRef.current = [layer]
+      activeLayerIdRef.current = layer.id
+      pushHistory()
+    }
+
+    renderComposite()
+    notifyLayers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -257,8 +337,8 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
     canvas.style.height = `${baseWidth * zoom * (CANVAS_HEIGHT / CANVAS_WIDTH)}px`
   }, [zoom])
 
-  const drawImageFitted = (ctx, img) => {
-    clearToBackground(ctx)
+  const drawImageFittedOnLayer = (ctx, img) => {
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
     const scale = Math.min(CANVAS_WIDTH / img.width, CANVAS_HEIGHT / img.height)
     const w = img.width * scale
     const h = img.height * scale
@@ -271,42 +351,110 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
     exportPNG: () => canvasRef.current.toDataURL('image/png'),
     hasContent: () => hasContentRef.current,
     clear: () => {
-      const ctx = ctxRef.current
-      clearToBackground(ctx)
-      hasContentRef.current = false
+      const ctx = getActiveCtx()
+      if (!ctx) return
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      renderComposite()
       pushHistory()
     },
     undo: () => {
       if (historyIndexRef.current <= 0) return
       historyIndexRef.current -= 1
-      ctxRef.current.putImageData(historyRef.current[historyIndexRef.current], 0, 0)
+      restoreHistoryEntry(historyRef.current[historyIndexRef.current])
       notifyHistory()
       onCommit?.()
     },
     redo: () => {
       if (historyIndexRef.current >= historyRef.current.length - 1) return
       historyIndexRef.current += 1
-      ctxRef.current.putImageData(historyRef.current[historyIndexRef.current], 0, 0)
+      restoreHistoryEntry(historyRef.current[historyIndexRef.current])
       notifyHistory()
       onCommit?.()
     },
-    /** Fit an external image (import, or a generated result) onto the canvas as a new undoable state. */
+    /** Fit an external image (import, or a generated result) onto the active layer as a new undoable state. */
     loadImage: async (dataUrl) => {
       const img = await loadHtmlImage(dataUrl)
-      drawImageFitted(ctxRef.current, img)
+      drawImageFittedOnLayer(getActiveCtx(), img)
       hasContentRef.current = true
+      renderComposite()
       pushHistory()
     },
-    /** Restore an exact 1:1 autosave snapshot as the base state (does not count as a user action). */
-    restoreSnapshot: async (dataUrl) => {
-      const img = await loadHtmlImage(dataUrl)
-      const ctx = ctxRef.current
-      clearToBackground(ctx)
-      ctx.drawImage(img, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    /** Rebuild the whole layer stack from an autosave/restore payload. Not an undoable action. */
+    restoreLayers: async ({ layers, activeLayerId }) => {
+      if (!layers?.length) return
+      const rebuilt = []
+      let maxCounter = 0
+      for (const saved of layers) {
+        const img = await loadHtmlImage(saved.dataUrl)
+        const { canvas, ctx } = createLayerCanvas()
+        ctx.drawImage(img, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        rebuilt.push({ id: saved.id, name: saved.name, visible: saved.visible, canvas, ctx })
+        const num = parseInt(String(saved.id).replace('layer-', ''), 10)
+        if (!Number.isNaN(num)) maxCounter = Math.max(maxCounter, num)
+      }
+      layersRef.current = rebuilt
+      layerIdCounterRef.current = maxCounter
+      activeLayerIdRef.current = layers.some((l) => l.id === activeLayerId) ? activeLayerId : rebuilt[rebuilt.length - 1].id
       hasContentRef.current = true
-      historyRef.current = [ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)]
+      renderComposite()
+      notifyLayers()
+      historyRef.current = [{
+        layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, imageData: l.ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT) })),
+        activeLayerId: activeLayerIdRef.current,
+      }]
       historyIndexRef.current = 0
       notifyHistory()
+    },
+    /** Reset to a single fresh blank layer — used when switching to a brand-new drawing (no saved snapshot yet). */
+    resetBlank: () => {
+      const { canvas, ctx } = createLayerCanvas()
+      layerIdCounterRef.current += 1
+      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx }
+      layersRef.current = [layer]
+      activeLayerIdRef.current = layer.id
+      hasContentRef.current = false
+      renderComposite()
+      notifyLayers()
+      historyRef.current = [{
+        layers: [{ id: layer.id, name: layer.name, visible: layer.visible, imageData: ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT) }],
+        activeLayerId: layer.id,
+      }]
+      historyIndexRef.current = 0
+      notifyHistory()
+    },
+    /** Export every layer as a transparent PNG for autosave. */
+    exportLayers: () => ({
+      layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, dataUrl: l.canvas.toDataURL('image/png') })),
+      activeLayerId: activeLayerIdRef.current,
+    }),
+    addLayer: () => {
+      layerIdCounterRef.current += 1
+      const { canvas, ctx } = createLayerCanvas()
+      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx }
+      layersRef.current = [...layersRef.current, layer]
+      activeLayerIdRef.current = layer.id
+      notifyLayers()
+      pushHistory()
+    },
+    removeLayer: (id) => {
+      if (layersRef.current.length <= 1) return
+      const wasActive = activeLayerIdRef.current === id
+      layersRef.current = layersRef.current.filter((l) => l.id !== id)
+      if (wasActive) activeLayerIdRef.current = layersRef.current[layersRef.current.length - 1].id
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+    },
+    toggleLayerVisibility: (id) => {
+      layersRef.current = layersRef.current.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l))
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+    },
+    setActiveLayer: (id) => {
+      if (!layersRef.current.some((l) => l.id === id)) return
+      activeLayerIdRef.current = id
+      notifyLayers()
     },
   }))
 
@@ -325,35 +473,113 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
     ctx.fill()
   }
 
-  const stampPlacedImage = (ctx, pos) => {
+  const stampPlacedImage = (ctx, pos, maxDim) => {
     const active = placingRef.current
     if (!active?.img) return
-    const { img, maxDim } = active
+    const { img } = active
     const scale = maxDim / Math.max(img.width, img.height)
     const w = img.width * scale
     const h = img.height * scale
     ctx.drawImage(img, pos.x - w / 2, pos.y - h / 2, w, h)
   }
 
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+  /**
+   * Click sets the stamp's center; dragging out from it grows the stamp, with a
+   * live preview redrawn from a snapshot each move. A drag under ~4px counts as
+   * a plain click and falls back to the picker's default stamp size.
+   */
+  const placingDimForDrag = (center, pos) => {
+    const dist = Math.hypot(pos.x - center.x, pos.y - center.y)
+    if (dist < 4) return placingRef.current?.maxDim ?? 100
+    return clamp(dist * 2, 20, Math.max(CANVAS_WIDTH, CANVAS_HEIGHT))
+  }
+
+  /**
+   * Trails the raw pointer position through a smoothing lag, then adds a
+   * continuous sine-wave wobble perpendicular to the direction of travel on
+   * top — a real hand tremor is a smooth side-to-side oscillation as the hand
+   * moves forward, not independent per-axis noise. The phase advances with
+   * distance actually traveled (not event count), so the wobble's visual
+   * frequency stays consistent whether the pointer moves fast or slow — a
+   * random walk driven by event count instead reads as jagged, uncorrelated
+   * zigzag. Both effects are 0 at slider value 0, so behavior is unchanged
+   * unless the user turns them on.
+   */
+  const applySmoothWobble = (rawPos) => {
+    const smoothing = smoothingRef.current
+    const wobble = wobbleRef.current
+
+    if (!smoothPointRef.current) smoothPointRef.current = { ...rawPos }
+    const prevSmooth = smoothPointRef.current
+    const alpha = 1 - smoothing * 0.9
+    const nextSmooth = {
+      x: lerp(prevSmooth.x, rawPos.x, alpha),
+      y: lerp(prevSmooth.y, rawPos.y, alpha),
+    }
+    smoothPointRef.current = nextSmooth
+
+    if (wobble <= 0) return nextSmooth
+
+    const dx = nextSmooth.x - prevSmooth.x
+    const dy = nextSmooth.y - prevSmooth.y
+    const dist = Math.hypot(dx, dy)
+    let dirX = wobbleDirRef.current.x
+    let dirY = wobbleDirRef.current.y
+    if (dist > 0.01) {
+      dirX = dx / dist
+      dirY = dy / dist
+      wobbleDirRef.current = { x: dirX, y: dirY }
+    }
+    const perpX = -dirY
+    const perpY = dirX
+
+    wobblePhaseRef.current += dist
+
+    const amp = wobble * 9
+    // Two sine components at different frequencies/phases so the tremor
+    // reads as organic rather than a perfectly metronomic wave.
+    const wave = Math.sin(wobblePhaseRef.current * 0.09) * 0.7
+      + Math.sin(wobblePhaseRef.current * 0.23 + 1.7) * 0.3
+    const offset = wave * amp
+
+    return {
+      x: nextSmooth.x + perpX * offset,
+      y: nextSmooth.y + perpY * offset,
+    }
+  }
+
   const handlePointerDown = (e) => {
     const canvas = canvasRef.current
-    const ctx = ctxRef.current
     canvas.setPointerCapture(e.pointerId)
     const pos = getPos(canvas, e)
+    const ctx = getActiveCtx()
+    if (!ctx) return
 
     if (placingRef.current?.img) {
-      stampPlacedImage(ctx, pos)
+      shapeSnapshotRef.current = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      shapeStartRef.current = pos
+      drawingRef.current = true
       hasContentRef.current = true
-      pushHistory()
-      onPlaced?.()
+      stampPlacedImage(ctx, pos, placingDimForDrag(pos, pos))
+      renderComposite()
       return
     }
 
     const currentTool = toolRef.current
 
+    if (currentTool === 'move') {
+      moveSnapshotRef.current = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      moveStartRef.current = pos
+      drawingRef.current = true
+      return
+    }
+
     if (currentTool === 'fill') {
       floodFill(ctx, pos.x, pos.y, colorRef.current)
       hasContentRef.current = true
+      renderComposite()
       pushHistory()
       return
     }
@@ -367,23 +593,52 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
     }
 
     drawingRef.current = true
-    lastPointRef.current = pos
     hasContentRef.current = true
 
     if (currentTool === 'blur') {
+      lastPointRef.current = pos
       blurRegion(ctx, pos.x, pos.y, sizeRef.current)
+      renderComposite()
     } else {
+      smoothPointRef.current = null
+      wobblePhaseRef.current = 0
+      wobbleDirRef.current = { x: 1, y: 0 }
+      lastRawPointRef.current = pos
+      const drawnPos = applySmoothWobble(pos)
+      lastPointRef.current = drawnPos
       const strokeColor = currentTool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
-      strokeTo(ctx, pos, pos, strokeColor, pressureWidth(e, sizeRef.current))
+      const width = pressureWidth(e, sizeRef.current)
+      lastStrokeWidthRef.current = width
+      strokeTo(ctx, drawnPos, drawnPos, strokeColor, width)
+      renderComposite()
     }
   }
 
   const handlePointerMove = (e) => {
     if (!drawingRef.current) return
     const canvas = canvasRef.current
-    const ctx = ctxRef.current
     const pos = getPos(canvas, e)
+    const ctx = getActiveCtx()
+    if (!ctx) return
+
+    if (placingRef.current?.img) {
+      ctx.putImageData(shapeSnapshotRef.current, 0, 0)
+      const center = shapeStartRef.current
+      stampPlacedImage(ctx, center, placingDimForDrag(center, pos))
+      renderComposite()
+      return
+    }
+
     const currentTool = toolRef.current
+
+    if (currentTool === 'move') {
+      const dx = Math.round(pos.x - moveStartRef.current.x)
+      const dy = Math.round(pos.y - moveStartRef.current.y)
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      ctx.putImageData(moveSnapshotRef.current, dx, dy)
+      renderComposite()
+      return
+    }
 
     if (SHAPE_TOOLS.has(currentTool)) {
       ctx.putImageData(shapeSnapshotRef.current, 0, 0)
@@ -391,24 +646,68 @@ const CanvasBoard = forwardRef(function CanvasBoard({ tool, color, size, zoom = 
       if (currentTool === 'line') drawLineShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
       else if (currentTool === 'rect') drawRectShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
       else drawCircleShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
+      renderComposite()
       return
     }
 
     if (currentTool === 'blur') {
       blurRegion(ctx, pos.x, pos.y, sizeRef.current)
-    } else {
-      const strokeColor = currentTool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
-      strokeTo(ctx, lastPointRef.current, pos, strokeColor, pressureWidth(e, sizeRef.current))
+      lastPointRef.current = pos
+      renderComposite()
+      return
     }
-    lastPointRef.current = pos
+
+    lastRawPointRef.current = pos
+    const drawnPos = applySmoothWobble(pos)
+    const strokeColor = currentTool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
+    const width = pressureWidth(e, sizeRef.current)
+    lastStrokeWidthRef.current = width
+    strokeTo(ctx, lastPointRef.current, drawnPos, strokeColor, width)
+    lastPointRef.current = drawnPos
+    renderComposite()
   }
 
   const handlePointerUp = () => {
+    const ctx = getActiveCtx()
+
+    if (drawingRef.current && placingRef.current?.img) {
+      // The final size was already drawn on the last move (or, for a plain
+      // click with no move, on pointerdown at the default size) — just commit it.
+      drawingRef.current = false
+      shapeSnapshotRef.current = null
+      shapeStartRef.current = null
+      hasContentRef.current = true
+      pushHistory()
+      onPlaced?.()
+      return
+    }
+
+    if (drawingRef.current && toolRef.current === 'move') {
+      drawingRef.current = false
+      moveSnapshotRef.current = null
+      moveStartRef.current = null
+      pushHistory()
+      return
+    }
+
     if (drawingRef.current) {
+      const tool = toolRef.current
+      if (FREEHAND_INK_TOOLS.has(tool) && lastPointRef.current && lastRawPointRef.current && ctx) {
+        // Smoothing lags behind the raw pointer — draw one final segment so the
+        // stroke actually reaches where the pointer was released instead of
+        // stopping short.
+        const strokeColor = tool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
+        strokeTo(ctx, lastPointRef.current, lastRawPointRef.current, strokeColor, lastStrokeWidthRef.current ?? sizeRef.current)
+        renderComposite()
+      }
       pushHistory()
     }
     drawingRef.current = false
     lastPointRef.current = null
+    lastRawPointRef.current = null
+    smoothPointRef.current = null
+    wobblePhaseRef.current = 0
+    wobbleDirRef.current = { x: 1, y: 0 }
     shapeSnapshotRef.current = null
     shapeStartRef.current = null
   }

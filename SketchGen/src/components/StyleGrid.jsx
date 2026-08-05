@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import './StyleGrid.css'
 
-export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomStyle, onDeleteCustomStyle }) {
+export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomStyle, onDeleteCustomStyle, onUploadImageStyle, onDeleteImageStyle }) {
   const [formOpen, setFormOpen] = useState(false)
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
+  const fileInputRef = useRef(null)
 
   const handleSave = (e) => {
     e.preventDefault()
@@ -15,29 +16,45 @@ export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomSty
     setFormOpen(false)
   }
 
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) onUploadImageStyle(file)
+    e.target.value = ''
+  }
+
+  const handleDelete = (style) => {
+    if (style.type === 'image') onDeleteImageStyle(style.id)
+    else onDeleteCustomStyle(style.id)
+  }
+
   return (
-    <div className="style-grid-section">
-      <h3 className="style-grid-title">Style</h3>
+    <div className="style-grid-section side-panel">
+      <div className="side-panel-header">Style</div>
+      <div className="side-panel-body">
       <div className="style-grid">
         {styles.map((style) => (
           <div key={style.id} className="style-card-wrap">
             <button
               type="button"
-              className={`style-card ${selectedId === style.id ? 'active' : ''}`}
+              className={`style-card ${selectedId === style.id ? 'active' : ''} ${style.type === 'image' ? 'style-card-image' : ''}`}
               onClick={() => onSelect(style.id)}
               aria-pressed={selectedId === style.id}
-              title={style.prompt}
+              title={style.type === 'image' ? `${style.name} (image reference)` : style.prompt}
             >
-              <span className="style-card-emoji">{style.emoji}</span>
+              {style.type === 'image' ? (
+                <img className="style-card-thumb" src={style.thumbnailDataUrl} alt={style.name} />
+              ) : (
+                <span className="style-card-emoji">{style.emoji}</span>
+              )}
               <span className="style-card-name">{style.name}</span>
             </button>
-            {style.custom && (
+            {(style.custom || style.type === 'image') && (
               <button
                 type="button"
                 className="style-card-delete"
-                onClick={() => onDeleteCustomStyle(style.id)}
+                onClick={() => handleDelete(style)}
                 aria-label={`Delete ${style.name}`}
-                title="Delete custom style"
+                title="Delete style"
               >
                 ×
               </button>
@@ -47,6 +64,11 @@ export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomSty
         <button type="button" className="style-card style-card-add" onClick={() => setFormOpen((v) => !v)}>
           <span className="style-card-emoji">➕</span>
           <span className="style-card-name">Custom</span>
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+        <button type="button" className="style-card style-card-add" onClick={() => fileInputRef.current?.click()}>
+          <span className="style-card-emoji">🖼️</span>
+          <span className="style-card-name">Upload image</span>
         </button>
       </div>
 
@@ -70,6 +92,7 @@ export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomSty
           </div>
         </form>
       )}
+      </div>
     </div>
   )
 }

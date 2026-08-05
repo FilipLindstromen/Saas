@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Slide from './Slide'
 import { normalizeWebcamSizePercent } from '../utils/webcamSize'
 import ImagePicker from './ImagePicker'
@@ -12,9 +12,11 @@ import { resolveMotionSettings } from '../utils/motionPresets'
 import { generateMediaSearchQuery } from '../utils/mediaSearchQuery'
 import { searchStockVideo } from '../api/videoSearch'
 import { getExportCanvasSize } from '../utils/slideFormats'
-import DrawingLayer, { DrawingToolbar } from './DrawingLayer'
+import DrawingLayer from './DrawingLayer'
 import {
   DEFAULT_DRAWING_BRUSH_SIZE,
+  DEFAULT_DRAWING_SMOOTHING,
+  DEFAULT_DRAWING_WOBBLE,
   normalizeDrawingPenColors,
 } from '../utils/drawingDefaults'
 import { drawingRelativePath } from '../utils/drawingStorage'
@@ -29,7 +31,7 @@ const CAPTION_PREVIEW_STYLES = {
   'large-white': { position: 'bottom', bg: 'rgba(0,0,0,0.75)', fg: '#ffffff', outline: false }
 }
 
-function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, selectedSubSlideId, onSelectSubSlide, onDeselectSubSlide, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings, slideFormat = '16:9', projectName = '', drawingPenColors, onDrawingPersist }) {
+function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onDeselectGraphic, selectedSubSlideId, onSelectSubSlide, onDeselectSubSlide, settings, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, textDropShadow, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, textOutline, outlineWidth, outlineColor, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, recordSettings, slideFormat = '16:9', projectName = '', drawingPenColors, onDrawingPersist, onDrawingControlsChange }) {
   // Default recordSettings if not provided
   const safeRecordSettings = recordSettings || { webcamEnabled: false, selectedCameraId: '', microphoneEnabled: false, selectedMicrophoneId: '', webcamFlipHorizontal: false, webcamFlipVertical: false }
   const [isSelectingImages, setIsSelectingImages] = useState(false)
@@ -76,6 +78,66 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
   const [drawTool, setDrawTool] = useState('pen')
   const [drawColor, setDrawColor] = useState(penColors[0])
   const [drawBrushSize, setDrawBrushSize] = useState(DEFAULT_DRAWING_BRUSH_SIZE)
+  const [drawSmoothing, setDrawSmoothing] = useState(DEFAULT_DRAWING_SMOOTHING)
+  const [drawWobble, setDrawWobble] = useState(DEFAULT_DRAWING_WOBBLE)
+  const [drawHistory, setDrawHistory] = useState({ canUndo: false, canRedo: false })
+  const [drawingPreviewLoaded, setDrawingPreviewLoaded] = useState(false)
+  const [drawingPreviewRevealed, setDrawingPreviewRevealed] = useState(false)
+
+  useEffect(() => {
+    setDrawingPreviewLoaded(false)
+    setDrawingPreviewRevealed(false)
+  }, [slide?.id])
+
+  useEffect(() => {
+    if (!drawingPreviewLoaded) {
+      setDrawingPreviewRevealed(false)
+      return
+    }
+    const id = requestAnimationFrame(() => setDrawingPreviewRevealed(true))
+    return () => cancelAnimationFrame(id)
+  }, [slide?.id, drawingPreviewLoaded])
+
+  const handlePreviewDrawingLoad = useCallback(() => setDrawingPreviewLoaded(true), [])
+  const handlePreviewDrawingHistory = useCallback((state) => setDrawHistory(state), [])
+
+  useEffect(() => {
+    if (!onDrawingControlsChange) return
+    if (!drawingEnabled) {
+      onDrawingControlsChange(null)
+      return
+    }
+    onDrawingControlsChange({
+      penColors,
+      tool: drawTool,
+      onToolChange: setDrawTool,
+      color: drawColor,
+      onColorChange: setDrawColor,
+      brushSize: drawBrushSize,
+      onBrushSizeChange: setDrawBrushSize,
+      lineSmoothing: drawSmoothing,
+      onLineSmoothingChange: setDrawSmoothing,
+      lineWobble: drawWobble,
+      onLineWobbleChange: setDrawWobble,
+      canUndo: drawHistory.canUndo,
+      canRedo: drawHistory.canRedo,
+      onUndo: () => drawingLayerRef.current?.undo(),
+      onRedo: () => drawingLayerRef.current?.redo(),
+      onClear: () => drawingLayerRef.current?.clear(),
+      onDone: () => setDrawingEnabled(false),
+    })
+  }, [
+    onDrawingControlsChange,
+    drawingEnabled,
+    penColors,
+    drawTool,
+    drawColor,
+    drawBrushSize,
+    drawSmoothing,
+    drawWobble,
+    drawHistory.canUndo,
+    drawHistory.canRedo,
+  ])
 
   useEffect(() => {
     try {
@@ -346,22 +408,6 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
           >
             Draw
           </button>
-          {drawingEnabled && (
-            <div className="preview-drawing-toolbar-wrap">
-              <DrawingToolbar
-                drawingEnabled={drawingEnabled}
-                onToggleDrawing={() => setDrawingEnabled(false)}
-                penColors={penColors}
-                tool={drawTool}
-                onToolChange={setDrawTool}
-                color={drawColor}
-                onColorChange={setDrawColor}
-                brushSize={drawBrushSize}
-                onBrushSizeChange={setDrawBrushSize}
-                onClear={() => drawingLayerRef.current?.clear()}
-              />
-            </div>
-          )}
           {previewAnimationConfigured && (
             <>
             <button
@@ -554,7 +600,15 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             onSelectSubSlide={onSelectSubSlide}
             onDeselectSubSlide={onDeselectSubSlide}
           />
-          <div className="slide-preview__drawing-wrap">
+          <div
+            className={[
+              'slide-preview__drawing-wrap',
+              (drawingPreviewRevealed || drawingEnabled) && 'slide-preview__drawing-wrap--revealed',
+              drawingEnabled && 'slide-preview__drawing-wrap--drawing',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <DrawingLayer
               ref={drawingLayerRef}
               slideId={slide.id}
@@ -566,6 +620,10 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
               tool={drawTool}
               color={drawColor}
               brushSize={drawBrushSize}
+              lineSmoothing={drawSmoothing}
+              lineWobble={drawWobble}
+              onHistoryChange={handlePreviewDrawingHistory}
+              onLoadComplete={handlePreviewDrawingLoad}
               onDrawingPersist={(slideId, path) => {
                 onDrawingPersist?.(slideId, path ? drawingRelativePath(slideId) : null)
               }}

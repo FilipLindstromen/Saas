@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "SketchGen", "run", "dev"],
       "port": 5177
+    },
+    {
+      "name": "CopyLearner",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "CopyLearner", "run", "dev"],
+      "port": 5185
     }
   ]
 }

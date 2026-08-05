@@ -42,6 +42,17 @@
   border-style: dashed;
 }
 
+.style-card-thumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.style-card-image.active {
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
 .style-card-delete {
   position: absolute;
   top: -4px;

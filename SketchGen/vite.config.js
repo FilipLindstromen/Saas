@@ -1,13 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
+
+// This file runs as a real ES module (package.json has "type": "module"), so
+// `require(...)` isn't available here — it throws "Dynamic require... is not
+// supported" and silently no-ops inside a try/catch, which meant OPENAI_API_KEY
+// from the root .env never actually reached the build. Use ESM imports instead.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Load env from repo root (localhost: one .env for all apps)
 const rootEnv = path.resolve(__dirname, '..')
-try {
-  require('dotenv').config({ path: path.join(rootEnv, '.env') })
-  require('dotenv').config({ path: path.join(rootEnv, '.env.local') })
-} catch {}
+dotenv.config({ path: path.join(rootEnv, '.env') })
+dotenv.config({ path: path.join(rootEnv, '.env.local') })
 
 // Default for local `vite build` / electron build (relative assets).
 // GitHub Actions / Vercel override with `--base=/<repo>/SketchGen/`.

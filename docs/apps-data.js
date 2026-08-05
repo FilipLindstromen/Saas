@@ -74,6 +74,7 @@ window.SAAS_APPS_CATALOG = [
     apps: [
       { name: 'BrainDump', href: 'BrainDump/', icon: 'braindump.svg' },
       { name: 'PostIt', href: 'PostIt/', icon: 'postit.svg' },
+      { name: 'CopyLearner', href: 'CopyLearner/', icon: 'bullet-generator.svg' },
     ],
   },
   {

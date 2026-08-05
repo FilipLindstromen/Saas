@@ -14,9 +14,9 @@
     "server": "cd server && npm start",
     "server:install": "cd server && npm install",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://127.0.0.1:5174 && cross-env NODE_ENV=development electron .\"",
-    "electron:pack": "node scripts/prepare-electron-build.mjs && npm run build:electron && npm run server:install && node scripts/run-electron-builder.mjs --dir",
-    "electron:build": "node scripts/prepare-electron-build.mjs && npm run build:electron && npm run server:install && node scripts/run-electron-builder.mjs",
-    "electron:build:win": "node scripts/prepare-electron-build.mjs && npm run build:electron && npm run server:install && node scripts/run-electron-builder.mjs --win"
+    "electron:pack": "node scripts/prepare-electron-build.mjs && npm run build && npm run server:install && node scripts/run-electron-builder.mjs --dir",
+    "electron:build": "node scripts/prepare-electron-build.mjs && npm run build && npm run server:install && node scripts/run-electron-builder.mjs",
+    "electron:build:win": "node scripts/prepare-electron-build.mjs && npm run build && npm run server:install && node scripts/run-electron-builder.mjs --win"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",

@@ -44,15 +44,34 @@ npm run electron:pack
 ## How it works
 
 - **Electron shell** (`electron/main.cjs`) opens the app in a native window.
-- **Production UI** is served locally from `dist/` with the headers required for FFmpeg.wasm.
+- **Production UI** uses the **same `dist/` folder as the web app** (`npm run build`). On startup the shell picks the newest available copy:
+  1. `PITCHDECK_DIST_DIR` (optional override)
+  2. `distDir` in `%APPDATA%/…/ui-config.json`
+  3. `dist/` next to the `.exe`
+  4. **`PitchDeck/dist`** in the project (found by walking up from the exe — e.g. `release/*.exe` → parent `PitchDeck/dist`)
+  5. Bundled copy inside the installer (fallback if you run the exe without a local build)
+- After you change the web app, run **`npm run build`** in `PitchDeck` and **restart the desktop app** — no need to rebuild the `.exe` unless Electron or the FFmpeg server changed.
+- **Optional hosted UI:** set `PITCHDECK_UI_URL` to your deployed web URL (must send COOP/COEP headers like Vite preview), or put `{ "uiUrl": "https://…" }` in `ui-config.json` under the app userData folder. The shell loads that URL when reachable so the exe tracks your live web deploy.
 - **FFmpeg API server** (`server/`) is bundled and started automatically for export/transcription.
 - **FFmpeg.wasm** is bundled in `public/ffmpeg/` for offline browser fallback (no CDN required).
 - Projects are stored locally (browser storage + optional project folder via File System Access API).
+
+### ui-config.json (optional)
+
+Location: `%APPDATA%/Pitch Deck 2000/ui-config.json` (Windows)
+
+```json
+{
+  "uiUrl": "https://your-host.example/path/to/pitchdeck/",
+  "distDir": "C:\\\\path\\\\to\\\\Saas\\\\PitchDeck\\\\dist"
+}
+```
 
 ## Web vs desktop
 
 | | Browser | Desktop (.exe) |
 |---|---|---|
 | Run | `npm run dev` | `npm run electron:dev` |
-| Build | `npm run build` | `npm run electron:build:win` |
+| Update UI | `npm run build` (or deploy web) | Same — `npm run build`, then restart exe |
+| Rebuild shell | — | `npm run electron:build:win` (only when Electron/server packaging changes) |
 | FFmpeg server | Manual `npm run server` | Starts automatically |

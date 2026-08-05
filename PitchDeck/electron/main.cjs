@@ -79,9 +79,124 @@ function isDevelopment() {
   return process.env.NODE_ENV === 'development' || !app.isPackaged
 }
 
-function getDistDir() {
+function getBundledDistDir() {
   return path.join(__dirname, '..', 'dist')
 }
+
+function readUiConfig() {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'ui-config.json')
+    if (!fs.existsSync(configPath)) return {}
+    return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function resolveConfiguredUiUrl() {
+  const fromEnv = process.env.PITCHDECK_UI_URL?.trim()
+  if (fromEnv) return fromEnv
+  const cfg = readUiConfig()
+  if (typeof cfg.uiUrl === 'string' && cfg.uiUrl.trim()) return cfg.uiUrl.trim()
+  return null
+}
+
+function hasIndexHtml(dir) {
+  return !!(dir && fs.existsSync(path.join(dir, 'index.html')))
+}
+
+function distIndexMtime(dir) {
+  try {
+    return fs.statSync(path.join(dir, 'index.html')).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+/** Walk up from exe / cwd to find PitchDeck/dist (same output as `npm run build`). */
+function findProjectDistDir() {
+  const seeds = [
+    path.dirname(process.execPath),
+    path.join(__dirname, '..'),
+    process.cwd(),
+  ]
+  for (const seed of seeds) {
+    let dir = path.resolve(seed)
+    for (let depth = 0; depth < 12; depth++) {
+      const indexPath = path.join(dir, 'dist', 'index.html')
+      const pkgPath = path.join(dir, 'package.json')
+      if (fs.existsSync(indexPath) && fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+          if (pkg.name === 'pitch-deck-generator') {
+            return path.join(dir, 'dist')
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  }
+  return null
+}
+
+/** Prefer newest dist: env override → ui-config → beside exe → repo dist → bundled fallback. */
+function resolveDistDir() {
+  const explicit = process.env.PITCHDECK_DIST_DIR?.trim()
+  if (explicit && hasIndexHtml(explicit)) {
+    return { dir: path.resolve(explicit), source: 'PITCHDECK_DIST_DIR' }
+  }
+
+  const cfg = readUiConfig()
+  if (typeof cfg.distDir === 'string' && hasIndexHtml(cfg.distDir)) {
+    return { dir: path.resolve(cfg.distDir), source: 'ui-config.json distDir' }
+  }
+
+  const candidates = []
+  const besideExe = path.join(path.dirname(process.execPath), 'dist')
+  const projectDist = findProjectDistDir()
+  const bundled = getBundledDistDir()
+
+  if (hasIndexHtml(besideExe)) candidates.push({ dir: besideExe, source: 'dist next to .exe' })
+  if (projectDist) candidates.push({ dir: projectDist, source: 'PitchDeck/dist (web build)' })
+  if (hasIndexHtml(bundled)) candidates.push({ dir: bundled, source: 'bundled in app package' })
+
+  if (candidates.length === 0) return null
+
+  candidates.sort((a, b) => distIndexMtime(b.dir) - distIndexMtime(a.dir))
+  return candidates[0]
+}
+
+function canReachUrl(urlString) {
+  return new Promise((resolve) => {
+    let url
+    try {
+      url = new URL(urlString)
+    } catch {
+      resolve(false)
+      return
+    }
+    const lib = url.protocol === 'https:' ? require('https') : http
+    const req = lib.get(
+      urlString,
+      { timeout: 8000 },
+      (res) => {
+        resolve(res.statusCode >= 200 && res.statusCode < 400)
+        res.resume()
+      }
+    )
+    req.on('error', () => resolve(false))
+    req.on('timeout', () => {
+      req.destroy()
+      resolve(false)
+    })
+  })
+}
+
+let activeLoadUrl = null
 
 function getServerDir() {
   if (app.isPackaged) {
@@ -98,8 +213,7 @@ function safeFilePath(rootDir, requestPath) {
   return resolved
 }
 
-function startUiServer() {
-  const rootDir = getDistDir()
+function startUiServer(rootDir) {
   return new Promise((resolve, reject) => {
     uiServer = http.createServer((req, res) => {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
@@ -229,6 +343,7 @@ function createWindow(loadUrl) {
   })
 
   mainWindow.loadURL(loadUrl)
+  activeLoadUrl = loadUrl
 
   if (isDevelopment()) {
     mainWindow.webContents.openDevTools({ mode: 'detach' })
@@ -240,9 +355,29 @@ function createWindow(loadUrl) {
   })
 
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    const allowed = [loadUrl, DEV_URL, `http://127.0.0.1:${UI_PORT}`, `http://localhost:${UI_PORT}`]
-    const allowedOrigins = new Set(allowed.map((entry) => new URL(entry).origin))
-    const targetOrigin = new URL(navigationUrl).origin
+    const allowed = [
+      activeLoadUrl,
+      loadUrl,
+      DEV_URL,
+      `http://127.0.0.1:${UI_PORT}`,
+      `http://localhost:${UI_PORT}`,
+    ].filter(Boolean)
+    const allowedOrigins = new Set(
+      allowed.map((entry) => {
+        try {
+          return new URL(entry).origin
+        } catch {
+          return null
+        }
+      }).filter(Boolean)
+    )
+    let targetOrigin
+    try {
+      targetOrigin = new URL(navigationUrl).origin
+    } catch {
+      event.preventDefault()
+      return
+    }
     if (!allowedOrigins.has(targetOrigin)) {
       event.preventDefault()
       shell.openExternal(navigationUrl)
@@ -264,17 +399,26 @@ async function boot() {
     return
   }
 
-  const distDir = getDistDir()
-  if (!fs.existsSync(path.join(distDir, 'index.html'))) {
+  const remoteUrl = resolveConfiguredUiUrl()
+  if (remoteUrl && (await canReachUrl(remoteUrl))) {
+    console.log('[PitchDeck] Loading UI from URL:', remoteUrl)
+    createWindow(remoteUrl)
+    return
+  }
+
+  const resolved = resolveDistDir()
+  if (!resolved) {
     dialog.showErrorBox(
       'Pitch Deck 2000',
-      'App files are missing. Rebuild with: npm run electron:build:win'
+      'No UI files found. Run "npm run build" in the PitchDeck folder, or set PITCHDECK_UI_URL / PITCHDECK_DIST_DIR.'
     )
     app.quit()
     return
   }
 
-  const uiUrl = await startUiServer()
+  console.log(`[PitchDeck] Serving UI from ${resolved.source}:\n  ${resolved.dir}`)
+
+  const uiUrl = await startUiServer(resolved.dir)
   createWindow(uiUrl)
 }
 

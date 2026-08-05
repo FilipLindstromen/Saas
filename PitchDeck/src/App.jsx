@@ -178,6 +178,11 @@ function App() {
   }, [])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('pitchDeckSidebarCollapsed') === 'true')
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false)
+  const [previewDrawingControls, setPreviewDrawingControls] = useState(null)
+  useEffect(() => {
+    if (previewDrawingControls) setInspectorDrawerOpen(true)
+  }, [previewDrawingControls])
+
   const previousModeRef = useRef(readPersistedAppMode())
   const [theme, setTheme] = useState(() => getTheme())
   const [showProjectOverview, setShowProjectOverview] = useState(false)
@@ -2305,6 +2310,7 @@ function App() {
           projectName={projectName}
           drawingPenColors={settings.drawingPenColors}
           onDrawingPersist={handleDrawingPersist}
+          onDrawingControlsChange={setPreviewDrawingControls}
         />
             </div>
             {mode === 'edit' && (
@@ -2338,6 +2344,7 @@ function App() {
                     selectedGraphicId={selectedGraphicId}
                     onDeselectGraphic={() => setSelectedGraphicId(null)}
                     backgroundColor={settings.backgroundColor}
+                    drawingControls={previewDrawingControls}
                   />
                 </div>
               </>

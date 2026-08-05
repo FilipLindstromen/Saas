@@ -1,0 +1,104 @@
+.layers-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.layers-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layers-panel-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.layers-add-btn {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.layers-add-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.layers-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.layers-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--button-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+}
+
+.layers-panel-row.active {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.layers-visibility-btn,
+.layers-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.layers-visibility-btn:hover,
+.layers-remove-btn:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.layers-remove-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.layers-name-btn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 0.2rem 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layers-panel-row.active .layers-name-btn {
+  color: var(--text-primary);
+  font-weight: 600;
+}

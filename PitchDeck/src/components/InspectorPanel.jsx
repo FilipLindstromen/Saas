@@ -7,6 +7,7 @@ import SlideSettings from './SlideSettings'
 import DocumentSettings from './DocumentSettings'
 import ActiveObjectOptions from './ActiveObjectOptions'
 import { INSPECTOR_TABS, INSPECTOR_GROUP_LABELS, InspectorTabIcon, getInspectorTabMeta, normalizeInspectorTab } from './InspectorIcons'
+import { DrawingSettingsPanel } from './DrawingLayer'
 import './InspectorPanel.css'
 
 function InspectorPanel({
@@ -24,6 +25,7 @@ function InspectorPanel({
   selectedGraphicId,
   onDeselectGraphic,
   backgroundColor,
+  drawingControls = null,
 }) {
   const tab = normalizeInspectorTab(activeTab)
   const tabMeta = getInspectorTabMeta(tab)
@@ -102,6 +104,16 @@ function InspectorPanel({
       </nav>
 
       <div className="inspector-panel-content">
+        {drawingControls ? (
+          <div className="inspector-drawing-panel">
+            <header className="inspector-panel-content-header">
+              <p className="inspector-panel-content-group">Slide</p>
+              <h2 className="inspector-panel-content-title">Drawing</h2>
+            </header>
+            <DrawingSettingsPanel layout="sidebar" {...drawingControls} />
+          </div>
+        ) : (
+          <>
         <header className="inspector-panel-content-header">
           <p className="inspector-panel-content-group">{groupLabel}</p>
           <h2 className="inspector-panel-content-title">{tabMeta.label}</h2>
@@ -214,6 +226,8 @@ function InspectorPanel({
               <p>Select a graphic on the slide to edit it here, or add one from the preview toolbar.</p>
             </div>
           )
+        )}
+          </>
         )}
       </div>
     </div>

@@ -15,6 +15,16 @@
   height: 100%;
   z-index: 100;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--drawing-fade-duration, 450ms) ease-in-out;
+}
+
+.play-drawing-layer.play-drawing-layer--revealed {
+  opacity: 1;
+}
+
+.play-drawing-layer.play-drawing-layer--drawing {
+  opacity: 1;
 }
 
 .play-drawing-layer .drawing-layer__canvas--active {
@@ -91,6 +101,26 @@
   accent-color: var(--btn-primary-bg, #e67e22);
 }
 
+.drawing-layer__brush--narrow {
+  width: 72px;
+}
+
+.drawing-layer__slider-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: default;
+}
+
+.drawing-layer__slider-label span {
+  min-width: 2.75rem;
+}
+
 .drawing-layer__colors {
   display: flex;
   gap: 0.25rem;
@@ -127,6 +157,13 @@
   inset: 0;
   z-index: 120;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--drawing-fade-duration, 450ms) ease-in-out;
+}
+
+.slide-preview__drawing-wrap.slide-preview__drawing-wrap--revealed,
+.slide-preview__drawing-wrap.slide-preview__drawing-wrap--drawing {
+  opacity: 1;
 }
 
 .preview-drawing-toolbar-wrap .drawing-layer__toolbar--play {
@@ -141,6 +178,101 @@
 
 .preview-drawing-toolbar-wrap {
   flex: 1 1 100%;
+}
+
+/* Sidebar drawing settings (play + inspector) */
+.drawing-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.drawing-settings-panel--sidebar {
+  padding: 0.25rem 0;
+}
+
+.drawing-settings-panel__done {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--btn-primary-bg, #e67e22);
+  color: var(--btn-primary-text, #fff);
+  cursor: pointer;
+  width: 100%;
+}
+
+.drawing-settings-panel__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.drawing-settings-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted, rgba(255, 255, 255, 0.75));
+}
+
+.drawing-settings-panel__field .drawing-layer__brush {
+  width: 100%;
+}
+
+.drawing-settings-panel__row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.drawing-settings-panel__row .drawing-layer__tool {
+  flex: 1;
+}
+
+.drawing-settings-panel__colors-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.75));
+}
+
+.drawing-settings-panel__clear {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.play-drawing-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10003;
+  width: min(280px, 88vw);
+  padding: 1rem 1rem 5.5rem;
+  overflow-y: auto;
+  background: rgba(12, 12, 16, 0.94);
+  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.play-drawing-sidebar__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  color: var(--text, #fff);
+}
+
+.inspector-drawing-panel .drawing-settings-panel__field {
+  color: var(--text-secondary, rgba(0, 0, 0, 0.65));
+}
+
+.inspector-drawing-panel .drawing-settings-panel__colors-label {
+  color: var(--text-secondary, rgba(0, 0, 0, 0.65));
 }
 
 .preview-toolbar-group-btn--active {
