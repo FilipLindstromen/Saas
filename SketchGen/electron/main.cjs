@@ -6,6 +6,11 @@ const http = require('http')
 const UI_PORT = Number(process.env.SKETCHGEN_UI_PORT) || 5177
 const DEV_URL = process.env.SKETCHGEN_DEV_URL || 'http://127.0.0.1:5177'
 
+// Fixes the userData path to %APPDATA%/SketchGen regardless of the installed
+// productName/package name, so scripts/sync-desktop.mjs (plain Node, no Electron
+// APIs) can compute the same folder deterministically.
+app.setName('SketchGen')
+
 let mainWindow = null
 let uiServer = null
 
@@ -29,8 +34,29 @@ function isDevelopment() {
   return process.env.NODE_ENV === 'development' || !app.isPackaged
 }
 
-function getDistDir() {
+// The exe's own bundled snapshot (from electron-builder), used only to seed
+// userData/www on first run. Day-to-day, the app reads from userData/www instead —
+// `npm run build` (the same command used to deploy the web app) copies the fresh
+// dist/ there too (see scripts/sync-desktop.mjs), so an already-installed exe
+// picks up web updates on next launch without ever being repackaged or reinstalled.
+function getBundledDistDir() {
   return path.join(__dirname, '..', 'dist')
+}
+
+function getUserDataDistDir() {
+  return path.join(app.getPath('userData'), 'www')
+}
+
+function ensureUserDataDist() {
+  const target = getUserDataDistDir()
+  if (fs.existsSync(path.join(target, 'index.html'))) return target
+
+  const bundled = getBundledDistDir()
+  if (fs.existsSync(path.join(bundled, 'index.html'))) {
+    fs.mkdirSync(target, { recursive: true })
+    fs.cpSync(bundled, target, { recursive: true })
+  }
+  return target
 }
 
 function safeFilePath(rootDir, requestPath) {
@@ -41,8 +67,7 @@ function safeFilePath(rootDir, requestPath) {
   return resolved
 }
 
-function startUiServer() {
-  const rootDir = getDistDir()
+function startUiServer(rootDir) {
   return new Promise((resolve, reject) => {
     uiServer = http.createServer((req, res) => {
       const urlPath = req.url === '/' ? '/index.html' : req.url
@@ -153,7 +178,7 @@ async function boot() {
     return
   }
 
-  const distDir = getDistDir()
+  const distDir = ensureUserDataDist()
   if (!fs.existsSync(path.join(distDir, 'index.html'))) {
     dialog.showErrorBox(
       'SketchGen',
@@ -163,7 +188,7 @@ async function boot() {
     return
   }
 
-  const uiUrl = await startUiServer()
+  const uiUrl = await startUiServer(distDir)
   createWindow(uiUrl)
 }
 
