@@ -1,17 +1,19 @@
 # CopyLearner
 
-Swipeable micro-lessons, like an Instagram carousel you learn from. Comes preloaded with a set of copywriting fundamentals, and you can upload your own material (PDF, ZIP, text file, or pasted text) to generate more lessons from it.
+Swipeable micro-lessons, like an Instagram carousel you learn from. The AI writing the lessons is prompted as an expert direct-response copywriter working as a copywriting mentor — every lesson, whether from the built-in deck or your own uploads, teaches copywriting craft. Comes preloaded with a set of fundamentals, and you can upload your own material (PDF, ZIP, text file, or pasted text) as source material for more lessons.
 
 ## Gestures (full screen)
 
 - **Swipe left / right** — next / previous slide within a lesson
 - **Swipe down** — a new learning (next lesson)
 - **Swipe up** — previous lesson
-- Tap the left/right edge of the card also moves slides; arrow keys and trackpad scroll work on desktop.
+- Slide text is selectable (click/tap-and-drag to select, then copy) — start a swipe from anywhere else on the card. Arrow keys and trackpad scroll also work on desktop.
 
 ## Uploading your own content
 
-Tap the settings icon (top-right) → **My Content** → upload a PDF, ZIP, or text file, or paste text directly. The content is read locally in your browser, then OpenAI turns it into a set of swipeable lessons (title → point/example/quiz/challenge → takeaway), tagged under the **My Content** topic.
+Tap the settings icon (top-right) → **My Content** → upload a PDF, ZIP, or text file, or paste text directly. The file is only read and stored at this point — no AI call yet, so uploading is instant.
+
+Lessons are generated progressively, in the background, as you swipe through the **My Content** topic: the first batch of 10 is written once you start swiping through it, and once you're down to the last 4, the next 10 are already being written behind the scenes. If your uploaded material runs out of distinct ideas, the mentor persona keeps going using its own copywriting expertise (staying relevant to your material's subject) — so the flow doesn't dry up even from a short upload.
 
 This uses the same OpenAI key as the rest of the SaaS apps — set `OPENAI_API_KEY` in the repo root `.env`, or add your key in another app's Settings (keys are shared via `localStorage` across all apps here).
 

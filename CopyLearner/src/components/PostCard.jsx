@@ -5,7 +5,7 @@ import SlideBody from './SlideBody.jsx'
 export default function PostCard({
   post, slide, slideIdx, accent, label, isFav,
   revealed, setRevealed, quizPick, setQuizPick,
-  onTapLeft, onTapRight, onToggleFav, onRate, isLastSlide,
+  onToggleFav, onRate, isLastSlide,
 }) {
   const total = post.slides.length
 
@@ -30,10 +30,10 @@ export default function PostCard({
         </button>
       </div>
 
-      {/* tap zones + slide content */}
+      {/* slide content — text within it is selectable; swipe (left/right/up/down) and
+          arrow keys handle navigation instead of tap zones, so selecting text with a
+          click-drag doesn't compete with an overlay for the pointer */}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-        <div onClick={onTapLeft} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '32%', zIndex: 2, cursor: 'pointer' }} />
-        <div onClick={onTapRight} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '32%', zIndex: 2, cursor: 'pointer' }} />
         <div style={{ height: '100%', overflowY: 'auto', padding: '18px 22px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <SlideBody
             slide={slide}
@@ -47,7 +47,7 @@ export default function PostCard({
         </div>
       </div>
 
-      {/* nav chevrons (visual affordance, tap zones + swipe handle the actual nav) */}
+      {/* nav chevrons (visual affordance — swipe handles the actual nav) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 10px 10px', pointerEvents: 'none' }}>
         <ChevronLeft size={16} color={slideIdx > 0 ? '#4E4E54' : 'transparent'} />
         <span style={{ fontSize: 10.5, color: '#4E4E54' }}>{slideIdx + 1} / {total}</span>

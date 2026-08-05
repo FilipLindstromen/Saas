@@ -6,8 +6,8 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
   if (slide.kind === 'title') {
     return (
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>{slide.kicker}</div>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, lineHeight: 1.15, color: '#F4F4F5' }}>{slide.heading}</div>
+        <div className="select-text" style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>{slide.kicker}</div>
+        <div className="select-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, lineHeight: 1.15, color: '#F4F4F5' }}>{slide.heading}</div>
       </div>
     )
   }
@@ -15,8 +15,8 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
   if (slide.kind === 'point') {
     return (
       <div>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 21, lineHeight: 1.25, color: '#F4F4F5', marginBottom: 12 }}>{slide.heading}</div>
-        <div style={{ fontSize: 15.5, lineHeight: 1.55, color: '#C6C6CB' }}>{slide.body}</div>
+        <div className="select-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 21, lineHeight: 1.25, color: '#F4F4F5', marginBottom: 12 }}>{slide.heading}</div>
+        <div className="select-text" style={{ fontSize: 15.5, lineHeight: 1.55, color: '#C6C6CB' }}>{slide.body}</div>
       </div>
     )
   }
@@ -24,16 +24,16 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
   if (slide.kind === 'example') {
     return (
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>{slide.label}</div>
+        <div className="select-text" style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>{slide.label}</div>
         {slide.before && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: '#6B6B70', marginBottom: 4 }}>BEFORE</div>
-            <div style={{ fontSize: 15, color: '#7C7C82', textDecoration: 'line-through', lineHeight: 1.4 }}>{slide.before}</div>
+            <div className="select-text" style={{ fontSize: 15, color: '#7C7C82', textDecoration: 'line-through', lineHeight: 1.4 }}>{slide.before}</div>
           </div>
         )}
         <div>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: accent, marginBottom: 4 }}>{slide.before ? 'AFTER' : 'EXAMPLE'}</div>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.4 }}>{slide.after}</div>
+          <div className="select-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.4 }}>{slide.after}</div>
         </div>
       </div>
     )
@@ -43,7 +43,7 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
     return (
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Quick check</div>
-        <div style={{ fontSize: 17, fontWeight: 600, color: '#F4F4F5', lineHeight: 1.4, marginBottom: 16 }}>{slide.prompt}</div>
+        <div className="select-text" style={{ fontSize: 17, fontWeight: 600, color: '#F4F4F5', lineHeight: 1.4, marginBottom: 16 }}>{slide.prompt}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {slide.options.map((opt, i) => {
             const picked = quizPick === i
@@ -64,7 +64,7 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
           })}
         </div>
         {quizPick !== null && (
-          <div style={{ marginTop: 14, fontSize: 13.5, color: '#B0B0B6', lineHeight: 1.5, background: '#1E1E22', padding: '10px 12px', borderRadius: 10 }}>{slide.explanation}</div>
+          <div className="select-text" style={{ marginTop: 14, fontSize: 13.5, color: '#B0B0B6', lineHeight: 1.5, background: '#1E1E22', padding: '10px 12px', borderRadius: 10 }}>{slide.explanation}</div>
         )}
       </div>
     )
@@ -74,8 +74,8 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
     return (
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Try it yourself</div>
-        <div style={{ fontSize: 17, fontWeight: 600, color: '#F4F4F5', lineHeight: 1.4, marginBottom: 8 }}>{slide.prompt}</div>
-        <div style={{ fontSize: 13, color: '#8B8B91', marginBottom: 16 }}>{slide.hint}</div>
+        <div className="select-text" style={{ fontSize: 17, fontWeight: 600, color: '#F4F4F5', lineHeight: 1.4, marginBottom: 8 }}>{slide.prompt}</div>
+        <div className="select-text" style={{ fontSize: 13, color: '#8B8B91', marginBottom: 16 }}>{slide.hint}</div>
         {!isRevealed ? (
           <button
             onClick={(e) => { e.stopPropagation(); setRevealed((r) => ({ ...r, [slideKey]: true })) }}
@@ -86,7 +86,7 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
         ) : (
           <div style={{ background: '#1E1E22', padding: '12px 14px', borderRadius: 10 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: accent, marginBottom: 4 }}>ONE WAY TO ANSWER IT</div>
-            <div style={{ fontSize: 14.5, color: '#C6C6CB', lineHeight: 1.5 }}>{slide.modelAnswer}</div>
+            <div className="select-text" style={{ fontSize: 14.5, color: '#C6C6CB', lineHeight: 1.5 }}>{slide.modelAnswer}</div>
           </div>
         )}
       </div>
@@ -97,7 +97,7 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
     return (
       <div>
         <div style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>Takeaway</div>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.4 }}>{slide.body}</div>
+        <div className="select-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 19, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.4 }}>{slide.body}</div>
       </div>
     )
   }

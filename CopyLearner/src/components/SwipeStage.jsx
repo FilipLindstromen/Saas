@@ -20,7 +20,10 @@ export default function SwipeStage({ children, onSwipeLeft, onSwipeRight, onSwip
 
   const onPointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
-    dragInfo.current = { startX: e.clientX, startY: e.clientY, dx: 0, dy: 0, active: true, axis: null }
+    // Let a click-drag that starts on slide text become a native text
+    // selection instead of a card swipe — don't arm the drag for it.
+    const startsOnText = !!(e.target.closest && e.target.closest('.select-text'))
+    dragInfo.current = { startX: e.clientX, startY: e.clientY, dx: 0, dy: 0, active: !startsOnText, axis: null }
   }
 
   const onPointerMove = (e) => {

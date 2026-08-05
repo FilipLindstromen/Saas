@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { BUILT_IN_CATEGORIES, CUSTOM_CATEGORY, DEFAULT_POSTS, accentOf, labelOf } from './data/defaultPosts.js'
 import { buildFeed, nextDue } from './utils/spacedRepetition.js'
 import { extractTextFromFile, guessFileType } from './utils/fileParsing.js'
-import { generateLessonsFromText } from './utils/generateLessons.js'
+import { generateLessonBatch, BATCH_SIZE, REFILL_THRESHOLD, MAX_TOTAL_LESSONS } from './utils/generateLessons.js'
 import {
   isCloudEnabled, getWorkspaceCode, setWorkspaceCode,
   subscribeState, saveState, subscribeSources, createSource, updateSource, deleteSource,
@@ -17,6 +17,10 @@ import EmptyState from './components/EmptyState.jsx'
 
 const ALL_CATEGORIES = [...BUILT_IN_CATEGORIES, CUSTOM_CATEGORY]
 const cloudEnabled = isCloudEnabled()
+// Source text is now kept around (not just used once at upload) so later
+// batches can keep drawing on it — cap it well under Firestore's 1MB
+// document limit for large uploads.
+const MAX_STORED_TEXT_CHARS = 60000
 
 export default function App() {
   const [workspaceCode, setWorkspaceCodeState] = useState(() => getWorkspaceCode())
@@ -32,6 +36,14 @@ export default function App() {
   const [slideIdx, setSlideIdx] = useState(0)
   const [revealed, setRevealed] = useState({})
   const [quizPick, setQuizPick] = useState(null)
+  const [isRestocking, setIsRestocking] = useState(false)
+
+  // Lessons from uploaded content are generated progressively, in the
+  // background, as the reader swipes through them — not up front on
+  // upload. These refs track that without persisting to storage.
+  const seenMineIdsRef = useRef(new Set())
+  const generatingRef = useRef(false)
+  const failureCooldownRef = useRef(0)
 
   // Keep a ref of custom posts so the sources subscription (set up once per
   // workspace) can compute live post counts without re-subscribing.
@@ -74,6 +86,41 @@ export default function App() {
   const slide = post ? post.slides[slideIdx] : null
   const isLastSlide = post ? slideIdx === post.slides.length - 1 : false
   const isFav = post ? favorites.includes(post.id) : false
+
+  const generateNextBatch = useCallback(async () => {
+    generatingRef.current = true
+    setIsRestocking(true)
+    try {
+      const readySources = sources.filter((s) => s.status === 'ready' && s.text)
+      if (!readySources.length) return
+      const referenceText = readySources.slice(0, 3).map((s) => s.text).join('\n\n---\n\n')
+      const coveredTitles = customPosts.map((p) => p.title)
+      const posts = await generateLessonBatch({ referenceText, coveredTitles, batchSize: BATCH_SIZE })
+      if (posts.length) await addPosts(readySources[0].id, posts)
+      failureCooldownRef.current = 0
+    } catch (err) {
+      failureCooldownRef.current = Date.now()
+    } finally {
+      generatingRef.current = false
+      setIsRestocking(false)
+    }
+  }, [sources, customPosts])
+
+  // Keep the "My Content" flow topped up: whenever the reader has swiped
+  // through most of what's been generated so far, quietly generate the
+  // next batch in the background — an endless stream instead of a single
+  // upfront generation.
+  useEffect(() => {
+    if (view !== 'feed') return
+    if (!selectedCats.includes('mine')) return
+    if (post && post.category === 'mine') seenMineIdsRef.current.add(post.id)
+    if (generatingRef.current) return
+    if (customPosts.length >= MAX_TOTAL_LESSONS) return
+    if (Date.now() - failureCooldownRef.current < 30000) return
+    const seenCount = customPosts.filter((p) => seenMineIdsRef.current.has(p.id)).length
+    const remaining = customPosts.length - seenCount
+    if (remaining <= REFILL_THRESHOLD) generateNextBatch()
+  }, [view, selectedCats, post, customPosts, generateNextBatch])
 
   const goPost = useCallback((delta) => {
     setPostIdx((i) => {
@@ -125,22 +172,9 @@ export default function App() {
     saveState({ selectedCats: safe })
   }
 
-  const runGeneration = async (sourceId, text) => {
-    try {
-      const posts = await generateLessonsFromText(text, {
-        onProgress: () => {},
-      })
-      if (!posts.length) {
-        await updateSource(sourceId, { status: 'error', error: 'Could not find learnable ideas in this content.' })
-        return
-      }
-      await addPosts(sourceId, posts)
-      await updateSource(sourceId, { status: 'ready' })
-    } catch (err) {
-      await updateSource(sourceId, { status: 'error', error: err.message || 'Failed to generate lessons.' })
-    }
-  }
-
+  // Uploading only extracts and stores the text — no AI call here. Lessons
+  // for it are generated later, progressively, as the reader swipes
+  // through the "My Content" category (see generateNextBatch above).
   const onAddFile = async (file) => {
     const type = guessFileType(file)
     const sourceId = await createSource({ title: file.name, type, text: '' })
@@ -150,15 +184,15 @@ export default function App() {
         await updateSource(sourceId, { status: 'error', error: 'No readable text found in this file.' })
         return
       }
-      await runGeneration(sourceId, text)
+      await updateSource(sourceId, { status: 'ready', text: text.slice(0, MAX_STORED_TEXT_CHARS) })
     } catch (err) {
       await updateSource(sourceId, { status: 'error', error: err.message || 'Could not read this file.' })
     }
   }
 
   const onAddText = async (title, text) => {
-    const sourceId = await createSource({ title, type: 'text', text })
-    await runGeneration(sourceId, text)
+    const sourceId = await createSource({ title, type: 'text', text: text.slice(0, MAX_STORED_TEXT_CHARS) })
+    await updateSource(sourceId, { status: 'ready' })
   }
 
   const onDeleteSource = (id) => deleteSource(id)
@@ -201,8 +235,6 @@ export default function App() {
               setRevealed={setRevealed}
               quizPick={quizPick}
               setQuizPick={setQuizPick}
-              onTapLeft={() => goSlide(-1)}
-              onTapRight={() => goSlide(1)}
               onToggleFav={toggleFavorite}
               onRate={rate}
               isLastSlide={isLastSlide}
@@ -216,6 +248,7 @@ export default function App() {
           <button onClick={() => goPost(1)} style={{ background: 'none', border: 'none', color: '#5C5C61', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
             swipe down for a new learning <ChevronDown size={14} />
           </button>
+          {isRestocking && <div style={{ color: '#4A4A50', fontSize: 10.5, marginTop: 2 }}>writing more lessons…</div>}
         </div>
       )}
 

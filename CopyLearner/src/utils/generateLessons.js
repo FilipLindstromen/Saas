@@ -1,12 +1,23 @@
 import { chatCompletion } from '@shared/openai'
 
-const CHUNK_SIZE = 6000
-const MAX_CHUNKS = 5
-const MAX_POSTS = 14
+export const BATCH_SIZE = 10
+// Trigger the next batch once this many (or fewer) unseen lessons remain —
+// e.g. with BATCH_SIZE 10 and threshold 4, a new batch starts after the
+// reader has swiped through 6 of the current 10.
+export const REFILL_THRESHOLD = 4
+// Circuit breaker against runaway generation from a stuck loop — not a
+// real ceiling the reader would ever hit in normal use.
+export const MAX_TOTAL_LESSONS = 300
 
-const SYSTEM_PROMPT = `You turn source material into a swipeable micro-learning deck, like an Instagram-carousel study app.
+const REFERENCE_CHAR_BUDGET = 9000
 
-Read the provided text and extract the distinct, learnable ideas in it. For each idea, produce one "post" — a short sequence of slides someone can swipe through in under a minute and actually remember.
+const SYSTEM_PROMPT = `You are an expert direct-response copywriter with decades of experience — the kind who has written control-beating emails, landing pages, and ads — now working one-on-one as a copywriting mentor. Your job is to keep teaching a student copywriting through an endless stream of short, swipeable lessons, like an Instagram-carousel study app.
+
+You'll be given:
+1. Reference material the student uploaded (could be an article, a book excerpt, notes, a product description — anything).
+2. A list of lesson titles you've already taught this student. Never repeat these ideas.
+
+Ground new lessons in the reference material where it genuinely teaches something about persuasive writing — extract the copywriting techniques, structures, or psychology it demonstrates, even if the material itself isn't explicitly "about" copywriting (e.g. a product description can teach a benefit-framing lesson; a news article can teach a hook technique). Once you've meaningfully mined the material, keep going using your own expert copywriting knowledge — classic formulas, persuasion psychology, headline/CTA/email techniques, structural patterns — staying loosely relevant to the material's subject or audience where it makes sense. You must always produce a full batch. Never say you've run out of material or ideas.
 
 Return STRICT JSON only, no markdown fences, matching this shape:
 {
@@ -30,17 +41,8 @@ Rules:
 - Between them, use 2-5 slides mixing "point", "example", "quiz", and "challenge" kinds — whichever fit the content. Not every kind is required in every post.
 - "quiz" options must have exactly 2 items, and "correct" is the 0-based index of the right one.
 - Keep every string short and mobile-friendly. No markdown, no bullet characters, no numbering.
-- Only use ideas actually present in the source text. Do not invent facts not supported by it.
-- Produce as many posts as there are genuinely distinct ideas, but no more than 8 posts for this chunk of text.`
-
-function chunkText(text) {
-  const clean = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
-  const chunks = []
-  for (let i = 0; i < clean.length && chunks.length < MAX_CHUNKS; i += CHUNK_SIZE) {
-    chunks.push(clean.slice(i, i + CHUNK_SIZE))
-  }
-  return chunks
-}
+- Write like a real copywriting mentor: concrete, opinionated, example-driven — never generic filler.
+- Produce exactly the requested number of posts, each teaching a genuinely distinct idea (no near-duplicates of each other or of the already-taught list).`
 
 function normalizeSlide(slide) {
   if (!slide || typeof slide !== 'object') return null
@@ -98,44 +100,49 @@ function normalizePost(raw) {
 }
 
 /**
- * Turn raw extracted text into an array of { title, slides } posts using OpenAI.
- * @param {string} text
- * @param {{ apiKey?: string, onProgress?: (msg: string) => void }} [opts]
+ * Generate the next batch of lessons, continuing from what's already been
+ * taught. One OpenAI call per batch — this is meant to be called
+ * repeatedly as the reader swipes, not once up front.
+ * @param {Object} opts
+ * @param {string} opts.referenceText - combined text from the uploaded source(s)
+ * @param {string[]} [opts.coveredTitles] - titles already generated, to avoid repeats
+ * @param {number} [opts.batchSize]
+ * @param {string} [opts.apiKey]
  */
-export async function generateLessonsFromText(text, opts = {}) {
-  const chunks = chunkText(text || '')
-  if (!chunks.length) return []
+export async function generateLessonBatch({ referenceText, coveredTitles = [], batchSize = BATCH_SIZE, apiKey }) {
+  const reference = (referenceText || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, REFERENCE_CHAR_BUDGET)
+  if (!reference) return []
 
-  const posts = []
-  for (let i = 0; i < chunks.length; i++) {
-    opts.onProgress?.(`Reading part ${i + 1} of ${chunks.length}...`)
-    let raw
-    try {
-      raw = await chatCompletion({
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: chunks[i] },
-        ],
-        model: 'gpt-4o-mini',
-        temperature: 0.4,
-        max_tokens: 3000,
-        response_format: { type: 'json_object' },
-        apiKey: opts.apiKey,
-      })
-    } catch (err) {
-      if (i === 0) throw err
-      break
-    }
-    let parsed
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      continue
-    }
-    const chunkPosts = Array.isArray(parsed.posts) ? parsed.posts.map(normalizePost).filter(Boolean) : []
-    posts.push(...chunkPosts)
-    if (posts.length >= MAX_POSTS) break
+  const coveredList = coveredTitles.length
+    ? coveredTitles.map((t) => `- ${t}`).join('\n')
+    : '(none yet — this is the first batch)'
+
+  const userMessage = `REFERENCE MATERIAL:\n${reference}\n\nALREADY TAUGHT (do not repeat these):\n${coveredList}\n\nGenerate exactly ${batchSize} new lessons continuing this student's copywriting education.`
+
+  let raw
+  try {
+    raw = await chatCompletion({
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+      max_tokens: 4500,
+      response_format: { type: 'json_object' },
+      apiKey,
+    })
+  } catch (err) {
+    throw err
   }
 
-  return posts.slice(0, MAX_POSTS)
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+
+  const posts = Array.isArray(parsed.posts) ? parsed.posts.map(normalizePost).filter(Boolean) : []
+  return posts.slice(0, batchSize)
 }

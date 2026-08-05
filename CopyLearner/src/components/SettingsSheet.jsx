@@ -137,7 +137,13 @@ export default function SettingsSheet({
                         <div style={{ color: '#E4E4E7', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</div>
                         <div style={{ color: s.status === 'error' ? '#E06868' : '#7A7A80', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                           {s.status === 'processing' && <Loader2 size={11} className="spin" />}
-                          {s.status === 'processing' ? 'Generating lessons…' : s.status === 'error' ? (s.error || 'Failed to process') : `${s.postCount ?? ''} lesson${s.postCount === 1 ? '' : 's'}`}
+                          {s.status === 'processing'
+                            ? 'Reading file…'
+                            : s.status === 'error'
+                              ? (s.error || 'Failed to process')
+                              : s.postCount
+                                ? `${s.postCount} lesson${s.postCount === 1 ? '' : 's'} so far`
+                                : 'Ready — lessons appear as you swipe'}
                         </div>
                       </div>
                       <button onClick={() => onDeleteSource(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>

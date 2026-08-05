@@ -63,6 +63,12 @@ export const STYLES = [
     emoji: '🔺',
     prompt: 'a low-poly 3D illustration made of faceted geometric shapes with flat-shaded lighting',
   },
+  {
+    id: 'sketchnote',
+    name: 'Sketchnote',
+    emoji: '🗒️',
+    prompt: 'a clean black-marker sketchnote / visual-note-taking illustration on a plain white background: bold confident black outline linework, simple stick-figure people with circle heads, minimalist doodle icons, hand-drawn boxes, arrows and connectors linking ideas, circled numbered step markers, and neat hand-lettered text labels integrated directly into the diagram — in the style of graphic recording / visual thinking notes, mostly monochrome with at most one small color accent',
+  },
 ]
 
 export const DEFAULT_STYLE_ID = STYLES[0].id
