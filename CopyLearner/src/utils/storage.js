@@ -53,6 +53,49 @@ export function setWorkspaceCode(code) {
 }
 
 /* ---------------------------------------------------------
+   Session feed position (persists across reloads in the same tab)
+--------------------------------------------------------- */
+function sessionSeenKey(workspaceCode) {
+  return `copylearner_session_seen_${(workspaceCode || 'local').toLowerCase()}`
+}
+
+export function getSessionSeenPostIds(workspaceCode) {
+  try {
+    const raw = sessionStorage.getItem(sessionSeenKey(workspaceCode))
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+export function markSessionSeenPost(workspaceCode, postId) {
+  if (!postId) return
+  const seen = getSessionSeenPostIds(workspaceCode)
+  if (seen.has(postId)) return
+  seen.add(postId)
+  sessionStorage.setItem(sessionSeenKey(workspaceCode), JSON.stringify([...seen]))
+}
+
+export function clearSessionSeenForPosts(workspaceCode, postIds) {
+  const seen = getSessionSeenPostIds(workspaceCode)
+  postIds.forEach((id) => seen.delete(id))
+  sessionStorage.setItem(sessionSeenKey(workspaceCode), JSON.stringify([...seen]))
+}
+
+function sessionLastStartKey(workspaceCode) {
+  return `copylearner_session_last_start_${(workspaceCode || 'local').toLowerCase()}`
+}
+
+export function getSessionLastStartPostId(workspaceCode) {
+  return sessionStorage.getItem(sessionLastStartKey(workspaceCode)) || ''
+}
+
+export function setSessionLastStartPostId(workspaceCode, postId) {
+  if (!postId) return
+  sessionStorage.setItem(sessionLastStartKey(workspaceCode), postId)
+}
+
+/* ---------------------------------------------------------
    Local pub-sub — Firestore's onSnapshot fires again on every write;
    plain localStorage doesn't, so mimic that for the no-Firebase fallback
    (otherwise subscribers only ever see the value at mount time).

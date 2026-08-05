@@ -15,7 +15,7 @@
 .sketch-canvas {
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 3;
+  max-height: min(100%, 85vh);
   display: block;
   margin: auto;
   background: #ffffff;

@@ -1,8 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat'
 import './CanvasBoard.css'
 
-export const CANVAS_WIDTH = 1024
-export const CANVAS_HEIGHT = 768
+/** @deprecated use getSketchFormat — kept for any external imports */
+export const CANVAS_WIDTH = getSketchFormat('16:9').width
+export const CANVAS_HEIGHT = getSketchFormat('16:9').height
 export const BACKGROUND_COLOR = '#ffffff'
 const MAX_HISTORY = 40
 const FILL_TOLERANCE = 40
@@ -193,16 +195,27 @@ function loadHtmlImage(dataUrl) {
   })
 }
 
-function createLayerCanvas() {
+function createLayerCanvas(w, h) {
   const canvas = document.createElement('canvas')
-  canvas.width = CANVAS_WIDTH
-  canvas.height = CANVAS_HEIGHT
+  canvas.width = w
+  canvas.height = h
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   return { canvas, ctx }
 }
 
+function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH, background = BACKGROUND_COLOR) {
+  const { canvas, ctx } = createLayerCanvas(newW, newH)
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, newW, newH)
+  const scale = Math.min(newW / oldW, newH / oldH)
+  const dw = oldW * scale
+  const dh = oldH * scale
+  ctx.drawImage(sourceCanvas, (newW - dw) / 2, (newH - dh) / 2, dw, dh)
+  return { canvas, ctx }
+}
+
 const CanvasBoard = forwardRef(function CanvasBoard(
-  { tool, color, size, smoothing = 0, wobble = 0, zoom = 1, placing, onPlaced, onHistoryChange, onLayersChange, onCommit, onDropFile },
+  { tool, color, size, smoothing = 0, wobble = 0, zoom = 1, formatId = DEFAULT_SKETCH_FORMAT_ID, placing, onPlaced, onHistoryChange, onLayersChange, onCommit, onDropFile },
   ref
 ) {
   const canvasRef = useRef(null)
@@ -218,6 +231,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const smoothingRef = useRef(smoothing)
   const wobbleRef = useRef(wobble)
   const placingRef = useRef(placing)
+  const formatRef = useRef(formatId)
+  const canvasSizeRef = useRef({
+    w: getSketchFormat(formatId).width,
+    h: getSketchFormat(formatId).height,
+  })
+  const W = () => canvasSizeRef.current.w
+  const H = () => canvasSizeRef.current.h
   const shapeSnapshotRef = useRef(null)
   const shapeStartRef = useRef(null)
   const smoothPointRef = useRef(null)
@@ -264,7 +284,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     const ctx = ctxRef.current
     if (!ctx) return
     ctx.fillStyle = BACKGROUND_COLOR
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    ctx.fillRect(0, 0, W(), H())
     for (const layer of layersRef.current) {
       if (layer.visible) ctx.drawImage(layer.canvas, 0, 0)
     }
@@ -277,7 +297,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         id: l.id,
         name: l.name,
         visible: l.visible,
-        imageData: l.ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT),
+        imageData: l.ctx.getImageData(0, 0, W(), H()),
       })),
       activeLayerId: activeLayerIdRef.current,
     }
@@ -291,7 +311,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   const restoreHistoryEntry = (entry) => {
     layersRef.current = entry.layers.map((saved) => {
-      const { canvas, ctx } = createLayerCanvas()
+      const { canvas, ctx } = createLayerCanvas(W(), H())
       ctx.putImageData(saved.imageData, 0, 0)
       return { id: saved.id, name: saved.name, visible: saved.visible, canvas, ctx }
     })
@@ -302,15 +322,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   useEffect(() => {
     const canvas = canvasRef.current
-    canvas.width = CANVAS_WIDTH
-    canvas.height = CANVAS_HEIGHT
+    canvas.width = W()
+    canvas.height = H()
     ctxRef.current = canvas.getContext('2d', { willReadFrequently: true })
 
     // Guard against React StrictMode's dev-only double-invoke of mount effects:
     // without this, a second invocation would silently replace "Layer 1" with
     // a fresh "Layer 2" (layerIdCounterRef survives the simulated remount).
     if (layersRef.current.length === 0) {
-      const { canvas: layerCanvas, ctx: layerCtx } = createLayerCanvas()
+      const { canvas: layerCanvas, ctx: layerCtx } = createLayerCanvas(W(), H())
       layerIdCounterRef.current += 1
       const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas: layerCanvas, ctx: layerCtx }
       layersRef.current = [layer]
@@ -334,16 +354,39 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
     const baseWidth = container.clientWidth
     canvas.style.width = `${baseWidth * zoom}px`
-    canvas.style.height = `${baseWidth * zoom * (CANVAS_HEIGHT / CANVAS_WIDTH)}px`
+    canvas.style.height = `${baseWidth * zoom * (H() / W())}px`
   }, [zoom])
 
+  useEffect(() => {
+    formatRef.current = formatId
+    const next = getSketchFormat(formatId)
+    const oldW = canvasSizeRef.current.w
+    const oldH = canvasSizeRef.current.h
+    if (next.width === oldW && next.height === oldH) return
+
+    layersRef.current = layersRef.current.map((layer) => {
+      const resized = resizeLayerCanvas(layer.canvas, oldW, oldH, next.width, next.height)
+      return { ...layer, canvas: resized.canvas, ctx: resized.ctx }
+    })
+    canvasSizeRef.current = { w: next.width, h: next.height }
+    const canvas = canvasRef.current
+    if (canvas) {
+      canvas.width = next.width
+      canvas.height = next.height
+    }
+    renderComposite()
+    pushHistory()
+    onCommit?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formatId])
+
   const drawImageFittedOnLayer = (ctx, img) => {
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-    const scale = Math.min(CANVAS_WIDTH / img.width, CANVAS_HEIGHT / img.height)
+    ctx.clearRect(0, 0, W(), H())
+    const scale = Math.min(W() / img.width, H() / img.height)
     const w = img.width * scale
     const h = img.height * scale
-    const x = (CANVAS_WIDTH - w) / 2
-    const y = (CANVAS_HEIGHT - h) / 2
+    const x = (W() - w) / 2
+    const y = (H() - h) / 2
     ctx.drawImage(img, x, y, w, h)
   }
 
@@ -353,7 +396,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     clear: () => {
       const ctx = getActiveCtx()
       if (!ctx) return
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      ctx.clearRect(0, 0, W(), H())
       renderComposite()
       pushHistory()
     },
@@ -380,14 +423,29 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       pushHistory()
     },
     /** Rebuild the whole layer stack from an autosave/restore payload. Not an undoable action. */
-    restoreLayers: async ({ layers, activeLayerId }) => {
+    restoreLayers: async ({ layers, activeLayerId, formatId: savedFormatId }) => {
       if (!layers?.length) return
+      if (savedFormatId) {
+        const f = getSketchFormat(savedFormatId)
+        canvasSizeRef.current = { w: f.width, h: f.height }
+        formatRef.current = savedFormatId
+        const canvas = canvasRef.current
+        if (canvas) {
+          canvas.width = f.width
+          canvas.height = f.height
+        }
+      }
       const rebuilt = []
       let maxCounter = 0
       for (const saved of layers) {
         const img = await loadHtmlImage(saved.dataUrl)
-        const { canvas, ctx } = createLayerCanvas()
-        ctx.drawImage(img, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        const { canvas, ctx } = createLayerCanvas(W(), H())
+        ctx.fillStyle = BACKGROUND_COLOR
+        ctx.fillRect(0, 0, W(), H())
+        const scale = Math.min(W() / img.width, H() / img.height)
+        const dw = img.width * scale
+        const dh = img.height * scale
+        ctx.drawImage(img, (W() - dw) / 2, (H() - dh) / 2, dw, dh)
         rebuilt.push({ id: saved.id, name: saved.name, visible: saved.visible, canvas, ctx })
         const num = parseInt(String(saved.id).replace('layer-', ''), 10)
         if (!Number.isNaN(num)) maxCounter = Math.max(maxCounter, num)
@@ -399,15 +457,25 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       renderComposite()
       notifyLayers()
       historyRef.current = [{
-        layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, imageData: l.ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT) })),
+        layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, imageData: l.ctx.getImageData(0, 0, W(), H()) })),
         activeLayerId: activeLayerIdRef.current,
       }]
       historyIndexRef.current = 0
       notifyHistory()
     },
     /** Reset to a single fresh blank layer — used when switching to a brand-new drawing (no saved snapshot yet). */
-    resetBlank: () => {
-      const { canvas, ctx } = createLayerCanvas()
+    resetBlank: (forcedFormatId) => {
+      if (forcedFormatId) {
+        const f = getSketchFormat(forcedFormatId)
+        canvasSizeRef.current = { w: f.width, h: f.height }
+        formatRef.current = forcedFormatId
+        const canvas = canvasRef.current
+        if (canvas) {
+          canvas.width = f.width
+          canvas.height = f.height
+        }
+      }
+      const { canvas, ctx } = createLayerCanvas(W(), H())
       layerIdCounterRef.current += 1
       const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx }
       layersRef.current = [layer]
@@ -416,7 +484,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       renderComposite()
       notifyLayers()
       historyRef.current = [{
-        layers: [{ id: layer.id, name: layer.name, visible: layer.visible, imageData: ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT) }],
+        layers: [{ id: layer.id, name: layer.name, visible: layer.visible, imageData: ctx.getImageData(0, 0, W(), H()) }],
         activeLayerId: layer.id,
       }]
       historyIndexRef.current = 0
@@ -424,12 +492,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     },
     /** Export every layer as a transparent PNG for autosave. */
     exportLayers: () => ({
+      formatId: formatRef.current,
       layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, dataUrl: l.canvas.toDataURL('image/png') })),
       activeLayerId: activeLayerIdRef.current,
     }),
+    getFormatId: () => formatRef.current,
     addLayer: () => {
       layerIdCounterRef.current += 1
-      const { canvas, ctx } = createLayerCanvas()
+      const { canvas, ctx } = createLayerCanvas(W(), H())
       const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx }
       layersRef.current = [...layersRef.current, layer]
       activeLayerIdRef.current = layer.id
@@ -493,7 +563,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const placingDimForDrag = (center, pos) => {
     const dist = Math.hypot(pos.x - center.x, pos.y - center.y)
     if (dist < 4) return placingRef.current?.maxDim ?? 100
-    return clamp(dist * 2, 20, Math.max(CANVAS_WIDTH, CANVAS_HEIGHT))
+    return clamp(dist * 2, 20, Math.max(W(), H()))
   }
 
   /**
@@ -558,7 +628,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     if (!ctx) return
 
     if (placingRef.current?.img) {
-      shapeSnapshotRef.current = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      shapeSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
       shapeStartRef.current = pos
       drawingRef.current = true
       hasContentRef.current = true
@@ -570,7 +640,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     const currentTool = toolRef.current
 
     if (currentTool === 'move') {
-      moveSnapshotRef.current = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      moveSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
       moveStartRef.current = pos
       drawingRef.current = true
       return
@@ -585,7 +655,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
 
     if (SHAPE_TOOLS.has(currentTool)) {
-      shapeSnapshotRef.current = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      shapeSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
       shapeStartRef.current = pos
       drawingRef.current = true
       hasContentRef.current = true
@@ -634,7 +704,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     if (currentTool === 'move') {
       const dx = Math.round(pos.x - moveStartRef.current.x)
       const dy = Math.round(pos.y - moveStartRef.current.y)
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      ctx.clearRect(0, 0, W(), H())
       ctx.putImageData(moveSnapshotRef.current, dx, dy)
       renderComposite()
       return
@@ -723,11 +793,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onDropFile?.(file)
   }
 
+  const aspect = getSketchFormat(formatId)
+
   return (
     <div className="sketch-canvas-viewport" onDragOver={handleDragOver} onDrop={handleDrop}>
       <canvas
         ref={canvasRef}
         className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}`}
+        style={{ aspectRatio: `${aspect.width} / ${aspect.height}` }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

@@ -37,3 +37,17 @@ export function buildFeed(allPosts, selectedCats, progress) {
   }
   return feed.length ? feed : pool
 }
+
+/** First lesson to show — skip posts already viewed this browser session (survives reload). */
+export function pickFeedStartIndex(feed, progress, sessionSeen, lastStartPostId = '') {
+  if (!feed.length) return 0
+  const unseenIdx = feed.findIndex((p) => !sessionSeen.has(p.id))
+  if (unseenIdx >= 0) return unseenIdx
+  const freshIdx = feed.findIndex((p) => !progress[p.id])
+  if (freshIdx >= 0) return freshIdx
+  if (lastStartPostId) {
+    const lastIdx = feed.findIndex((p) => p.id === lastStartPostId)
+    if (lastIdx >= 0) return (lastIdx + 1) % feed.length
+  }
+  return 0
+}

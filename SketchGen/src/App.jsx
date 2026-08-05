@@ -23,7 +23,11 @@ import {
 import { loadCustomStyles, addCustomStyle, deleteCustomStyle } from './utils/customStyles'
 import { copyImageToClipboard } from './utils/clipboard'
 import {
-  generateProjectId, drawingKeyFor,
+  DEFAULT_SKETCH_FORMAT_ID,
+  normalizeSketchFormatId,
+  SKETCH_FORMATS,
+} from './utils/canvasFormat'
+import {
   loadProjects, saveProjects,
   loadCurrentProjectId, saveCurrentProjectId,
   loadCurrentTabId, saveCurrentTabId,
@@ -81,6 +85,7 @@ export default function App() {
   const [smoothing, setSmoothing] = useState(0)
   const [wobble, setWobble] = useState(0)
   const [zoom, setZoom] = useState(1)
+  const [canvasFormat, setCanvasFormat] = useState(DEFAULT_SKETCH_FORMAT_ID)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
 
@@ -119,8 +124,10 @@ export default function App() {
     const key = drawingKeyFor(projectId, tabId)
     try {
       const snapshot = await kvGet(`canvas:${key}`)
-      if (snapshot?.layers?.length) await canvasRef.current?.restoreLayers(snapshot)
-      else canvasRef.current?.resetBlank()
+      const format = normalizeSketchFormatId(snapshot?.formatId)
+      setCanvasFormat(format)
+      if (snapshot?.layers?.length) await canvasRef.current?.restoreLayers({ ...snapshot, formatId: format })
+      else canvasRef.current?.resetBlank(format)
     } catch {
       canvasRef.current?.resetBlank()
     }
@@ -423,7 +430,9 @@ export default function App() {
     setIsGenerating(true)
     try {
       const results = await Promise.all(
-        Array.from({ length: variations }, () => generateStyledImage({ sketchDataUrl, style, instructions }))
+        Array.from({ length: variations }, () =>
+          generateStyledImage({ sketchDataUrl, style, instructions, formatId: canvasFormat })
+        )
       )
       const batchId = `batch-${Date.now()}`
       const createdAt = Date.now()
@@ -453,7 +462,7 @@ export default function App() {
     } finally {
       setIsGenerating(false)
     }
-  }, [allStyles, selectedStyleId, instructions, variations, refreshHistory])
+  }, [allStyles, selectedStyleId, instructions, variations, refreshHistory, canvasFormat])
 
   const handleDownload = useCallback(() => {
     if (!generatedImage) return
@@ -629,6 +638,11 @@ export default function App() {
           zoom={zoom}
           onZoomChange={setZoom}
           onImportFile={handleImportFile}
+          canvasFormat={canvasFormat}
+          onCanvasFormatChange={(id) => {
+            setCanvasFormat(id)
+            scheduleAutosave()
+          }}
         />
       )}
 
@@ -645,6 +659,7 @@ export default function App() {
               smoothing={smoothing}
               wobble={wobble}
               zoom={zoom}
+              formatId={canvasFormat}
               placing={placing}
               onPlaced={handlePlaced}
               onDropFile={handleImportFile}

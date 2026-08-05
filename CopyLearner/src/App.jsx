@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { BUILT_IN_CATEGORIES, CUSTOM_CATEGORY, DEFAULT_POSTS, accentOf, labelOf } from './data/defaultPosts.js'
-import { buildFeed, nextDue } from './utils/spacedRepetition.js'
+import { buildFeed, nextDue, pickFeedStartIndex } from './utils/spacedRepetition.js'
 import { extractTextFromFile, guessFileType } from './utils/fileParsing.js'
 import { generateLessonBatch, BATCH_SIZE, REFILL_THRESHOLD, MAX_TOTAL_LESSONS } from './utils/generateLessons.js'
 import { transformCopy } from './utils/transformCopy.js'
@@ -9,6 +9,8 @@ import {
   isCloudEnabled, getWorkspaceCode, setWorkspaceCode,
   subscribeState, saveState, subscribeSources, createSource, updateSource, deleteSource,
   subscribePosts, addPosts, subscribeTransforms, addTransform, deleteTransform,
+  getSessionSeenPostIds, markSessionSeenPost, clearSessionSeenForPosts,
+  getSessionLastStartPostId, setSessionLastStartPostId,
 } from './utils/storage.js'
 import TopBar from './components/TopBar.jsx'
 import PostCard from './components/PostCard.jsx'
@@ -127,6 +129,11 @@ export default function App() {
     if (remaining <= REFILL_THRESHOLD) generateNextBatch()
   }, [view, selectedCats, post, customPosts, generateNextBatch])
 
+  const feedRef = useRef(feed)
+  const progressRef = useRef(progress)
+  useEffect(() => { feedRef.current = feed }, [feed])
+  useEffect(() => { progressRef.current = progress }, [progress])
+
   const goPost = useCallback((delta) => {
     setPostIdx((i) => {
       const n = i + delta
@@ -139,10 +146,40 @@ export default function App() {
     setQuizPick(null)
   }, [feed.length])
 
-  useEffect(() => { setPostIdx(0); setSlideIdx(0); setRevealed({}); setQuizPick(null) }, [view])
+  const repositionToFeedStart = useCallback(() => {
+    const currentFeed = feedRef.current
+    const currentProgress = progressRef.current
+    if (!currentFeed.length || view === 'transform') return
+    const seen = getSessionSeenPostIds(workspaceCode)
+    const allShownThisSession = currentFeed.every((p) => seen.has(p.id))
+    if (allShownThisSession) clearSessionSeenForPosts(workspaceCode, currentFeed.map((p) => p.id))
+    const sessionSeen = getSessionSeenPostIds(workspaceCode)
+    const idx = pickFeedStartIndex(
+      currentFeed,
+      currentProgress,
+      sessionSeen,
+      getSessionLastStartPostId(workspaceCode),
+    )
+    const startPost = currentFeed[idx]
+    if (startPost) setSessionLastStartPostId(workspaceCode, startPost.id)
+    setPostIdx(idx)
+    setSlideIdx(0)
+    setRevealed({})
+    setQuizPick(null)
+  }, [view, workspaceCode])
+
   useEffect(() => {
-    if (postIdx >= feed.length && feed.length > 0) setPostIdx(0)
-  }, [feed.length, postIdx])
+    if (!ready) return
+    repositionToFeedStart()
+  }, [ready, view, workspaceCode, repositionToFeedStart])
+
+  useEffect(() => {
+    if (post?.id) markSessionSeenPost(workspaceCode, post.id)
+  }, [post?.id, workspaceCode])
+
+  useEffect(() => {
+    if (postIdx >= feed.length && feed.length > 0) repositionToFeedStart()
+  }, [feed.length, postIdx, repositionToFeedStart])
 
   const goSlide = (delta) => {
     if (!post) return

@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { SKETCH_FORMATS } from '../utils/canvasFormat'
 import './OptionsBar.css'
 
 const PRESET_COLORS = ['#1a1a1a', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#9c36b5', '#ffffff']
@@ -26,6 +27,8 @@ export default function OptionsBar({
   zoom,
   onZoomChange,
   onImportFile,
+  canvasFormat,
+  onCanvasFormatChange,
 }) {
   const fileInputRef = useRef(null)
   const showColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle'
@@ -113,6 +116,20 @@ export default function OptionsBar({
       )}
 
       <div className="options-bar-spacer" />
+
+      <div className="options-bar-group options-bar-format-group" role="group" aria-label="Canvas aspect ratio">
+        {SKETCH_FORMATS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            className={`options-bar-format-btn ${canvasFormat === f.id ? 'active' : ''}`}
+            onClick={() => onCanvasFormatChange?.(f.id)}
+            title={`Sketch format ${f.label}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       <div className="options-bar-group options-bar-zoom-group">
         <button type="button" className="options-bar-btn" onClick={() => onZoomChange(Math.max(0.5, Math.round((zoom - 0.25) * 100) / 100))} title="Zoom out">
