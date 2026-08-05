@@ -17,7 +17,7 @@ function TransitionOptions({ settings, onUpdateSettings, slide, onUpdateSlide, s
   const show = (name) => !section || section === name
   const panelRef = useRef(null)
   const [localSettings, setLocalSettings] = useState({
-    transitionStyle: settings?.transitionStyle || 'default',
+    transitionStyle: settings?.transitionStyle || 'crossfade',
     transitionSpeed: settings?.transitionSpeed ?? 1,
     canvasPushDirection: settings?.canvasPushDirection || 'left',
   })
@@ -29,7 +29,7 @@ function TransitionOptions({ settings, onUpdateSettings, slide, onUpdateSlide, s
 
   useEffect(() => {
     setLocalSettings({
-      transitionStyle: settings?.transitionStyle || 'default',
+      transitionStyle: settings?.transitionStyle || 'crossfade',
       transitionSpeed: settings?.transitionSpeed ?? 1,
       canvasPushDirection: settings?.canvasPushDirection || 'left',
     })

@@ -185,12 +185,12 @@ export function getTransitionStyleLabel(style = 'default') {
 }
 
 /** Per-slide transition style override; falls back to deck default. */
-export function resolveTransitionStyle(deckStyle = 'default', slide = null) {
+export function resolveTransitionStyle(deckStyle = 'crossfade', slide = null) {
   const slideStyle = slide?.transitionStyle
   if (typeof slideStyle === 'string' && slideStyle !== '' && VALID_TRANSITION_STYLES.has(slideStyle)) {
     return slideStyle
   }
-  return VALID_TRANSITION_STYLES.has(deckStyle) ? deckStyle : 'default'
+  return VALID_TRANSITION_STYLES.has(deckStyle) ? deckStyle : 'crossfade'
 }
 
 const VALID_CANVAS_PUSH_DIRECTIONS = new Set(['left', 'right', 'up', 'down'])

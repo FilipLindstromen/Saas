@@ -259,7 +259,11 @@ function App() {
       inlineBgColor: localStorage.getItem('inlineBgColor') || '#000000',
       inlineBgOpacity: parseFloat(localStorage.getItem('inlineBgOpacity')) || 0.7,
       inlineBgPadding: parseInt(localStorage.getItem('inlineBgPadding')) || 8,
-      transitionStyle: localStorage.getItem('transitionStyle') || 'default',
+      transitionStyle: (() => {
+        const saved = localStorage.getItem('transitionStyle')
+        if (!saved || saved === 'default') return 'crossfade'
+        return saved
+      })(),
       transitionSpeed: parseFloat(localStorage.getItem('transitionSpeed')) || 1,
       canvasPushDirection: localStorage.getItem('canvasPushDirection') || 'left',
       textAnimation: localStorage.getItem('textAnimation') || 'none',
@@ -633,7 +637,7 @@ function App() {
     localStorage.setItem('inlineBgColor', settings.inlineBgColor || '#000000')
     localStorage.setItem('inlineBgOpacity', settings.inlineBgOpacity?.toString() || '0.7')
     localStorage.setItem('inlineBgPadding', settings.inlineBgPadding?.toString() || '8')
-    localStorage.setItem('transitionStyle', settings.transitionStyle || 'default')
+    localStorage.setItem('transitionStyle', settings.transitionStyle || 'crossfade')
     localStorage.setItem('transitionSpeed', (settings.transitionSpeed ?? 1).toString())
     localStorage.setItem('canvasPushDirection', settings.canvasPushDirection || 'left')
     localStorage.setItem('textAnimation', settings.textAnimation || 'none')
@@ -2105,7 +2109,7 @@ function App() {
           inlineBgPadding={settings.inlineBgPadding}
           showMenu={true}
           initialSlideId={selectedSlideId}
-          transitionStyle={settings.transitionStyle || 'default'}
+          transitionStyle={settings.transitionStyle || 'crossfade'}
           transitionSpeed={settings.transitionSpeed ?? 1}
           canvasPushDirection={settings.canvasPushDirection || 'left'}
           lineHeight={settings.lineHeight ?? 1}
