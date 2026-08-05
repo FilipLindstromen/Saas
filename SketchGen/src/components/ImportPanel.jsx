@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { searchGiphyGifs } from '@shared/stockMedia/giphy'
 import { ICONS, iconToDataUrl } from '../constants/icons'
+import { EMOJIS, emojiToDataUrl } from '../constants/emojis'
 import './ImportPanel.css'
 
 export default function ImportPanel({ penColor, onStartPlacing, placing, onCancelPlacing }) {
   const [tab, setTab] = useState('icons')
   const [iconQuery, setIconQuery] = useState('')
+  const [emojiQuery, setEmojiQuery] = useState('')
   const [gifQuery, setGifQuery] = useState('')
   const [gifResults, setGifResults] = useState([])
   const [gifLoading, setGifLoading] = useState(false)
@@ -15,6 +17,12 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
   const filteredIcons = ICONS.filter((icon) =>
     !iconQuery.trim() || icon.name.toLowerCase().includes(iconQuery.trim().toLowerCase())
   )
+
+  const filteredEmojis = EMOJIS.filter((e) => {
+    const q = emojiQuery.trim().toLowerCase()
+    if (!q) return true
+    return e.name.toLowerCase().includes(q) || e.keywords.toLowerCase().includes(q)
+  })
 
   const handleGifSearch = async (e) => {
     e.preventDefault()
@@ -35,6 +43,14 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
       url: iconToDataUrl(icon, penColor, 128),
       maxDim: stampSize,
       label: icon.name,
+    })
+  }
+
+  const handlePickEmoji = (item) => {
+    onStartPlacing({
+      url: emojiToDataUrl(item.emoji, 128),
+      maxDim: stampSize,
+      label: item.name,
     })
   }
 
@@ -59,6 +75,7 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
         <>
           <div className="import-panel-tabs">
             <button type="button" className={tab === 'icons' ? 'active' : ''} onClick={() => setTab('icons')}>Icons</button>
+            <button type="button" className={tab === 'emojis' ? 'active' : ''} onClick={() => setTab('emojis')}>Emojis</button>
             <button type="button" className={tab === 'gifs' ? 'active' : ''} onClick={() => setTab('gifs')}>GIFs</button>
           </div>
 
@@ -99,6 +116,32 @@ export default function ImportPanel({ penColor, onStartPlacing, placing, onCance
                   </button>
                 ))}
                 {filteredIcons.length === 0 && <p className="import-empty">No icons match "{iconQuery}".</p>}
+              </div>
+            </>
+          )}
+
+          {tab === 'emojis' && (
+            <>
+              <input
+                type="text"
+                className="import-search-input"
+                placeholder="Search emojis… (e.g. brain)"
+                value={emojiQuery}
+                onChange={(e) => setEmojiQuery(e.target.value)}
+              />
+              <div className="import-grid import-grid-emojis">
+                {filteredEmojis.map((item) => (
+                  <button
+                    key={item.emoji}
+                    type="button"
+                    className="import-emoji-btn"
+                    title={item.name}
+                    onClick={() => handlePickEmoji(item)}
+                  >
+                    {item.emoji}
+                  </button>
+                ))}
+                {filteredEmojis.length === 0 && <p className="import-empty">No emojis match "{emojiQuery}".</p>}
               </div>
             </>
           )}

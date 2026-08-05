@@ -112,7 +112,8 @@
 }
 
 .import-grid-gifs {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
+  max-height: 420px;
 }
 
 .import-icon-btn {
@@ -133,6 +134,24 @@
   border-color: var(--border-strong);
 }
 
+.import-emoji-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  font-size: 1.3rem;
+  line-height: 1;
+  border-radius: var(--button-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+}
+
+.import-emoji-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
 .import-gif-btn {
   padding: 0;
   border-radius: var(--button-radius);
@@ -140,13 +159,15 @@
   overflow: hidden;
   cursor: pointer;
   background: var(--bg-tertiary);
-  aspect-ratio: 1;
+  /* Giphy previews are naturally tall/portrait — a square box crushed most of
+     each gif into an unrecognizable crop. Give it real vertical room instead. */
+  aspect-ratio: 3 / 4;
 }
 
 .import-gif-btn img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
