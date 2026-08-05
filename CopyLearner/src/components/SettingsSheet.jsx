@@ -91,12 +91,12 @@ export default function SettingsSheet({
               }}
             >
               <Upload size={20} color="#9B7FE0" style={{ marginBottom: 8 }} />
-              <div style={{ color: '#E4E4E7', fontSize: 13.5, fontWeight: 600 }}>Upload PDF, ZIP, or text file</div>
+              <div style={{ color: '#E4E4E7', fontSize: 13.5, fontWeight: 600 }}>Upload PDF, Word, ZIP, or text file</div>
               <div style={{ color: '#7A7A80', fontSize: 11.5, marginTop: 3 }}>or drop it here — tap to browse</div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.zip,.txt,.md"
+                accept=".pdf,.docx,.doc,.zip,.txt,.md"
                 multiple
                 onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
                 style={{ display: 'none' }}

@@ -12,6 +12,7 @@ const WORKSPACE_CODE_KEY = 'copylearner_workspace_code'
 const LOCAL_STATE_KEY = 'copylearner_state_local'
 const LOCAL_SOURCES_KEY = 'copylearner_sources_local'
 const LOCAL_POSTS_KEY = 'copylearner_posts_local'
+const LOCAL_TRANSFORMS_KEY = 'copylearner_transforms_local'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -56,7 +57,7 @@ export function setWorkspaceCode(code) {
    plain localStorage doesn't, so mimic that for the no-Firebase fallback
    (otherwise subscribers only ever see the value at mount time).
 --------------------------------------------------------- */
-const localListeners = { state: new Set(), sources: new Set(), posts: new Set() }
+const localListeners = { state: new Set(), sources: new Set(), posts: new Set(), transforms: new Set() }
 function notifyLocal(kind, data) {
   localListeners[kind].forEach((cb) => cb(data))
 }
@@ -291,4 +292,71 @@ export async function addPosts(sourceId, posts) {
     batch.set(ref, { category: 'mine', sourceId, createdAt: cloud.serverTimestamp(), ...p })
   })
   await batch.commit()
+}
+
+/* ---------------------------------------------------------
+   Transforms (Transform section: paste copy + instructions → rewrite)
+--------------------------------------------------------- */
+function readLocalTransforms() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_TRANSFORMS_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+function writeLocalTransforms(list) {
+  localStorage.setItem(LOCAL_TRANSFORMS_KEY, JSON.stringify(list))
+  notifyLocal('transforms', list)
+}
+
+export function subscribeTransforms(onChange) {
+  let cancelled = false
+  ;(async () => {
+    const cloud = await getCloud()
+    if (cancelled) return
+    if (!cloud) {
+      localListeners.transforms.add(onChange)
+      onChange(readLocalTransforms())
+      return
+    }
+    const code = getWorkspaceCode()
+    const q = cloud.query(cloud.collection(cloud.db, 'workspaces', code, 'transforms'), cloud.orderBy('createdAt', 'desc'))
+    const unsub = cloud.onSnapshot(q, (snap) => {
+      onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    }, () => onChange(readLocalTransforms()))
+    cancelled = unsub
+  })()
+  return () => {
+    if (typeof cancelled === 'function') cancelled()
+    localListeners.transforms.delete(onChange)
+    cancelled = true
+  }
+}
+
+export async function addTransform({ copy, instructions, output }) {
+  const cloud = await getCloud()
+  const base = { copy, instructions, output, createdAt: Date.now() }
+  if (!cloud) {
+    const id = `transform-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const list = readLocalTransforms()
+    list.unshift({ id, ...base })
+    writeLocalTransforms(list)
+    return id
+  }
+  const code = getWorkspaceCode()
+  const ref = await cloud.addDoc(cloud.collection(cloud.db, 'workspaces', code, 'transforms'), {
+    ...base,
+    createdAt: cloud.serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function deleteTransform(id) {
+  const cloud = await getCloud()
+  if (!cloud) {
+    writeLocalTransforms(readLocalTransforms().filter((t) => t.id !== id))
+    return
+  }
+  const code = getWorkspaceCode()
+  await cloud.deleteDoc(cloud.doc(cloud.db, 'workspaces', code, 'transforms', id))
 }

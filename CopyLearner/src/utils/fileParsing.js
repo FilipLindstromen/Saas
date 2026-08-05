@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -18,6 +19,11 @@ async function extractPdfText(arrayBuffer) {
   return pageTexts.join('\n\n')
 }
 
+async function extractDocxText(arrayBuffer) {
+  const { value } = await mammoth.extractRawText({ arrayBuffer })
+  return value
+}
+
 async function extractZipText(arrayBuffer) {
   const zip = await JSZip.loadAsync(arrayBuffer)
   const parts = []
@@ -32,6 +38,14 @@ async function extractZipText(arrayBuffer) {
       } catch {
         /* skip unreadable pdf inside zip */
       }
+    } else if (lower.endsWith('.docx')) {
+      const buf = await entry.async('arraybuffer')
+      try {
+        const text = await extractDocxText(buf)
+        if (text.trim()) parts.push(`# ${entry.name}\n${text}`)
+      } catch {
+        /* skip unreadable docx inside zip */
+      }
     } else if (TEXT_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
       const text = await entry.async('text')
       if (text.trim()) parts.push(`# ${entry.name}\n${text}`)
@@ -41,7 +55,7 @@ async function extractZipText(arrayBuffer) {
 }
 
 /**
- * Extract plain text from a File (pdf, zip, txt/md, or anything readable as text).
+ * Extract plain text from a File (pdf, docx, zip, txt/md, or anything readable as text).
  * @param {File} file
  * @returns {Promise<string>}
  */
@@ -50,6 +64,13 @@ export async function extractTextFromFile(file) {
   if (name.endsWith('.pdf')) {
     const buf = await file.arrayBuffer()
     return extractPdfText(buf)
+  }
+  if (name.endsWith('.docx')) {
+    const buf = await file.arrayBuffer()
+    return extractDocxText(buf)
+  }
+  if (name.endsWith('.doc')) {
+    throw new Error('Old .doc format isn\'t supported — save it as .docx (Word: File > Save As > Word Document) or paste the text instead.')
   }
   if (name.endsWith('.zip')) {
     const buf = await file.arrayBuffer()
@@ -61,6 +82,7 @@ export async function extractTextFromFile(file) {
 export function guessFileType(file) {
   const name = file.name.toLowerCase()
   if (name.endsWith('.pdf')) return 'pdf'
+  if (name.endsWith('.docx') || name.endsWith('.doc')) return 'docx'
   if (name.endsWith('.zip')) return 'zip'
   return 'text'
 }
