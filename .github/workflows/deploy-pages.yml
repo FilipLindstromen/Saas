@@ -165,6 +165,13 @@ jobs:
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/SketchGen/
           cp -r dist ../deploy/SketchGen
 
+      - name: Build CopyLearner
+        run: |
+          cd CopyLearner
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/CopyLearner/
+          cp -r dist ../deploy/CopyLearner
+
       - name: Build Native Ads Generator
         run: |
           cd NativeAdsGenerator
