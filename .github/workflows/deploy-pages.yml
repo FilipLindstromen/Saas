@@ -158,6 +158,13 @@ jobs:
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/InfoGraphics/
           cp -r dist ../deploy/InfoGraphics
 
+      - name: Build SketchGen
+        run: |
+          cd SketchGen
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/SketchGen/
+          cp -r dist ../deploy/SketchGen
+
       - name: Build Native Ads Generator
         run: |
           cd NativeAdsGenerator

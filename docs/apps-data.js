@@ -10,6 +10,7 @@ window.SAAS_APPS_CATALOG = [
       { name: 'Info Graphics', href: 'InfoGraphics/', icon: 'info-graphics.svg' },
       { name: 'Native Ads', href: 'NativeAdsGenerator/', icon: 'native-ads.svg' },
       { name: 'Mosaic Typography', href: 'MosaicTypography/', icon: 'typography.svg' },
+      { name: 'SketchGen', href: 'SketchGen/', icon: 'info-graphics.svg' },
     ],
   },
   {

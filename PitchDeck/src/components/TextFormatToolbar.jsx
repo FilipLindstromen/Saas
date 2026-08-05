@@ -6,7 +6,7 @@ const TEXT_COLOR_SWATCHES = [
   '#78716c', '#a8a29e', '#f87171', '#fb923c', '#facc15', '#4ade80', '#22d3ee', '#60a5fa', '#a78bfa', '#f472b6'
 ]
 
-function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, underlineActive = false, strikethroughActive = false, backgroundActive = false, headingActive = null, serifActive = false, textColorActive = null, onClose, onBold, onItalic, onUnderline, onStrikethrough, onBackground, onH1, onH2, onH3, onFontPairing, onTextColor, onClearFormatting }) {
+function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, underlineActive = false, strikethroughActive = false, backgroundActive = false, chipActive = false, markerActive = false, headingActive = null, serifActive = false, textColorActive = null, onClose, onBold, onItalic, onUnderline, onStrikethrough, onBackground, onEmphasisChip, onEmphasisMarker, onH1, onH2, onH3, onFontPairing, onTextColor, onClearFormatting }) {
   const toolbarRef = useRef(null)
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const colorInputRef = useRef(null)
@@ -93,6 +93,12 @@ function TextFormatToolbar({ x, y, boldActive = false, italicActive = false, und
           <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
         </svg>
       </button>
+      {onEmphasisChip && (
+        <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${chipActive ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onEmphasisChip(); }} title="Accent chip">Chip</button>
+      )}
+      {onEmphasisMarker && (
+        <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${markerActive ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onEmphasisMarker(); }} title="Marker highlight">Mark</button>
+      )}
       <div className="text-format-toolbar-divider" />
       <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h1' ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onH1(); }} title={headingActive === 'h1' ? 'Remove H1 (default)' : 'Heading 1'}>H1</button>
       <button type="button" className={`text-format-toolbar-btn text-format-toolbar-btn-text${headingActive === 'h2' ? ' text-format-toolbar-btn-active' : ''}`} onMouseDown={(e) => { e.preventDefault(); onH2(); }} title={headingActive === 'h2' ? 'Remove H2 (default)' : 'Heading 2'}>H2</button>

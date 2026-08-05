@@ -1,3 +1,5 @@
+import { isSmartAnimationActive, resolveSmartTextMotion } from './smartAnimation'
+
 /** Per-slide motion presets and resolved animation settings. */
 
 export const KEN_BURNS_DURATION_S = 10
@@ -112,20 +114,23 @@ export function resolveEffectiveMotionPresetId(_globalSettings = {}, slide = nul
   return 'default'
 }
 
-export function resolveMotionSettings(_globalSettings = {}, slide = null) {
+export function resolveMotionSettings(globalSettings = {}, slide = null) {
   const effectivePresetId = resolveEffectiveMotionPresetId({}, slide)
   const preset = getMotionPreset(effectivePresetId)
   const presetSettings = preset.id === 'default' ? {} : (preset.settings || {})
+  const smartMotion = isSmartAnimationActive(globalSettings, slide) ? resolveSmartTextMotion(slide) : null
 
   const pick = (slideKeys, presetKey, fallback) => {
     const slideValue = readSlideMotionValue(slide, Array.isArray(slideKeys) ? slideKeys : [slideKeys])
     if (slideValue !== undefined) return slideValue
     if (presetSettings[presetKey] !== undefined) return presetSettings[presetKey]
+    if (smartMotion && smartMotion[presetKey] !== undefined) return smartMotion[presetKey]
     return fallback
   }
 
   return {
     motionPreset: effectivePresetId,
+    textAnimationMode: slide?.textAnimationMode || globalSettings.textAnimationMode || 'manual',
     textAnimation: pick(['textAnimation', 'textAnimationOverride'], 'textAnimation', SLIDE_MOTION_DEFAULTS.textAnimation),
     textAnimationUnit: pick('textAnimationUnit', 'textAnimationUnit', SLIDE_MOTION_DEFAULTS.textAnimationUnit),
     textAnimationSpeed: pick('textAnimationSpeed', 'textAnimationSpeed', SLIDE_MOTION_DEFAULTS.textAnimationSpeed),
@@ -148,6 +153,7 @@ const TEXT_EXIT_MATCH_MAP = {
   'zoom-in': 'zoom-out',
   'bounce-in': 'fade-out',
   'words-fade-up': 'words-fade-down',
+  'words-kinetic': 'words-fade-down',
   'blur-in': 'blur-out',
   typewriter: 'fade-out',
 }

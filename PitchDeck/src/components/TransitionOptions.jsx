@@ -23,8 +23,8 @@ function TransitionOptions({ settings, onUpdateSettings, slide, onUpdateSlide, s
   })
 
   const slideMotion = useMemo(
-    () => (slide ? resolveMotionSettings({}, slide) : null),
-    [slide]
+    () => (slide ? resolveMotionSettings(settings || {}, slide) : null),
+    [slide, settings]
   )
 
   useEffect(() => {
@@ -203,6 +203,22 @@ function TransitionOptions({ settings, onUpdateSettings, slide, onUpdateSlide, s
           <div className="transition-options-section">
             <h3>Text in &amp; out animations</h3>
             <div className="transition-options-field">
+              <label htmlFor="slide-text-animation-mode">Animation mode</label>
+              <select
+                id="slide-text-animation-mode"
+                value={slide.textAnimationMode || 'inherit'}
+                onChange={(e) => handleSlideMotionChange('textAnimationMode', e.target.value === 'inherit' ? undefined : e.target.value)}
+                className="transition-options-select"
+              >
+                <option value="inherit">Use deck default ({settings?.textAnimationMode === 'smart' ? 'Smart' : 'Manual'})</option>
+                <option value="manual">Manual (settings below)</option>
+                <option value="smart">Smart (by word count &amp; layout)</option>
+              </select>
+            </div>
+            {(slide.textAnimationMode === 'smart' || (settings?.textAnimationMode === 'smart' && slide.textAnimationMode !== 'manual')) && (
+              <p className="transition-options-hint">Smart mode picks animation from slide content. Override text animation below to force a specific effect.</p>
+            )}
+            <div className="transition-options-field">
               <label htmlFor="text-animation-select">Text animation</label>
               <select
                 id="text-animation-select"
@@ -220,6 +236,7 @@ function TransitionOptions({ settings, onUpdateSettings, slide, onUpdateSlide, s
                 <option value="zoom-in">Zoom in</option>
                 <option value="bounce-in">Bounce in</option>
                 <option value="words-fade-up">Words: fade + slide up (sequence)</option>
+                <option value="words-kinetic">Words: kinetic (rise, rotate, blur)</option>
                 <option value="blur-in">Blur in</option>
               </select>
             </div>

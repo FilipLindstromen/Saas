@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog, Menu } = require('electron')
+const { app, BrowserWindow, shell, dialog, Menu, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
@@ -28,6 +28,51 @@ const MIME_TYPES = {
   '.wasm': 'application/wasm',
   '.map': 'application/json',
   '.ico': 'image/x-icon',
+}
+
+function sanitizeDrawingSegment(name) {
+  return String(name || 'untitled')
+    .trim()
+    .replace(/[^a-z0-9_-]/gi, '-')
+    .replace(/-+/g, '-')
+    .toLowerCase() || 'untitled'
+}
+
+function sanitizeSlideIdForFile(slideId) {
+  return String(slideId || 'slide').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120) || 'slide'
+}
+
+function electronDrawingFilePath(projectName, slideId) {
+  const root = path.join(
+    app.getPath('userData'),
+    'SaasProjects',
+    'pitchdeck',
+    sanitizeDrawingSegment(projectName),
+    'drawings'
+  )
+  return path.join(root, `${sanitizeSlideIdForFile(slideId)}.png`)
+}
+
+function registerDrawingIpc() {
+  ipcMain.handle('drawing:save', async (_event, { projectName, slideId, buffer }) => {
+    if (!buffer) return { ok: false }
+    const filePath = electronDrawingFilePath(projectName, slideId)
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
+    fs.writeFileSync(filePath, Buffer.from(buffer))
+    return { ok: true, path: filePath }
+  })
+
+  ipcMain.handle('drawing:load', async (_event, { projectName, slideId }) => {
+    const filePath = electronDrawingFilePath(projectName, slideId)
+    if (!fs.existsSync(filePath)) return null
+    return fs.readFileSync(filePath)
+  })
+
+  ipcMain.handle('drawing:delete', async (_event, { projectName, slideId }) => {
+    const filePath = electronDrawingFilePath(projectName, slideId)
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    return { ok: true }
+  })
 }
 
 function isDevelopment() {
@@ -211,6 +256,7 @@ function createWindow(loadUrl) {
 
 async function boot() {
   stripNativeMenu()
+  registerDrawingIpc()
   startFfmpegServer()
 
   if (isDevelopment()) {

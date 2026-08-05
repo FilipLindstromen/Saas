@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "serve", "-l", "4175", "C:\\Users\\Filip Lindström\\AppData\\Local\\Temp\\deploy-check"],
       "port": 4175
+    },
+    {
+      "name": "SketchGen",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "SketchGen", "run", "dev"],
+      "port": 5177
     }
   ]
 }

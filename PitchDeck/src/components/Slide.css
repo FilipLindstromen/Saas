@@ -1276,6 +1276,70 @@
   }
 }
 
+/* Kinetic word entrance: rise + slight rotate + blur */
+.slide.text-animation-words-kinetic .slide-text-words .text-animation-word,
+.slide.text-animation-words-kinetic .slide-text-centered-wrapper .slide-text-words .text-animation-word,
+.slide.text-animation-words-kinetic .slide-bullet .bullet-text .text-animation-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(28px) rotate(2deg);
+  filter: blur(6px);
+  animation: text-word-kinetic var(--text-animation-duration, 0.65s) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes text-word-kinetic {
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+    filter: blur(0);
+  }
+}
+
+.slide.text-animation-words-kinetic .slide-bullet.visible::before,
+.slide.preview-text-animation.text-animation-words-kinetic .slide-bullet.visible::before {
+  animation-name: text-word-kinetic;
+}
+
+/* Inline emphasis (animated with word stagger) */
+.text-emphasis-chip.text-animation-word,
+.slide-text .text-emphasis-chip,
+.slide-bullet .text-emphasis-chip {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 0.35em;
+  padding: 0.05em 0.28em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.text-emphasis-marker.text-animation-word,
+.slide-text .text-emphasis-marker,
+.slide-bullet .text-emphasis-marker {
+  background: linear-gradient(105deg, transparent 0%, transparent 40%, rgba(250, 204, 21, 0.55) 40%, rgba(250, 204, 21, 0.55) 100%);
+  background-size: 220% 100%;
+  background-position: 100% 0;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: text-marker-sweep 0.85s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: inherit;
+}
+
+@keyframes text-marker-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+
+.slide.text-archetype-statement .slide-text.centered,
+.slide.text-archetype-quote .slide-text.centered {
+  text-align: center;
+  max-width: var(--slide-text-max-width, 88%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.slide.text-archetype-stat .slide-text {
+  letter-spacing: -0.02em;
+}
+
 /* 1. Fade in */
 .slide.text-animation-fade-in .slide-content:not(:has(.text-animation-word)),
 .slide.text-animation-fade-in .slide-content-video:not(:has(.text-animation-word)),

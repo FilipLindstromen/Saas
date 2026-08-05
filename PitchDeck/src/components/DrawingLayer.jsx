@@ -5,10 +5,26 @@ import {
   DRAWING_BRUSH_MIN,
   normalizeDrawingPenColors,
 } from '../utils/drawingDefaults'
-import { clearDrawingBlob, loadDrawingBlob, saveDrawingPng } from '../utils/drawingStorage'
+import { clearDrawingBlob, loadDrawingBlob, saveDrawingPng, normalizeDrawingProjectName } from '../utils/drawingStorage'
 import './DrawingLayer.css'
 
 export const DRAWING_TOOLS = ['pen', 'eraser', 'fill', 'blend']
+
+/** 0–1; mouse/touch use 1 so size matches the slider unless a pen reports pressure. */
+function pointerPressure(e) {
+  if (e.pointerType === 'mouse' || e.pointerType === 'touch') return 1
+  const raw = typeof e.pressure === 'number' ? e.pressure : 0.5
+  if (raw <= 0) return 0.08
+  return Math.min(1, Math.max(0, raw))
+}
+
+function brushSizeForPressure(baseSize, pressure, activeTool) {
+  if (activeTool !== 'pen' && activeTool !== 'eraser') return baseSize
+  const minRatio = 0.12
+  const ratio = minRatio + pressure * (1 - minRatio)
+  const size = baseSize * ratio
+  return Math.max(DRAWING_BRUSH_MIN, Math.min(DRAWING_BRUSH_MAX, size))
+}
 
 function hexToRgba(hex) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
@@ -106,34 +122,47 @@ const DrawingLayer = forwardRef(function DrawingLayer(
   const lastPointRef = useRef(null)
   const saveTimerRef = useRef(null)
   const loadGenRef = useRef(0)
+  const flushSaveRef = useRef(null)
+
+  const flushSaveNow = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    if (!slideId) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return
+    const proj = normalizeDrawingProjectName(projectName)
+    const ctx = canvas.getContext('2d')
+    const sample = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    let hasInk = false
+    for (let i = 3; i < sample.length; i += 4) {
+      if (sample[i] > 0) {
+        hasInk = true
+        break
+      }
+    }
+    if (!hasInk) {
+      await clearDrawingBlob(proj, slideId)
+      onDrawingPersist?.(slideId, null)
+      return
+    }
+    const result = await saveDrawingPng(proj, slideId, blob)
+    onDrawingPersist?.(slideId, result.path || 'cached')
+  }, [slideId, projectName, onDrawingPersist])
+
+  flushSaveRef.current = flushSaveNow
 
   const scheduleSave = useCallback(() => {
     if (!slideId) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(async () => {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-      if (!blob) return
-      const proj = (projectName || '').trim() || 'Untitled Project'
-      const ctx = canvas.getContext('2d')
-      const sample = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-      let hasInk = false
-      for (let i = 3; i < sample.length; i += 4) {
-        if (sample[i] > 0) {
-          hasInk = true
-          break
-        }
-      }
-      if (!hasInk) {
-        await clearDrawingBlob(proj, slideId)
-        onDrawingPersist?.(slideId, null)
-        return
-      }
-      const result = await saveDrawingPng(proj, slideId, blob)
-      onDrawingPersist?.(slideId, result.path || 'cached')
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null
+      flushSaveRef.current?.()
     }, 400)
-  }, [slideId, projectName, onDrawingPersist])
+  }, [slideId])
 
   useImperativeHandle(ref, () => ({
     clear() {
@@ -143,11 +172,32 @@ const DrawingLayer = forwardRef(function DrawingLayer(
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       scheduleSave()
     },
+    flushSave() {
+      return flushSaveRef.current?.()
+    },
   }))
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      flushSaveRef.current?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    const onPageHide = () => {
+      flushSaveRef.current?.()
+    }
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flushSaveRef.current?.()
+    }
+    window.addEventListener('pagehide', onPageHide)
+    window.addEventListener('beforeunload', onPageHide)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('pagehide', onPageHide)
+      window.removeEventListener('beforeunload', onPageHide)
+      document.removeEventListener('visibilitychange', onHidden)
     }
   }, [])
 
@@ -161,7 +211,7 @@ const DrawingLayer = forwardRef(function DrawingLayer(
     ctx.clearRect(0, 0, width, height)
 
     if (!slideId) return
-    const proj = (projectName || '').trim() || 'Untitled Project'
+    const proj = normalizeDrawingProjectName(projectName)
     loadDrawingBlob(proj, slideId).then((blob) => {
       if (gen !== loadGenRef.current || !blob) return
       const img = new Image()
@@ -181,18 +231,21 @@ const DrawingLayer = forwardRef(function DrawingLayer(
     const rect = canvas.getBoundingClientRect()
     const scaleX = canvas.width / rect.width
     const scaleY = canvas.height / rect.height
+    const pressure = pointerPressure(e)
     return {
       x: (e.clientX - rect.left) * scaleX,
       y: (e.clientY - rect.top) * scaleY,
+      pressure,
     }
   }
 
-  const strokeTo = (from, to) => {
+  const strokeTo = (from, to, lineWidth) => {
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx || !from || !to) return
+    const width = lineWidth ?? brushSize
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    ctx.lineWidth = brushSize
+    ctx.lineWidth = width
     if (tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out'
       ctx.strokeStyle = 'rgba(0,0,0,1)'
@@ -227,12 +280,14 @@ const DrawingLayer = forwardRef(function DrawingLayer(
       return
     }
     if (tool === 'blend') {
-      applyBlendAt(ctx, p.x, p.y, brushSize * 2)
+      const r = brushSizeForPressure(brushSize * 2, p.pressure, 'pen')
+      applyBlendAt(ctx, p.x, p.y, r)
       scheduleSave()
     }
     if (tool === 'pen' || tool === 'eraser') {
+      const w = brushSizeForPressure(brushSize, p.pressure, tool)
       ctx.lineCap = 'round'
-      ctx.lineWidth = brushSize
+      ctx.lineWidth = w
       if (tool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out'
         ctx.fillStyle = 'rgba(0,0,0,1)'
@@ -241,7 +296,7 @@ const DrawingLayer = forwardRef(function DrawingLayer(
         ctx.fillStyle = color
       }
       ctx.beginPath()
-      ctx.arc(p.x, p.y, brushSize / 2, 0, Math.PI * 2)
+      ctx.arc(p.x, p.y, w / 2, 0, Math.PI * 2)
       ctx.fill()
       ctx.globalCompositeOperation = 'source-over'
     }
@@ -254,10 +309,15 @@ const DrawingLayer = forwardRef(function DrawingLayer(
     if (!p) return
     const last = lastPointRef.current
     if (tool === 'pen' || tool === 'eraser') {
-      strokeTo(last, p)
+      const wFrom = brushSizeForPressure(brushSize, last?.pressure ?? p.pressure, tool)
+      const wTo = brushSizeForPressure(brushSize, p.pressure, tool)
+      strokeTo(last, p, (wFrom + wTo) / 2)
     } else if (tool === 'blend') {
       const ctx = canvasRef.current?.getContext('2d')
-      if (ctx) applyBlendAt(ctx, p.x, p.y, brushSize * 2)
+      if (ctx) {
+        const r = brushSizeForPressure(brushSize * 2, p.pressure, 'pen')
+        applyBlendAt(ctx, p.x, p.y, r)
+      }
     }
     lastPointRef.current = p
   }
@@ -343,7 +403,7 @@ export function DrawingToolbar({
             value={brushSize}
             onChange={(e) => onBrushSizeChange(Number(e.target.value))}
             className="drawing-layer__brush"
-            title="Brush size"
+            title="Brush size (max for pen pressure)"
           />
           <div className="drawing-layer__colors">
             {colors.map((c) => (

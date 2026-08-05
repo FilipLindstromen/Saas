@@ -1,0 +1,7 @@
+node_modules
+dist
+release
+release-staging
+.electron-builder-output
+.env
+*.local

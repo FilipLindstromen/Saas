@@ -15,6 +15,8 @@ import {
 import { prepareBulletLayoutContent } from '../utils/bulletStyles'
 import { getBulletPointsFromSlide, decodeBasicHtmlEntities, fixDoubleEncodedEntities } from '../utils/slidePlainText'
 import { resolveMotionSettings } from '../utils/motionPresets'
+import { resolveEffectiveH1Rem } from '../utils/autoFitHeadline'
+import { resolveTextArchetypeId } from '../utils/textArchetypes'
 import { getWebcamCircleSizeStyle, usesWebcamSizeSlider } from '../utils/webcamSize'
 import { startWebcamStream } from '../utils/webcamStream'
 import { getSlideFormatMeta } from '../utils/slideFormats'
@@ -109,7 +111,7 @@ function WebcamVideo({ cameraId, layout, isPlayMode, webcamSize = 20, videoBrigh
   )
 }
 
-function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, suppressTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide }) {
+function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', fontFamily = 'Inter', defaultTextSize = 4, h1Size = 10, h2Size = 3.5, h3Size = 2.5, h1FontFamily = '', h2FontFamily = '', h3FontFamily = '', defaultFontWeight = 700, h1Weight = 700, h2Weight = 700, h3Weight = 700, h1LineHeight = 1.2, h2LineHeight = 1.2, h3LineHeight = 1.2, isPlayMode = false, visibleBulletIndex = null, visibleLineIndex = null, textDropShadow = false, shadowBlur = 4, shadowOffsetX = 2, shadowOffsetY = 2, shadowColor = '#000000', textOutline = false, outlineWidth = 2, outlineColor = '#000000', textInlineBackground = false, inlineBgColor = '#000000', inlineBgOpacity = 0.7, inlineBgPadding = 8, lineHeight = 1, bulletLineHeight = 1, bulletTextSize = 3, bulletGap = 0, bulletStyle = 'dot', contentBottomOffset = 12, contentEdgeOffset = 9, contentVerticalAlign = 'bottom', showBullets = true, onUpdate, webcamEnabled = false, selectedCameraId = '', webcamSize = 20, webcamFlipHorizontal = false, webcamFlipVertical = false, videoBrightness = 1, videoContrast = 1, videoSaturation = 1, videoShadows = 1, videoMidtones = 1, videoHighlights = 1, videoShadowHue = 0, videoMidHue = 0, videoHighlightHue = 0, motionPreset = 'custom', textStyleMode = 'standard', fontPairingSerifFont = 'Playfair Display', textAnimation = 'none', textAnimationUnit = 'word', textAnimationSpeed = 1, textAnimationStagger = 0.07, textExitAnimation = 'match-in', subtitleDelay = 0, backgroundKenBurnsDirection = 'zoom-in', backgroundBlurOnTextEnter = false, graphicAnimationIn = 'fade-scale', kenBurns = false, previewTextAnimation = false, suppressTextAnimation = false, slideFormat = '16:9', cameraOverrideEnabled = false, cameraOverridePosition = 'fullscreen', isPreload = false, hideBackground = false, hideGradient = false, selectedGraphicId = null, onSelectGraphic, onDeselectGraphic, selectedSubSlideId = null, onSelectSubSlide, onDeselectSubSlide, deckTextAnimationMode = 'manual', motionPreviewInEdit = false }) {
   if (!slide) return null
 
   // Refs to track if contentEditable elements are being edited
@@ -134,7 +136,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const [backgroundVideoSrc, setBackgroundVideoSrc] = useState(null)
 
   const layout = slide.layout === 'title' ? 'centered' : (slide.layout || 'default')
-  const isEditable = !isPlayMode && !!onUpdate
+  const motionPreviewActive = motionPreviewInEdit && previewTextAnimation
+  const isEditable = !isPlayMode && !!onUpdate && !motionPreviewActive
   const supportsTextWidthConstraint = layout !== 'section'
   const supportsTextWidthResize = isEditable && supportsTextWidthConstraint
   const gradientStrength = slide.gradientStrength !== undefined ? slide.gradientStrength : 0.7
@@ -144,9 +147,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const imagePositionX = slide.imagePositionX !== undefined ? slide.imagePositionX : 50
   const imagePositionY = slide.imagePositionY !== undefined ? slide.imagePositionY : 50
 
-  const motion = useMemo(() => resolveMotionSettings({}, slide), [slide])
+  const motion = useMemo(
+    () => resolveMotionSettings({ textAnimationMode: deckTextAnimationMode }, slide),
+    [slide, deckTextAnimationMode]
+  )
 
-  const inPlayOrPreview = (isPlayMode || (previewTextAnimation && !onUpdate))
+  const inPlayOrPreview = isPlayMode || previewTextAnimation
   const hasTextAnimation = inPlayOrPreview && motion.textAnimation && motion.textAnimation !== 'none'
   const shouldRunTextEntrance = hasTextAnimation && !suppressTextAnimation
 
@@ -373,7 +379,9 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
           if (!text) return
           const serif = !!(node.parentElement?.closest?.('.font-pairing-serif'))
-          text.split(' ').filter(Boolean).forEach((word) => result.push({ word, serif, blockTag }))
+          const emphasisChip = !!(node.parentElement?.closest?.('.text-emphasis-chip'))
+          const emphasisMarker = !!(node.parentElement?.closest?.('.text-emphasis-marker'))
+          text.split(' ').filter(Boolean).forEach((word) => result.push({ word, serif, emphasisChip, emphasisMarker, blockTag }))
           return
         }
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -436,11 +444,19 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     let chunkIndex = offset
     const flush = () => {
       if (group.length === 0) return
-      const content = group.map((item, j) => (
-        <span key={nodes.length + j} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${(chunkIndex - group.length + j) * chunkDelay}s` }}>
+      const content = group.map((item, j) => {
+        const wordClasses = [
+          'text-animation-word',
+          item.serif ? 'font-pairing-serif' : '',
+          item.emphasisChip ? 'text-emphasis-chip' : '',
+          item.emphasisMarker ? 'text-emphasis-marker' : '',
+        ].filter(Boolean).join(' ')
+        return (
+        <span key={nodes.length + j} className={wordClasses} style={{ animationDelay: `${(chunkIndex - group.length + j) * chunkDelay}s` }}>
           {item.word != null ? item.word + ' ' : item.text}
         </span>
-      ))
+        )
+      })
       if (currentTag === 'h1' || currentTag === 'h2' || currentTag === 'h3') {
         nodes.push(React.createElement(currentTag, { key: `block-${nodes.length}` }, content))
       } else {
@@ -684,6 +700,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       const underlineActive = document.queryCommandState('underline')
       const strikethroughActive = document.queryCommandState('strikeThrough')
       const backgroundActive = !!(startEl?.closest?.('mark'))
+      const chipActive = !!(startEl?.closest?.('.text-emphasis-chip'))
+      const markerActive = !!(startEl?.closest?.('.text-emphasis-marker'))
       // Explicit text color: walk up from selection start and use first inline style.color
       let textColorActive = null
       let colorEl = startEl
@@ -719,6 +737,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
         underlineActive,
         strikethroughActive,
         backgroundActive,
+        chipActive,
+        markerActive,
         headingActive,
         textColorActive
       })
@@ -821,6 +841,45 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     syncContentFromTarget(state.target)
     closeTextFormatToolbar()
   }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar, textInlineBackground, inlineBgColor, inlineBgOpacity, inlineBgPadding])
+
+  const toggleEmphasisSpan = useCallback((className) => {
+    const state = textFormatToolbar
+    if (!state?.target) return
+    const range = textFormatRangeRef.current
+    if (!range) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    try {
+      const container = range.commonAncestorContainer
+      const startEl = container.nodeType === Node.TEXT_NODE ? container.parentElement : container
+      const existing = startEl?.closest?.(`.${className}`)
+      if (existing?.classList?.contains(className)) {
+        const parent = existing.parentNode
+        if (parent) {
+          while (existing.firstChild) parent.insertBefore(existing.firstChild, existing)
+          if (existing.parentNode === parent) parent.removeChild(existing)
+        }
+      } else {
+        const span = document.createElement('span')
+        span.className = className
+        try {
+          range.surroundContents(span)
+        } catch (e) {
+          const fragment = range.extractContents()
+          span.appendChild(fragment)
+          range.insertNode(span)
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    syncContentFromTarget(state.target)
+    closeTextFormatToolbar()
+  }, [textFormatToolbar, syncContentFromTarget, closeTextFormatToolbar])
+
+  const applyEmphasisChip = useCallback(() => toggleEmphasisSpan('text-emphasis-chip'), [toggleEmphasisSpan])
+  const applyEmphasisMarker = useCallback(() => toggleEmphasisSpan('text-emphasis-marker'), [toggleEmphasisSpan])
   const getBlockElement = useCallback((range, container) => {
     if (!container) return null
     let node = range.startContainer
@@ -1280,7 +1339,12 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
                     item.lineBreak ? (
                       <br key={wi} />
                     ) : (
-                      <span key={wi} className={`text-animation-word ${item.serif ? 'font-pairing-serif' : ''}`} style={{ animationDelay: `${getBulletWordDelay(index, wi)}s` }}>
+                      <span key={wi} className={[
+                        'text-animation-word',
+                        item.serif ? 'font-pairing-serif' : '',
+                        item.emphasisChip ? 'text-emphasis-chip' : '',
+                        item.emphasisMarker ? 'text-emphasis-marker' : '',
+                      ].filter(Boolean).join(' ')} style={{ animationDelay: `${getBulletWordDelay(index, wi)}s` }}>
                         {item.word != null ? item.word + ' ' : item.text}
                       </span>
                     )
@@ -1411,20 +1475,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
     // Animated present / explicit animation replay only — edit mode always uses contentEditable below
     if ((isPlayMode || previewTextAnimation) && !isEditable) {
-      if (useChunkedText) {
-        const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
-        const textContent = (
-          <div
-            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
-            style={textStyle}
-          >
-            {renderChunksWithHeadings(chunks, chunkDelay)}
-          </div>
-        )
-        return layout === 'centered' ? (
-          <div key={slide.id} className="slide-text-centered-wrapper">{textContent}</div>
-        ) : textContent
-      }
       if (visibleLineIndex !== null) {
         const lines = getContentLines(slide.content || '')
         return (
@@ -1442,6 +1492,20 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
             ))}
           </div>
         )
+      }
+      if (useChunkedText) {
+        const chunks = getChunksWithFormatting(slide.content || '', effectiveTextAnimationUnit)
+        const textContent = (
+          <div
+            className={`slide-text slide-text-words ${layout === 'centered' ? 'centered' : ''} ${layout === 'right' ? 'right' : ''} ${layout === 'left-video' ? 'left-video' : ''} ${layout === 'right-video' ? 'right-video' : ''} ${textHeadingLevel ? `text-heading-${textHeadingLevel}` : ''} ${dynamicClass}`}
+            style={textStyle}
+          >
+            {renderChunksWithHeadings(chunks, chunkDelay)}
+          </div>
+        )
+        return layout === 'centered' ? (
+          <div key={slide.id} className="slide-text-centered-wrapper">{textContent}</div>
+        ) : textContent
       }
       return (
         <div
@@ -1587,10 +1651,11 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   // Typography scales with slide width; present mode uses export-canvas density to match edit preview
   useEffect(() => {
+    const effectiveH1 = resolveEffectiveH1Rem(slide, h1Size)
     const typographySizes = {
       defaultTextSize,
       bulletTextSize,
-      h1Size,
+      h1Size: effectiveH1,
       h2Size,
       h3Size,
     }
@@ -1630,7 +1695,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
       window.removeEventListener('resize', handleResize)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
-  }, [defaultTextSize, bulletTextSize, h1Size, h2Size, h3Size])
+  }, [defaultTextSize, bulletTextSize, h1Size, h2Size, h3Size, slide.content, slide.textHeadingLevel, slide.autoFitHeadline, slide.textArchetype])
 
   const handleImageMouseDown = (e) => {
     if (!onUpdate || isPlayMode || (!slide.imageUrl && !slide.backgroundVideoUrl && !slide.infographicProjectId)) return
@@ -1702,6 +1767,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
     }
   }, [isDragging, handleImageMouseMove, handleImageMouseUp])
 
+  const textArchetypeClass = resolveTextArchetypeId(slide) !== 'custom' ? `text-archetype-${resolveTextArchetypeId(slide)}` : ''
   const textAnimationClass = hasTextAnimation ? `text-animation-${motion.textAnimation}` : ''
   const textEntrancePendingClass = hasTextAnimation && suppressTextAnimation ? 'text-entrance-pending' : ''
   const bgBlurClass = (isPlayMode || previewTextAnimation) && motion.backgroundBlurOnTextEnter ? 'bg-blur-on-text-enter' : ''
@@ -1766,7 +1832,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   return (
     <div 
-      className={`slide ${formatClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${revealBulletsProgressively ? 'bullets-progressive-reveal' : ''} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
+      className={`slide ${formatClass} ${textArchetypeClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${revealBulletsProgressively ? 'bullets-progressive-reveal' : ''} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onPointerDown={handleSlidePointerDown}
@@ -2130,6 +2196,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           underlineActive={textFormatToolbar.underlineActive}
           strikethroughActive={textFormatToolbar.strikethroughActive}
           backgroundActive={textFormatToolbar.backgroundActive}
+          chipActive={textFormatToolbar.chipActive}
+          markerActive={textFormatToolbar.markerActive}
           headingActive={textFormatToolbar.headingActive}
           serifActive={textFormatToolbar.serifActive}
           textColorActive={textFormatToolbar.textColorActive ?? null}
@@ -2139,6 +2207,8 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
           onUnderline={applyUnderline}
           onStrikethrough={applyStrikethrough}
           onBackground={applyBackground}
+          onEmphasisChip={applyEmphasisChip}
+          onEmphasisMarker={applyEmphasisMarker}
           onH1={() => applyHeading('h1')}
           onH2={() => applyHeading('h2')}
           onH3={() => applyHeading('h3')}

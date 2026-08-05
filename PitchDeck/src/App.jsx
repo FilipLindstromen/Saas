@@ -90,7 +90,8 @@ function App() {
             textHeadingLevel: slide.textHeadingLevel || null,
             subtitleHeadingLevel: slide.subtitleHeadingLevel || null,
             graphicOverlays: Array.isArray(slide.graphicOverlays) ? slide.graphicOverlays : [],
-            subSlides: Array.isArray(slide.subSlides) ? slide.subSlides : []
+            subSlides: Array.isArray(slide.subSlides) ? slide.subSlides : [],
+            drawingLayer: slide.drawingLayer ?? undefined,
           }))
           return {
             slides: slidesWithLayout,
@@ -285,6 +286,8 @@ function App() {
       contentBottomOffset: parseFloat(localStorage.getItem('contentBottomOffset')) || 12,
       contentEdgeOffset: parseFloat(localStorage.getItem('contentEdgeOffset')) || 9,
       contentVerticalAlign: localStorage.getItem('contentVerticalAlign') || 'bottom',
+      textAnimationMode: localStorage.getItem('textAnimationMode') || 'manual',
+      editMotionPreview: localStorage.getItem('editMotionPreview') !== 'false',
       defaultFontWeight: parseInt(localStorage.getItem('defaultFontWeight'), 10) || 700,
       h1Weight: parseInt(localStorage.getItem('h1Weight'), 10) || 700,
       h2Weight: parseInt(localStorage.getItem('h2Weight'), 10) || 700,
@@ -654,6 +657,8 @@ function App() {
     if (settings.contentBottomOffset !== undefined) localStorage.setItem('contentBottomOffset', settings.contentBottomOffset.toString())
     if (settings.contentEdgeOffset !== undefined) localStorage.setItem('contentEdgeOffset', settings.contentEdgeOffset.toString())
     localStorage.setItem('contentVerticalAlign', settings.contentVerticalAlign || 'bottom')
+    localStorage.setItem('textAnimationMode', settings.textAnimationMode || 'manual')
+    localStorage.setItem('editMotionPreview', settings.editMotionPreview !== false ? 'true' : 'false')
     localStorage.setItem('showBullets', settings.showBullets !== false ? 'true' : 'false')
     try {
       localStorage.setItem(
@@ -1508,6 +1513,29 @@ function App() {
     })
   }, [resetHistory, settings, recordSettings])
 
+  // On mount: restore workspace snapshot (chapters + project name) so reload matches last session
+  useEffect(() => {
+    const workspaceId = localStorage.getItem('pitchDeckCurrentWorkspace') || 'default'
+    const raw = localStorage.getItem(`pitchDeckWorkspace_${workspaceId}`)
+    if (!raw) return
+    try {
+      const data = JSON.parse(raw)
+      if (!data.chapters?.length) return
+      setChapters(data.chapters)
+      const chapterId = data.currentChapterId || data.chapters[0]?.id || 1
+      setCurrentChapterId(chapterId)
+      const chapter = data.chapters.find((c) => c.id === chapterId) ?? data.chapters[0]
+      const chapterSlides = chapter?.slides ?? []
+      setSlides(chapterSlides)
+      const firstSlide = chapterSlides.find((s) => s.layout !== 'section') || chapterSlides[0]
+      if (firstSlide) setSelectedSlideId(firstSlide.id)
+      if (data.projectName) setProjectName(data.projectName)
+    } catch (e) {
+      console.warn('Failed to restore workspace on load:', e)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // On mount: if connected folder has project newer than browser, load from folder
   useEffect(() => {
     let cancelled = false
@@ -2095,6 +2123,7 @@ function App() {
           contentEdgeOffset={settings.contentEdgeOffset ?? 9}
           contentVerticalAlign={settings.contentVerticalAlign ?? 'bottom'}
           showBullets={settings.showBullets !== false}
+          textAnimationMode={settings.textAnimationMode || 'manual'}
           defaultFontWeight={settings.defaultFontWeight ?? 700}
           h1Weight={settings.h1Weight ?? 700}
           h2Weight={settings.h2Weight ?? 700}

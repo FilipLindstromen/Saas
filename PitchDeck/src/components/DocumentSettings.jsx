@@ -5,6 +5,8 @@ function DocumentSettings({
   contentEdgeOffset = 9,
   contentBottomOffset = 12,
   contentVerticalAlign = 'bottom',
+  textAnimationMode = 'manual',
+  editMotionPreview = true,
   onUpdateSettings,
 }) {
   if (!onUpdateSettings) return null
@@ -80,6 +82,33 @@ function DocumentSettings({
           />
         </div>
         <p className="slide-settings-hint">Applies to all slides in edit, present, and export.</p>
+      </div>
+
+      <div className="slide-settings-section">
+        <h4 className="slide-settings-section-title">Text motion (deck)</h4>
+        <div className="slide-settings-field">
+          <label htmlFor="deck-text-animation-mode">Default animation mode</label>
+          <select
+            id="deck-text-animation-mode"
+            className="slide-settings-select"
+            value={textAnimationMode || 'manual'}
+            onChange={(e) => onUpdateSettings({ textAnimationMode: e.target.value })}
+          >
+            <option value="manual">Manual (per-slide animation)</option>
+            <option value="smart">Smart (content-aware picks)</option>
+          </select>
+        </div>
+        <div className="slide-settings-field">
+          <label className="slide-settings-checkbox">
+            <input
+              type="checkbox"
+              checked={editMotionPreview !== false}
+              onChange={(e) => onUpdateSettings({ editMotionPreview: e.target.checked })}
+            />
+            <span>Live motion preview in editor</span>
+          </label>
+          <p className="slide-settings-hint">Shows entrance animations on the canvas (turn off to edit text without animation).</p>
+        </div>
       </div>
     </div>
   )

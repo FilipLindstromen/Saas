@@ -1,0 +1,90 @@
+.prompt-bar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.prompt-bar-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.prompt-bar-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.prompt-bar-input::placeholder {
+  color: var(--text-quaternary);
+}
+
+.prompt-bar-variations {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.prompt-bar-variations-options {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  padding: 0.2rem;
+}
+
+.prompt-bar-variations-options button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: calc(var(--button-radius) - 4px);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prompt-bar-variations-options button.active {
+  background: var(--accent-gradient);
+  color: #ffffff;
+}
+
+.prompt-bar-error {
+  font-size: 0.8rem;
+  color: var(--accent-secondary);
+}
+
+.prompt-bar-generate {
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: var(--button-radius);
+  background: var(--accent-gradient);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.prompt-bar-generate:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.prompt-bar-generate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

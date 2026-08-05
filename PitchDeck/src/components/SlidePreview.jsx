@@ -55,10 +55,19 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
     return 1
   })
   const [previewAnimKey, setPreviewAnimKey] = useState(0)
-  const resolvedMotion = resolveMotionSettings({}, slide)
+  const [motionPreviewOn, setMotionPreviewOn] = useState(() => settings?.editMotionPreview !== false)
+  const resolvedMotion = resolveMotionSettings(
+    { textAnimationMode: settings?.textAnimationMode || 'manual' },
+    slide
+  )
   const previewAnimationConfigured = !!(
     resolvedMotion.textAnimation && resolvedMotion.textAnimation !== 'none'
   )
+  const liveMotionPreview = motionPreviewOn && previewAnimationConfigured && settings?.editMotionPreview !== false
+
+  useEffect(() => {
+    setMotionPreviewOn(settings?.editMotionPreview !== false)
+  }, [settings?.editMotionPreview, slide?.id])
   const fileInputRef = useRef(null)
   const drawingLayerRef = useRef(null)
   const penColors = normalizeDrawingPenColors(drawingPenColors ?? settings?.drawingPenColors)
@@ -354,6 +363,15 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             </div>
           )}
           {previewAnimationConfigured && (
+            <>
+            <button
+              type="button"
+              className={`preview-toolbar-group-btn${liveMotionPreview ? ' preview-toolbar-group-btn--active' : ''}`}
+              onClick={() => setMotionPreviewOn((v) => !v)}
+              title="Toggle live text motion in preview"
+            >
+              Live motion
+            </button>
             <button
               type="button"
               className="preview-toolbar-group-btn"
@@ -362,6 +380,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             >
               Replay animation
             </button>
+            </>
           )}
           {(slide.layout || 'default') !== 'section' && (
             <div className="preview-header-graphic-btns" ref={overlayMenuRef}>
@@ -463,7 +482,7 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             transformOrigin: 'center center'
           }}
         >
-          <div className={`preview-slide-wrap preview-format-${(slideFormat || '16:9').replace(':', '-')}${safeRecordSettings.captionsEnabled ? ' has-caption-preview' : ''}${selectedGraphicId ? ' has-selected-graphic' : ''}${selectedSubSlideId ? ' has-selected-subslide' : ''}`}>
+          <div className={`preview-slide-wrap preview-format-${(slideFormat || '16:9').replace(':', '-')}${safeRecordSettings.captionsEnabled ? ' has-caption-preview' : ''}${selectedGraphicId ? ' has-selected-graphic' : ''}${selectedSubSlideId ? ' has-selected-subslide' : ''}${drawingEnabled ? ' preview-slide-wrap--drawing' : ''}`}>
           <Slide 
             key={`${slide.id}-${previewAnimKey}`}
             slide={slide} 
@@ -525,7 +544,9 @@ function SlidePreview({ slide, onUpdate, selectedGraphicId, onSelectGraphic, onD
             textStyleMode={settings.textStyleMode || 'standard'}
             fontPairingSerifFont={settings.fontPairingSerifFont || 'Playfair Display'}
             slideFormat={slideFormat}
-            previewTextAnimation={false}
+            previewTextAnimation={liveMotionPreview}
+            motionPreviewInEdit={liveMotionPreview}
+            deckTextAnimationMode={settings?.textAnimationMode || 'manual'}
             selectedGraphicId={selectedGraphicId}
             onSelectGraphic={onSelectGraphic}
             onDeselectGraphic={onDeselectGraphic}

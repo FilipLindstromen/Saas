@@ -1,5 +1,7 @@
 import './SlideSettings.css'
 import { MOTION_PRESET_OPTIONS, applyMotionPresetToSlide } from '../utils/motionPresets'
+import { TEXT_ARCHETYPE_OPTIONS, applyTextArchetypeToSlide } from '../utils/textArchetypes'
+import { shouldAutoFitSlideHeadline } from '../utils/autoFitHeadline'
 
 function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '#1a1a1a', section }) {
   const show = (name) => !section || section === name
@@ -58,6 +60,52 @@ function SlideSettings({ slide, onUpdate, selectedCount = 1, backgroundColor = '
     <div className="slide-settings-content">
       {isMultiSelect && (
         <p className="slide-settings-multi-hint">Applying to {selectedCount} slides</p>
+      )}
+
+      {show('motion') && (
+      <div className="slide-settings-section">
+        <h3 className="slide-settings-section-title">Text archetype</h3>
+        <div className="slide-settings-field">
+          <label htmlFor="slide-text-archetype">Archetype</label>
+          <select
+            id="slide-text-archetype"
+            className="slide-settings-select"
+            value={slide.textArchetype || 'custom'}
+            onChange={(e) => onUpdate(applyTextArchetypeToSlide(slide, e.target.value))}
+          >
+            {TEXT_ARCHETYPE_OPTIONS.map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </select>
+          <p className="slide-settings-hint">
+            {TEXT_ARCHETYPE_OPTIONS.find((item) => item.id === (slide.textArchetype || 'custom'))?.description}
+          </p>
+        </div>
+        {layout !== 'bulletpoints' && layout !== 'section' && (
+          <div className="slide-settings-field">
+            <label className="slide-settings-checkbox">
+              <input
+                type="checkbox"
+                checked={slide.lineStepReveal === true}
+                onChange={(e) => onUpdate({ lineStepReveal: e.target.checked })}
+              />
+              <span>Reveal one line per click (present)</span>
+            </label>
+          </div>
+        )}
+        {layout !== 'bulletpoints' && layout !== 'section' && (
+          <div className="slide-settings-field">
+            <label className="slide-settings-checkbox">
+              <input
+                type="checkbox"
+                checked={shouldAutoFitSlideHeadline(slide)}
+                onChange={(e) => onUpdate({ autoFitHeadline: e.target.checked })}
+              />
+              <span>Auto-fit H1 size to text length</span>
+            </label>
+          </div>
+        )}
+      </div>
       )}
 
       {show('motion') && (

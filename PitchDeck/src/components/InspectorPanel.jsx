@@ -113,6 +113,8 @@ function InspectorPanel({
             contentEdgeOffset={settings.contentEdgeOffset ?? 9}
             contentBottomOffset={settings.contentBottomOffset ?? 12}
             contentVerticalAlign={settings.contentVerticalAlign ?? 'bottom'}
+            textAnimationMode={settings.textAnimationMode || 'manual'}
+            editMotionPreview={settings.editMotionPreview !== false}
             onUpdateSettings={onUpdateSettings}
           />
         )}

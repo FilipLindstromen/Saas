@@ -1,0 +1,74 @@
+.sketchgen-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  box-shadow: var(--header-inset);
+}
+
+.sketchgen-logo {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.sketchgen-view-switch {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  padding: 0.2rem;
+}
+
+.sketchgen-view-switch button {
+  padding: 0.3rem 0.75rem;
+  border: none;
+  border-radius: calc(var(--button-radius) - 4px);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sketchgen-view-switch button:hover:not(:disabled):not(.active) {
+  color: var(--text-primary);
+}
+
+.sketchgen-view-switch button.active {
+  background: var(--accent-gradient);
+  color: #ffffff;
+}
+
+.sketchgen-view-switch button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sketchgen-top-bar-spacer {
+  flex: 1;
+}
+
+.sketchgen-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--button-radius);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.sketchgen-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

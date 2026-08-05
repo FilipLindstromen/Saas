@@ -22,6 +22,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | PostIt | `/PostIt` | Plan & brainstorm app |
 | InfoGraphics | `/InfoGraphics` | Infographic generator |
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
+| SketchGen | `/SketchGen` | Draw a sketch, generate a styled illustration with AI |
 | Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |
 | Reel Recorder | `/ReelRecorder` | Reel/short-form video recorder |

@@ -1,0 +1,47 @@
+.sketch-canvas-viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* flex-start + margin:auto on the child (not center/center) so overflowing
+     content stays fully scrollable when zoomed — centering via align-items
+     clips the start of overflowing flex children in every browser. */
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: auto;
+  border-radius: var(--card-radius);
+  background: var(--bg-secondary);
+}
+
+.sketch-canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  display: block;
+  margin: auto;
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-md);
+  touch-action: none;
+  cursor: crosshair;
+  flex-shrink: 0;
+}
+
+.sketch-canvas.tool-fill {
+  cursor: cell;
+}
+
+.sketch-canvas.tool-blur {
+  cursor: pointer;
+}
+
+.sketch-canvas.tool-line,
+.sketch-canvas.tool-rect,
+.sketch-canvas.tool-circle {
+  cursor: crosshair;
+}
+
+.sketch-canvas.tool-placing {
+  cursor: copy;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
