@@ -27,6 +27,9 @@ export default function OptionsBar({
   onApplyBrandFont,
   arrowStyleId,
   onArrowStyleChange,
+  penSnapHV,
+  onPenSnapHVChange,
+  onCleanUpSketch,
   onUndo,
   onRedo,
   onClear,
@@ -218,6 +221,28 @@ export default function OptionsBar({
           />
           <span className="options-bar-value">{Math.round(wobble * 100)}%</span>
         </div>
+      )}
+
+      {tool === 'pen' && (
+        <label className="options-bar-bold-toggle" title="Snap pen strokes to horizontal or vertical from the stroke start">
+          <input
+            type="checkbox"
+            checked={penSnapHV}
+            onChange={(e) => onPenSnapHVChange(e.target.checked)}
+          />
+          Snap H/V
+        </label>
+      )}
+
+      {showInkDynamics && tool === 'pen' && (
+        <button
+          type="button"
+          className="options-bar-btn options-bar-cleanup-btn"
+          onClick={onCleanUpSketch}
+          title="Clean up active sketch layer (smooth lines, reduce noise)"
+        >
+          Clean up
+        </button>
       )}
 
       <div className="options-bar-spacer" />

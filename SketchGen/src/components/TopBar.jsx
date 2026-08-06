@@ -1,9 +1,10 @@
 import ThemeToggle from '@shared/ThemeToggle'
 import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
+import ExportMenu from './ExportMenu'
 import './TopBar.css'
 
 export default function TopBar({
-  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onDownload,
+  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onExport,
   projects, currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject,
 }) {
   return (
@@ -49,13 +50,7 @@ export default function TopBar({
       <div className="sketchgen-top-bar-spacer" />
 
       {hasGenerated && view !== 'sketch' && (
-        <button type="button" className="sketchgen-icon-btn" onClick={onDownload} title="Download generated image">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3v12" />
-            <path d="M7 10l5 5 5-5" />
-            <path d="M4 21h16" />
-          </svg>
-        </button>
+        <ExportMenu variant="icon" className="export-menu-root-toolbar" onExport={onExport} />
       )}
 
       <ThemeToggle theme={theme} onToggle={onToggleTheme} className="sketchgen-icon-btn" />

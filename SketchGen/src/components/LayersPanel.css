@@ -124,6 +124,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.layers-kind-badge {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  opacity: 0.85;
 }
 
 .layers-panel-row.active .layers-name-btn {

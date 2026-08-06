@@ -31,7 +31,7 @@
   max-width: 100%;
   max-height: min(100%, 85vh);
   display: block;
-  background: #ffffff;
+  background: transparent;
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-md);
   touch-action: none;

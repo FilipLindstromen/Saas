@@ -1,0 +1,132 @@
+.generation-queue-dismiss {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.generation-queue-dismiss:hover {
+  color: var(--text-primary);
+}
+
+.generation-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.generation-queue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.45rem;
+  border-radius: var(--button-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+}
+
+.generation-queue-item.status-running {
+  border-color: var(--accent);
+}
+
+.generation-queue-item-main {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.generation-queue-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.generation-queue-thumb-empty {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-default);
+}
+
+.generation-queue-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.generation-queue-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.generation-queue-status {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.generation-queue-error {
+  font-size: 0.68rem;
+  color: var(--accent-secondary);
+  line-height: 1.25;
+}
+
+.generation-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.generation-queue-btn {
+  padding: 0.25rem 0.55rem;
+  border-radius: calc(var(--button-radius) - 2px);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.generation-queue-btn:hover {
+  color: var(--text-primary);
+}
+
+.generation-queue-btn.primary {
+  border: none;
+  background: var(--accent-gradient);
+  color: #fff;
+}
+
+.generation-queue-estimate {
+  font-size: 0.72rem;
+  color: var(--text-quaternary);
+}
+
+.generation-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.generation-error-actions button {
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--button-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.generation-error-actions button.primary {
+  border: none;
+  background: var(--accent-gradient);
+  color: #fff;
+}

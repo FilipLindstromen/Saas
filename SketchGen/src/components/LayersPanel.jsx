@@ -108,6 +108,7 @@ export default function LayersPanel({
               )}
             </button>
             <button type="button" className="layers-name-btn" onClick={() => onSelect(layer.id)}>
+              {layer.kind === 'generation' && <span className="layers-kind-badge" title="Generated layer">✨</span>}
               {layer.name}
             </button>
             <button

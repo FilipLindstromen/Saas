@@ -66,6 +66,8 @@ export async function generateStyledImage({
   referenceImageDataUrl = null,
   brand = null,
   useBrandColors = false,
+  quality = 'high',
+  signal = null,
 }) {
   const format = getSketchFormat(normalizeSketchFormatId(formatId))
   const improving = Boolean(referenceImageDataUrl)
@@ -78,7 +80,8 @@ export async function generateStyledImage({
     imageDataUrl: primaryImage,
     additionalImages: style.type === 'image' ? [style.referenceImageDataUrl] : [],
     size: format.apiSize,
-    quality: 'high',
+    quality: quality === 'low' ? 'low' : 'high',
+    signal,
   })
   return fitDataUrlToSketchSize(raw, format.width, format.height)
 }

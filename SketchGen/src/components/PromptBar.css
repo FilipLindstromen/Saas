@@ -55,6 +55,32 @@
   cursor: not-allowed;
 }
 
+.prompt-bar-quality {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.prompt-bar-quality > span:first-child {
+  margin-right: auto;
+}
+
+.prompt-bar-quality .prompt-bar-variations-options button {
+  width: auto;
+  padding: 0 0.55rem;
+  min-width: 4.5rem;
+}
+
+.prompt-bar-cost {
+  font-size: 0.75rem;
+  color: var(--text-quaternary);
+  width: 100%;
+  text-align: right;
+}
+
 .prompt-bar-variations {
   display: flex;
   align-items: center;

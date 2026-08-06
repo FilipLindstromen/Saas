@@ -188,6 +188,7 @@ export async function editImage({
   model = 'gpt-image-1',
   quality = 'high',
   apiKey,
+  signal,
 }) {
   const key = getKey(apiKey);
   if (!key) throw new Error('OpenAI API key is not set. Open Settings to add your key.');
@@ -217,6 +218,7 @@ export async function editImage({
     method: 'POST',
     headers: { Authorization: `Bearer ${key}` },
     body: form,
+    signal,
   });
 
   if (!res.ok) {

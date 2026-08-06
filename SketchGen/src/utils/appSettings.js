@@ -11,8 +11,10 @@ import {
   GOOGLE_FONT_OPTIONS,
   normalizeBrandColors,
   normalizeBrandFonts,
+  normalizeHexColor,
 } from '../constants/brand'
 import { normalizeArrowStyleId } from '../constants/arrowStyles'
+import { normalizeGenerationQuality } from '../utils/generationCost'
 
 const STORAGE_KEY = 'sketchgen-app-settings'
 
@@ -37,6 +39,10 @@ const DEFAULTS = {
   textFontSize: 36,
   textFontBold: false,
   arrowStyleId: 'straight',
+  penSnapHV: false,
+  generationQuality: 'high',
+  addGenerationsAsLayers: true,
+  canvasBackgroundColor: DEFAULT_BRAND_COLORS.bg,
 }
 
 const VALID_TOOLS = new Set([
@@ -73,6 +79,10 @@ export function loadAppSettings() {
       ? merged.textFontFamily
       : merged.brandFonts.body
     merged.arrowStyleId = normalizeArrowStyleId(merged.arrowStyleId)
+    merged.generationQuality = normalizeGenerationQuality(merged.generationQuality)
+    merged.addGenerationsAsLayers = merged.addGenerationsAsLayers !== false
+    merged.penSnapHV = Boolean(merged.penSnapHV)
+    merged.canvasBackgroundColor = normalizeHexColor(merged.canvasBackgroundColor, DEFAULTS.canvasBackgroundColor)
     if (typeof merged.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(merged.color)) {
       merged.color = DEFAULTS.color
     }

@@ -2,6 +2,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat'
 import { ensureGoogleFontLoaded } from '../constants/brand'
 import { drawArrowShape } from '../constants/arrowStyles'
+import { cleanUpSketchImageData, snapPointToHorizontalVertical } from '../utils/sketchAssist'
+import CanvasBackgroundPicker from './CanvasBackgroundPicker'
 import './CanvasBoard.css'
 
 /** @deprecated use getSketchFormat — kept for any external imports */
@@ -205,10 +207,8 @@ function createLayerCanvas(w, h) {
   return { canvas, ctx }
 }
 
-function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH, background = BACKGROUND_COLOR) {
+function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH) {
   const { canvas, ctx } = createLayerCanvas(newW, newH)
-  ctx.fillStyle = background
-  ctx.fillRect(0, 0, newW, newH)
   const scale = Math.min(newW / oldW, newH / oldH)
   const dw = oldW * scale
   const dh = oldH * scale
@@ -229,6 +229,10 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     textFontSize = 36,
     textFontBold = false,
     arrowStyleId = 'straight',
+    penSnapHV = false,
+    backgroundColor = BACKGROUND_COLOR,
+    brandColors,
+    onBackgroundColorChange,
     placing,
     onPlaced,
     onHistoryChange,
@@ -254,6 +258,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const textFontSizeRef = useRef(textFontSize)
   const textFontBoldRef = useRef(textFontBold)
   const arrowStyleRef = useRef(arrowStyleId)
+  const penSnapHVRef = useRef(penSnapHV)
+  const backgroundColorRef = useRef(backgroundColor)
   const placingRef = useRef(placing)
   const formatRef = useRef(formatId)
   const canvasSizeRef = useRef({
@@ -293,6 +299,10 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   useEffect(() => { textFontSizeRef.current = textFontSize }, [textFontSize])
   useEffect(() => { textFontBoldRef.current = textFontBold }, [textFontBold])
   useEffect(() => { arrowStyleRef.current = arrowStyleId }, [arrowStyleId])
+  useEffect(() => { penSnapHVRef.current = penSnapHV }, [penSnapHV])
+  useEffect(() => {
+    backgroundColorRef.current = backgroundColor
+  }, [backgroundColor])
   useEffect(() => {
     ensureGoogleFontLoaded(textFontFamily)
   }, [textFontFamily])
@@ -333,7 +343,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   const notifyLayers = () => {
     onLayersChange?.({
-      layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible })),
+      layers: layersRef.current.map((l) => ({
+        id: l.id,
+        name: l.name,
+        visible: l.visible,
+        kind: l.kind || 'sketch',
+      })),
       activeLayerId: activeLayerIdRef.current,
     })
   }
@@ -341,12 +356,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const renderComposite = () => {
     const ctx = ctxRef.current
     if (!ctx) return
-    ctx.fillStyle = BACKGROUND_COLOR
+    ctx.fillStyle = backgroundColorRef.current
     ctx.fillRect(0, 0, W(), H())
     for (const layer of layersRef.current) {
       if (layer.visible) ctx.drawImage(layer.canvas, 0, 0)
     }
   }
+
+  useEffect(() => {
+    renderComposite()
+  }, [backgroundColor])
 
   const pushHistory = () => {
     if (!layersRef.current.length) return
@@ -542,8 +561,6 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       for (const saved of layers) {
         const img = await loadHtmlImage(saved.dataUrl)
         const { canvas, ctx } = createLayerCanvas(W(), H())
-        ctx.fillStyle = BACKGROUND_COLOR
-        ctx.fillRect(0, 0, W(), H())
         const scale = Math.min(W() / img.width, H() / img.height)
         const dw = img.width * scale
         const dh = img.height * scale
@@ -638,10 +655,46 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       notifyLayers()
       pushHistory()
     },
+    addLayerFromImage: async (dataUrl, name = 'Generation') => {
+      const img = await loadHtmlImage(dataUrl)
+      layerIdCounterRef.current += 1
+      const { canvas, ctx } = createLayerCanvas(W(), H())
+      drawImageFittedOnLayer(ctx, img)
+      const layer = {
+        id: `layer-${layerIdCounterRef.current}`,
+        name,
+        visible: true,
+        canvas,
+        ctx,
+        kind: 'generation',
+      }
+      layersRef.current = [...layersRef.current, layer]
+      activeLayerIdRef.current = layer.id
+      hasContentRef.current = true
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+      onCommit?.()
+    },
+    cleanUpActiveLayer: () => {
+      const ctx = getActiveCtx()
+      if (!ctx) return
+      const w = W()
+      const h = H()
+      const imageData = ctx.getImageData(0, 0, w, h)
+      cleanUpSketchImageData(imageData, w, h)
+      ctx.putImageData(imageData, 0, 0)
+      hasContentRef.current = true
+      renderComposite()
+      pushHistory()
+      onCommit?.()
+    },
   }))
 
-  const strokeTo = (ctx, from, to, strokeColor, width) => {
-    ctx.strokeStyle = strokeColor
+  const strokeTo = (ctx, from, to, strokeColor, width, eraser = false) => {
+    ctx.save()
+    if (eraser) ctx.globalCompositeOperation = 'destination-out'
+    ctx.strokeStyle = eraser ? '#000000' : strokeColor
     ctx.lineWidth = width
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
@@ -651,8 +704,9 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     ctx.stroke()
     ctx.beginPath()
     ctx.arc(to.x, to.y, width / 2, 0, Math.PI * 2)
-    ctx.fillStyle = strokeColor
+    ctx.fillStyle = eraser ? '#000000' : strokeColor
     ctx.fill()
+    ctx.restore()
   }
 
   const stampPlacedImage = (ctx, pos, maxDim) => {
@@ -730,6 +784,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       x: nextSmooth.x + perpX * offset,
       y: nextSmooth.y + perpY * offset,
     }
+  }
+
+  const resolveInkPoint = (rawPos, snapAnchor) => {
+    let p = applySmoothWobble(rawPos)
+    if (toolRef.current === 'pen' && penSnapHVRef.current && snapAnchor) {
+      p = snapPointToHorizontalVertical(snapAnchor, p)
+    }
+    return p
   }
 
   const updateBrushPreview = (e) => {
@@ -858,12 +920,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       wobblePhaseRef.current = 0
       wobbleDirRef.current = { x: 1, y: 0 }
       lastRawPointRef.current = pos
-      const drawnPos = applySmoothWobble(pos)
+      const drawnPos = resolveInkPoint(pos, lastPointRef.current ?? pos)
       lastPointRef.current = drawnPos
-      const strokeColor = currentTool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
       const width = pressureWidth(e, sizeRef.current)
       lastStrokeWidthRef.current = width
-      strokeTo(ctx, drawnPos, drawnPos, strokeColor, width)
+      const erasing = currentTool === 'eraser'
+      strokeTo(ctx, drawnPos, drawnPos, colorRef.current, width, erasing)
       renderComposite()
     }
   }
@@ -916,11 +978,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
 
     lastRawPointRef.current = pos
-    const drawnPos = applySmoothWobble(pos)
-    const strokeColor = currentTool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
+    const drawnPos = resolveInkPoint(pos, lastPointRef.current)
     const width = pressureWidth(e, sizeRef.current)
     lastStrokeWidthRef.current = width
-    strokeTo(ctx, lastPointRef.current, drawnPos, strokeColor, width)
+    const erasing = currentTool === 'eraser'
+    strokeTo(ctx, lastPointRef.current, drawnPos, colorRef.current, width, erasing)
     lastPointRef.current = drawnPos
     renderComposite()
   }
@@ -963,8 +1025,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         // Smoothing lags behind the raw pointer — draw one final segment so the
         // stroke actually reaches where the pointer was released instead of
         // stopping short.
-        const strokeColor = tool === 'eraser' ? BACKGROUND_COLOR : colorRef.current
-        strokeTo(ctx, lastPointRef.current, lastRawPointRef.current, strokeColor, lastStrokeWidthRef.current ?? sizeRef.current)
+        const erasing = tool === 'eraser'
+        strokeTo(
+          ctx,
+          lastPointRef.current,
+          lastRawPointRef.current,
+          colorRef.current,
+          lastStrokeWidthRef.current ?? sizeRef.current,
+          erasing
+        )
         renderComposite()
       }
       pushHistory()
@@ -995,10 +1064,19 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   return (
     <div className="sketch-canvas-viewport" onDragOver={handleDragOver} onDrop={handleDrop}>
       <div className="sketch-canvas-wrap">
+        {onBackgroundColorChange && (
+          <div onPointerDown={(e) => e.stopPropagation()}>
+            <CanvasBackgroundPicker
+              value={backgroundColor}
+              brandColors={brandColors}
+              onChange={onBackgroundColorChange}
+            />
+          </div>
+        )}
         <canvas
           ref={canvasRef}
           className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}`}
-          style={{ aspectRatio: `${aspect.width} / ${aspect.height}` }}
+          style={{ aspectRatio: `${aspect.width} / ${aspect.height}`, backgroundColor }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}

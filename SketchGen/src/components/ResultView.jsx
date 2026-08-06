@@ -1,14 +1,25 @@
 import CompareSlider from './CompareSlider'
+import ExportMenu from './ExportMenu'
 import './ResultView.css'
 
-export default function ResultView({ view, sketchDataUrl, generatedDataUrl, onUseAsSketch, onImageContextMenu }) {
+export default function ResultView({
+  view,
+  sketchDataUrl,
+  generatedDataUrl,
+  onUseAsSketch,
+  onImageContextMenu,
+  onExport,
+}) {
   if (view === 'compare') {
     return (
       <div className="result-view-wrap">
         <CompareSlider beforeSrc={sketchDataUrl} afterSrc={generatedDataUrl} onAfterContextMenu={onImageContextMenu} />
-        <button type="button" className="result-use-as-sketch" onClick={onUseAsSketch}>
-          Use as new sketch
-        </button>
+        <div className="result-view-actions">
+          <ExportMenu onExport={onExport} />
+          <button type="button" className="result-use-as-sketch" onClick={onUseAsSketch}>
+            Use as new sketch
+          </button>
+        </div>
       </div>
     )
   }
@@ -22,9 +33,12 @@ export default function ResultView({ view, sketchDataUrl, generatedDataUrl, onUs
           onContextMenu={(e) => onImageContextMenu(e, generatedDataUrl)}
         />
       </div>
-      <button type="button" className="result-use-as-sketch" onClick={onUseAsSketch}>
-        Use as new sketch
-      </button>
+      <div className="result-view-actions">
+        <ExportMenu onExport={onExport} />
+        <button type="button" className="result-use-as-sketch" onClick={onUseAsSketch}>
+          Use as new sketch
+        </button>
+      </div>
     </div>
   )
 }

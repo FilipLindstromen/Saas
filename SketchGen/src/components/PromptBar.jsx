@@ -1,5 +1,6 @@
 import './PromptBar.css'
 import GenerationProgress from './GenerationProgress'
+import { estimateGenerationCost } from '../utils/generationCost'
 
 export default function PromptBar({
   value,
@@ -15,7 +16,13 @@ export default function PromptBar({
   canImproveGeneration,
   useBrandColors,
   onUseBrandColorsChange,
+  generationQuality,
+  onGenerationQualityChange,
+  addGenerationsAsLayers,
+  onAddGenerationsAsLayersChange,
 }) {
+  const cost = estimateGenerationCost(generationQuality, variations)
+
   return (
     <div className="prompt-bar-section side-panel">
       <div className="side-panel-header">Instructions (optional)</div>
@@ -60,6 +67,43 @@ export default function PromptBar({
         />
         <span>Use brand colors</span>
       </label>
+
+      <label
+        className="prompt-bar-improve"
+        title="Each finished variation is added as a non-destructive layer on the sketch canvas"
+      >
+        <input
+          type="checkbox"
+          checked={addGenerationsAsLayers}
+          onChange={(e) => onAddGenerationsAsLayersChange(e.target.checked)}
+        />
+        <span>Add generations as layers</span>
+      </label>
+
+      <div className="prompt-bar-quality">
+        <span>Quality</span>
+        <div className="prompt-bar-variations-options">
+          <button
+            type="button"
+            className={generationQuality === 'low' ? 'active' : ''}
+            onClick={() => onGenerationQualityChange('low')}
+            title="Faster, lower cost draft images"
+          >
+            Draft
+          </button>
+          <button
+            type="button"
+            className={generationQuality === 'high' ? 'active' : ''}
+            onClick={() => onGenerationQualityChange('high')}
+            title="Standard quality"
+          >
+            Standard
+          </button>
+        </div>
+        <span className="prompt-bar-cost" title="Indicative estimate only">
+          {cost.label}
+        </span>
+      </div>
 
       <div className="prompt-bar-variations">
         <span>Variations</span>
