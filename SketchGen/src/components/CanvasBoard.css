@@ -12,6 +12,14 @@
   background: var(--bg-secondary);
 }
 
+.sketch-canvas-wrap {
+  position: relative;
+  margin: auto;
+  flex-shrink: 0;
+  width: fit-content;
+  max-width: 100%;
+}
+
 .sketch-canvas {
   /* Both width and height must stay free ("auto") so the browser's aspect-ratio
      sizing algorithm can pick a box that fits within max-width AND max-height —
@@ -23,13 +31,41 @@
   max-width: 100%;
   max-height: min(100%, 85vh);
   display: block;
-  margin: auto;
   background: #ffffff;
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-md);
   touch-action: none;
   cursor: crosshair;
   flex-shrink: 0;
+}
+
+.sketch-canvas-wrap .sketch-canvas {
+  margin: 0;
+}
+
+.sketch-canvas.tool-pen,
+.sketch-canvas.tool-eraser {
+  cursor: none;
+}
+
+.brush-size-preview {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.brush-size-preview.pen {
+  border: 1.5px solid var(--brush-preview-color, #1a1a1a);
+  background: color-mix(in srgb, var(--brush-preview-color, #1a1a1a) 12%, transparent);
+}
+
+.brush-size-preview.eraser {
+  border: 1.5px dashed rgba(80, 80, 80, 0.55);
+  background: rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .sketch-canvas.tool-fill {

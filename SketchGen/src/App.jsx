@@ -85,7 +85,13 @@ export default function App() {
   const [theme, setThemeState] = useState(getTheme())
   const [tool, setTool] = useState(savedSettings.tool)
   const [color, setColor] = useState(savedSettings.color)
-  const [size, setSize] = useState(savedSettings.size)
+  const [penSize, setPenSize] = useState(savedSettings.penSize)
+  const [eraserSize, setEraserSize] = useState(savedSettings.eraserSize)
+  const brushSize = tool === 'eraser' ? eraserSize : penSize
+  const handleBrushSizeChange = useCallback((next) => {
+    if (tool === 'eraser') setEraserSize(next)
+    else setPenSize(next)
+  }, [tool])
   const [smoothing, setSmoothing] = useState(savedSettings.smoothing)
   const [wobble, setWobble] = useState(savedSettings.wobble)
   const [zoom, setZoom] = useState(1)
@@ -212,10 +218,10 @@ export default function App() {
   // sliders and the instructions textarea can fire on every pixel/keystroke.
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveAppSettings({ tool, color, size, smoothing, wobble, selectedStyleId, instructions, variations })
+      saveAppSettings({ tool, color, penSize, eraserSize, smoothing, wobble, selectedStyleId, instructions, variations })
     }, 300)
     return () => clearTimeout(timer)
-  }, [tool, color, size, smoothing, wobble, selectedStyleId, instructions, variations])
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, selectedStyleId, instructions, variations])
 
   // A persisted selectedStyleId might reference a custom/image style that was
   // deleted in a previous session — fall back once the real style list loads.
@@ -646,8 +652,8 @@ export default function App() {
           tool={tool}
           color={color}
           onColorChange={setColor}
-          size={size}
-          onSizeChange={setSize}
+          size={brushSize}
+          onSizeChange={handleBrushSizeChange}
           smoothing={smoothing}
           onSmoothingChange={setSmoothing}
           wobble={wobble}
@@ -677,7 +683,7 @@ export default function App() {
               ref={canvasRef}
               tool={tool}
               color={color}
-              size={size}
+              size={brushSize}
               smoothing={smoothing}
               wobble={wobble}
               zoom={zoom}

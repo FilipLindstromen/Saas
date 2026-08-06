@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat'
 import './CanvasBoard.css'
 
@@ -255,6 +255,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const layerIdCounterRef = useRef(0)
   const moveSnapshotRef = useRef(null)
   const moveStartRef = useRef(null)
+  const [brushPreview, setBrushPreview] = useState(null)
 
   useEffect(() => { toolRef.current = tool }, [tool])
   useEffect(() => { colorRef.current = color }, [color])
@@ -262,6 +263,20 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   useEffect(() => { smoothingRef.current = smoothing }, [smoothing])
   useEffect(() => { wobbleRef.current = wobble }, [wobble])
   useEffect(() => { placingRef.current = placing }, [placing])
+  useEffect(() => {
+    if (!FREEHAND_INK_TOOLS.has(tool)) setBrushPreview(null)
+  }, [tool])
+
+  useEffect(() => {
+    setBrushPreview((prev) => {
+      if (!prev) return null
+      const canvas = canvasRef.current
+      if (!canvas) return prev
+      const rect = canvas.getBoundingClientRect()
+      const scale = rect.width / canvas.width
+      return { ...prev, diameter: size * scale }
+    })
+  }, [size])
 
   const getActiveLayer = () => layersRef.current.find((l) => l.id === activeLayerIdRef.current) || layersRef.current[layersRef.current.length - 1]
   const getActiveCtx = () => getActiveLayer()?.ctx
@@ -643,6 +658,24 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
   }
 
+  const updateBrushPreview = (e) => {
+    const currentTool = toolRef.current
+    if (!FREEHAND_INK_TOOLS.has(currentTool)) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const scale = rect.width / canvas.width
+    const diameter = sizeRef.current * scale
+    setBrushPreview({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      diameter,
+      eraser: currentTool === 'eraser',
+    })
+  }
+
+  const clearBrushPreview = () => setBrushPreview(null)
+
   const handlePointerDown = (e) => {
     const canvas = canvasRef.current
     canvas.setPointerCapture(e.pointerId)
@@ -708,6 +741,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   }
 
   const handlePointerMove = (e) => {
+    if (FREEHAND_INK_TOOLS.has(toolRef.current)) updateBrushPreview(e)
     if (!drawingRef.current) return
     const canvas = canvasRef.current
     const pos = getPos(canvas, e)
@@ -758,6 +792,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     strokeTo(ctx, lastPointRef.current, drawnPos, strokeColor, width)
     lastPointRef.current = drawnPos
     renderComposite()
+  }
+
+  const handlePointerLeave = () => {
+    clearBrushPreview()
+    handlePointerUp()
+  }
+
+  const handlePointerEnter = (e) => {
+    if (FREEHAND_INK_TOOLS.has(toolRef.current)) updateBrushPreview(e)
   }
 
   const handlePointerUp = () => {
@@ -820,15 +863,31 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   return (
     <div className="sketch-canvas-viewport" onDragOver={handleDragOver} onDrop={handleDrop}>
-      <canvas
-        ref={canvasRef}
-        className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}`}
-        style={{ aspectRatio: `${aspect.width} / ${aspect.height}` }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      />
+      <div className="sketch-canvas-wrap">
+        <canvas
+          ref={canvasRef}
+          className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}`}
+          style={{ aspectRatio: `${aspect.width} / ${aspect.height}` }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
+          onPointerEnter={handlePointerEnter}
+        />
+        {brushPreview && (
+          <div
+            className={`brush-size-preview${brushPreview.eraser ? ' eraser' : ' pen'}`}
+            style={{
+              left: brushPreview.x,
+              top: brushPreview.y,
+              width: brushPreview.diameter,
+              height: brushPreview.diameter,
+              ...(brushPreview.eraser ? {} : { '--brush-preview-color': color }),
+            }}
+            aria-hidden
+          />
+        )}
+      </div>
     </div>
   )
 })
