@@ -12,6 +12,7 @@ import {
   normalizeBrandColors,
   normalizeBrandFonts,
 } from '../constants/brand'
+import { normalizeArrowStyleId } from '../constants/arrowStyles'
 
 const STORAGE_KEY = 'sketchgen-app-settings'
 
@@ -35,10 +36,11 @@ const DEFAULTS = {
   textFontFamily: DEFAULT_BRAND_FONTS.body,
   textFontSize: 36,
   textFontBold: false,
+  arrowStyleId: 'straight',
 }
 
 const VALID_TOOLS = new Set([
-  'pen', 'eraser', 'text', 'fill', 'line', 'rect', 'circle', 'blur', 'move', 'stamp',
+  'pen', 'eraser', 'text', 'fill', 'line', 'arrow', 'rect', 'circle', 'blur', 'move', 'stamp',
 ])
 
 export function loadAppSettings() {
@@ -70,6 +72,7 @@ export function loadAppSettings() {
     merged.textFontFamily = GOOGLE_FONT_OPTIONS.includes(merged.textFontFamily)
       ? merged.textFontFamily
       : merged.brandFonts.body
+    merged.arrowStyleId = normalizeArrowStyleId(merged.arrowStyleId)
     if (typeof merged.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(merged.color)) {
       merged.color = DEFAULTS.color
     }

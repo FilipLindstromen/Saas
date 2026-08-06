@@ -1,6 +1,6 @@
 import './HistoryGallery.css'
 
-export default function HistoryGallery({ items, activeId, onSelect, onDelete }) {
+export default function HistoryGallery({ items, activeId, onSelect, onDelete, onImageContextMenu }) {
   if (!items.length) return null
 
   return (
@@ -14,7 +14,15 @@ export default function HistoryGallery({ items, activeId, onSelect, onDelete }) 
           {items.map((item) => (
             <div key={item.id} className={`history-gallery-item ${item.id === activeId ? 'active' : ''}`}>
               <button type="button" onClick={() => onSelect(item)} title={`${item.styleName}${item.instructions ? ' — ' + item.instructions : ''}`}>
-                <img src={item.dataUrl} alt={item.styleName} />
+                <img
+                  src={item.dataUrl}
+                  alt={item.styleName}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onImageContextMenu?.(e, item.dataUrl)
+                  }}
+                />
                 <span className="history-gallery-label">{item.styleName}</span>
               </button>
               <button

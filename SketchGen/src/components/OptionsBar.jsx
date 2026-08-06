@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { SKETCH_FORMATS } from '../utils/canvasFormat'
 import { BRAND_FONT_ROLES, GOOGLE_FONT_OPTIONS } from '../constants/brand'
+import { ARROW_STYLES } from '../constants/arrowStyles'
 import './OptionsBar.css'
 
 const PRESET_COLORS = ['#1a1a1a', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#9c36b5', '#ffffff']
@@ -24,6 +25,8 @@ export default function OptionsBar({
   brandFonts,
   brandColors,
   onApplyBrandFont,
+  arrowStyleId,
+  onArrowStyleChange,
   onUndo,
   onRedo,
   onClear,
@@ -36,8 +39,9 @@ export default function OptionsBar({
   onCanvasFormatChange,
 }) {
   const fileInputRef = useRef(null)
-  const showDrawColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle'
+  const showDrawColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle' || tool === 'arrow'
   const showTextSettings = tool === 'text'
+  const showArrowSettings = tool === 'arrow'
   const showInkDynamics = tool === 'pen' || tool === 'eraser'
   const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text'
 
@@ -149,6 +153,22 @@ export default function OptionsBar({
             />
           </div>
         </>
+      )}
+
+      {showArrowSettings && (
+        <div className="options-bar-group options-bar-arrow-styles" role="group" aria-label="Arrow style">
+          {ARROW_STYLES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`options-bar-format-btn ${arrowStyleId === s.id ? 'active' : ''}`}
+              onClick={() => onArrowStyleChange(s.id)}
+              title={s.label}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       )}
 
       {showBrushSize && (

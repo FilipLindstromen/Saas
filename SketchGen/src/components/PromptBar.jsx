@@ -1,10 +1,12 @@
 import './PromptBar.css'
+import GenerationProgress from './GenerationProgress'
 
 export default function PromptBar({
   value,
   onChange,
   onGenerate,
   isGenerating,
+  generationProgress,
   error,
   variations,
   onVariationsChange,
@@ -76,6 +78,9 @@ export default function PromptBar({
       </div>
 
       {error && <div className="prompt-bar-error">{error}</div>}
+      {isGenerating && generationProgress && (
+        <GenerationProgress progress={generationProgress} />
+      )}
       <button
         type="button"
         className="prompt-bar-generate"
@@ -83,7 +88,7 @@ export default function PromptBar({
         disabled={isGenerating}
       >
         {isGenerating
-          ? 'Generating…'
+          ? (generationProgress ? `${Math.round(generationProgress.percent)}%` : 'Working…')
           : improveGeneration
             ? variations > 1
               ? `Improve ${variations} variations`

@@ -101,6 +101,7 @@
 }
 
 .sketch-canvas.tool-line,
+.sketch-canvas.tool-arrow,
 .sketch-canvas.tool-rect,
 .sketch-canvas.tool-circle {
   cursor: crosshair;

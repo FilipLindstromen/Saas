@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat'
 import { ensureGoogleFontLoaded } from '../constants/brand'
+import { drawArrowShape } from '../constants/arrowStyles'
 import './CanvasBoard.css'
 
 /** @deprecated use getSketchFormat — kept for any external imports */
@@ -9,7 +10,7 @@ export const CANVAS_HEIGHT = getSketchFormat('16:9').height
 export const BACKGROUND_COLOR = '#ffffff'
 const MAX_HISTORY = 40
 const FILL_TOLERANCE = 40
-const SHAPE_TOOLS = new Set(['line', 'rect', 'circle'])
+const SHAPE_TOOLS = new Set(['line', 'rect', 'circle', 'arrow'])
 const FREEHAND_INK_TOOLS = new Set(['pen', 'eraser'])
 
 function lerp(a, b, t) {
@@ -227,6 +228,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     textFontFamily = 'Inter',
     textFontSize = 36,
     textFontBold = false,
+    arrowStyleId = 'straight',
     placing,
     onPlaced,
     onHistoryChange,
@@ -251,6 +253,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const textFontFamilyRef = useRef(textFontFamily)
   const textFontSizeRef = useRef(textFontSize)
   const textFontBoldRef = useRef(textFontBold)
+  const arrowStyleRef = useRef(arrowStyleId)
   const placingRef = useRef(placing)
   const formatRef = useRef(formatId)
   const canvasSizeRef = useRef({
@@ -289,6 +292,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   useEffect(() => { textFontFamilyRef.current = textFontFamily }, [textFontFamily])
   useEffect(() => { textFontSizeRef.current = textFontSize }, [textFontSize])
   useEffect(() => { textFontBoldRef.current = textFontBold }, [textFontBold])
+  useEffect(() => { arrowStyleRef.current = arrowStyleId }, [arrowStyleId])
   useEffect(() => {
     ensureGoogleFontLoaded(textFontFamily)
   }, [textFontFamily])
@@ -499,6 +503,27 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       renderComposite()
       pushHistory()
     },
+    /** Replace the entire sketch with one layer containing this image (discards other layers). */
+    setAsSketch: async (dataUrl) => {
+      const img = await loadHtmlImage(dataUrl)
+      layerIdCounterRef.current += 1
+      const { canvas, ctx } = createLayerCanvas(W(), H())
+      drawImageFittedOnLayer(ctx, img)
+      const layer = {
+        id: `layer-${layerIdCounterRef.current}`,
+        name: 'Layer 1',
+        visible: true,
+        canvas,
+        ctx,
+      }
+      layersRef.current = [layer]
+      activeLayerIdRef.current = layer.id
+      hasContentRef.current = true
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+      onCommit?.()
+    },
     /** Rebuild the whole layer stack from an autosave/restore payload. Not an undoable action. */
     restoreLayers: async ({ layers, activeLayerId, formatId: savedFormatId }) => {
       if (!layers?.length) return
@@ -602,6 +627,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       if (!layersRef.current.some((l) => l.id === id)) return
       activeLayerIdRef.current = id
       notifyLayers()
+    },
+    /** Reorder stack bottom-to-top by layer id (must include every layer exactly once). */
+    reorderLayers: (orderedIdsBottomToTop) => {
+      if (!Array.isArray(orderedIdsBottomToTop) || orderedIdsBottomToTop.length !== layersRef.current.length) return
+      const byId = new Map(layersRef.current.map((l) => [l.id, l]))
+      if (!orderedIdsBottomToTop.every((id) => byId.has(id))) return
+      layersRef.current = orderedIdsBottomToTop.map((id) => byId.get(id))
+      renderComposite()
+      notifyLayers()
+      pushHistory()
     },
   }))
 
@@ -865,7 +900,10 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       const from = shapeStartRef.current
       if (currentTool === 'line') drawLineShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
       else if (currentTool === 'rect') drawRectShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
-      else drawCircleShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
+      else if (currentTool === 'circle') drawCircleShape(ctx, from, pos, colorRef.current, sizeRef.current, e.shiftKey)
+      else if (currentTool === 'arrow') {
+        drawArrowShape(ctx, from, pos, colorRef.current, sizeRef.current, arrowStyleRef.current, e.shiftKey)
+      }
       renderComposite()
       return
     }

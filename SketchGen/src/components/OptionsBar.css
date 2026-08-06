@@ -122,6 +122,15 @@
   border-radius: var(--button-radius);
 }
 
+.options-bar-arrow-styles {
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  max-width: 22rem;
+  padding: 0.15rem 0.25rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--button-radius);
+}
+
 .options-bar-format-btn {
   min-width: 2.5rem;
   padding: 0.35rem 0.55rem;

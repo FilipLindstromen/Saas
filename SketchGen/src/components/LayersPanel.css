@@ -57,6 +57,34 @@
   background: var(--bg-hover);
 }
 
+.layers-panel-row.dragging {
+  opacity: 0.45;
+}
+
+.layers-panel-row.drop-target {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.layers-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+  color: var(--text-quaternary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.layers-drag-handle:active {
+  cursor: grabbing;
+}
+
+.layers-drag-handle:hover {
+  color: var(--text-secondary);
+}
+
 .layers-visibility-btn,
 .layers-remove-btn {
   display: flex;

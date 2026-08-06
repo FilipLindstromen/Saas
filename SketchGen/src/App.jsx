@@ -5,6 +5,7 @@ import ToolRail from './components/ToolRail'
 import OptionsBar from './components/OptionsBar'
 import StyleGrid from './components/StyleGrid'
 import PromptBar from './components/PromptBar'
+import GenerationProgress from './components/GenerationProgress'
 import ResultView from './components/ResultView'
 import ImportPanel from './components/ImportPanel'
 import HistoryGallery from './components/HistoryGallery'
@@ -115,6 +116,7 @@ export default function App() {
   const [textFontFamily, setTextFontFamily] = useState(savedSettings.textFontFamily)
   const [textFontSize, setTextFontSize] = useState(savedSettings.textFontSize)
   const [textFontBold, setTextFontBold] = useState(savedSettings.textFontBold)
+  const [arrowStyleId, setArrowStyleId] = useState(savedSettings.arrowStyleId)
   const [brandingDraft, setBrandingDraft] = useState(null)
 
   const [view, setView] = useState('sketch')
@@ -123,6 +125,7 @@ export default function App() {
   const [activeGenerationId, setActiveGenerationId] = useState(null)
   const [generationHistory, setGenerationHistory] = useState([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState(null)
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [placing, setPlacing] = useState(null)
@@ -157,6 +160,7 @@ export default function App() {
     textFontFamily,
     textFontSize,
     textFontBold,
+    arrowStyleId,
   }
 
   const flushAppSettings = useCallback(() => {
@@ -267,7 +271,7 @@ export default function App() {
       clearTimeout(timer)
       flushAppSettings()
     }
-  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, instructions, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, flushAppSettings])
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, instructions, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, flushAppSettings])
 
   useEffect(() => {
     const onPageHide = () => flushAppSettings()
@@ -358,6 +362,19 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [handleUndo, handleRedo, placing])
 
+  const setImageAsSketch = useCallback(async (dataUrl) => {
+    if (!dataUrl) return
+    setError('')
+    try {
+      await canvasRef.current?.setAsSketch(dataUrl)
+      setSketchSnapshot(dataUrl)
+      setView('sketch')
+      scheduleAutosave()
+    } catch {
+      setError('Could not set that image as the sketch.')
+    }
+  }, [scheduleAutosave])
+
   const loadImageOntoCanvas = useCallback(async (dataUrl) => {
     setError('')
     try {
@@ -375,8 +392,8 @@ export default function App() {
 
   const handleUseAsSketch = useCallback(() => {
     if (!generatedImage) return
-    loadImageOntoCanvas(generatedImage)
-  }, [generatedImage, loadImageOntoCanvas])
+    setImageAsSketch(generatedImage)
+  }, [generatedImage, setImageAsSketch])
 
   // Paste an image from the OS clipboard (e.g. a screenshot, or an image copied
   // from another app or browser tab) straight onto the canvas. Skipped while an
@@ -427,6 +444,12 @@ export default function App() {
     link.click()
   }, [imageContextMenu])
 
+  const handleSetAsSketchFromMenu = useCallback(() => {
+    const dataUrl = imageContextMenu?.dataUrl
+    setImageContextMenu(null)
+    if (dataUrl) setImageAsSketch(dataUrl)
+  }, [imageContextMenu, setImageAsSketch])
+
   const handleStartPlacing = useCallback(async ({ url, maxDim, label }) => {
     setError('')
     try {
@@ -450,6 +473,9 @@ export default function App() {
   const handleRemoveLayer = useCallback((id) => canvasRef.current?.removeLayer(id), [])
   const handleToggleLayerVisibility = useCallback((id) => canvasRef.current?.toggleLayerVisibility(id), [])
   const handleSelectLayer = useCallback((id) => canvasRef.current?.setActiveLayer(id), [])
+  const handleReorderLayers = useCallback((orderedIdsBottomToTop) => {
+    canvasRef.current?.reorderLayers(orderedIdsBottomToTop)
+  }, [])
 
   const handleAddCustomStyle = useCallback(({ name, prompt }) => {
     const next = addCustomStyle({ name, prompt })
@@ -542,11 +568,39 @@ export default function App() {
       ? (sketchSnapshot || board?.exportPNG?.())
       : board.exportPNG()
     const referenceImageDataUrl = improveGeneration ? generatedImage : null
+    const total = variations
+    const verb = improveGeneration ? 'Improving' : 'Generating'
 
     setIsGenerating(true)
+    setGenerationProgress({
+      message: improveGeneration ? 'Preparing reference image…' : 'Preparing sketch…',
+      completed: 0,
+      total,
+      percent: 5,
+    })
+
+    let softTimer = setInterval(() => {
+      setGenerationProgress((prev) => {
+        if (!prev || prev.completed >= prev.total) return prev
+        const maxBeforeDone = 8 + (prev.completed / prev.total) * 82 + (prev.total > 1 ? 8 : 18)
+        if (prev.percent >= maxBeforeDone) return prev
+        return { ...prev, percent: Math.min(maxBeforeDone, prev.percent + 1) }
+      })
+    }, 700)
+
     try {
+      let completed = 0
+      setGenerationProgress({
+        message:
+          total > 1
+            ? `${verb} ${total} variation${total > 1 ? 's' : ''} with the model…`
+            : `${verb} illustration with the model…`,
+        completed: 0,
+        total,
+        percent: 10,
+      })
       const results = await Promise.all(
-        Array.from({ length: variations }, () =>
+        Array.from({ length: total }, () =>
           generateStyledImage({
             sketchDataUrl,
             style,
@@ -555,9 +609,29 @@ export default function App() {
             referenceImageDataUrl,
             brand: { colors: brandColors, fonts: brandFonts },
             useBrandColors: useBrandColorsInGeneration,
+          }).then((dataUrl) => {
+            completed += 1
+            const pct = Math.round(10 + (completed / total) * 85)
+            setGenerationProgress({
+              message:
+                total > 1
+                  ? `${verb} variation ${completed} of ${total}…`
+                  : `${verb} illustration…`,
+              completed,
+              total,
+              percent: pct,
+            })
+            return dataUrl
           })
         )
       )
+
+      setGenerationProgress({
+        message: 'Saving to history…',
+        completed: total,
+        total,
+        percent: 98,
+      })
       const batchId = `batch-${Date.now()}`
       const createdAt = Date.now()
       const entries = results.map((dataUrl, i) => ({
@@ -584,6 +658,8 @@ export default function App() {
     } catch (err) {
       setError(err.message || 'Generation failed. Please try again.')
     } finally {
+      clearInterval(softTimer)
+      setGenerationProgress(null)
       setIsGenerating(false)
     }
   }, [allStyles, selectedStyleId, instructions, variations, refreshHistory, canvasFormat, improveGeneration, generatedImage, sketchSnapshot, brandColors, brandFonts, useBrandColorsInGeneration])
@@ -763,6 +839,8 @@ export default function App() {
           brandFonts={brandFonts}
           brandColors={brandColors}
           onApplyBrandFont={handleApplyBrandFont}
+          arrowStyleId={arrowStyleId}
+          onArrowStyleChange={setArrowStyleId}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onClear={handleClear}
@@ -783,6 +861,11 @@ export default function App() {
         {view === 'sketch' && <ToolRail tool={tool} onToolChange={setTool} />}
 
         <main className="app-main">
+          {isGenerating && generationProgress && (
+            <div className="generation-progress-banner">
+              <GenerationProgress progress={generationProgress} />
+            </div>
+          )}
           <div className="app-canvas-area" style={{ display: view === 'sketch' ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
             <CanvasBoard
               ref={canvasRef}
@@ -794,6 +877,7 @@ export default function App() {
               textFontFamily={textFontFamily}
               textFontSize={textFontSize}
               textFontBold={textFontBold}
+              arrowStyleId={arrowStyleId}
               zoom={zoom}
               formatId={canvasFormat}
               placing={placing}
@@ -828,6 +912,7 @@ export default function App() {
               onToggleVisibility={handleToggleLayerVisibility}
               onAdd={handleAddLayer}
               onRemove={handleRemoveLayer}
+              onReorder={handleReorderLayers}
             />
           )}
           {view === 'sketch' && tool === 'stamp' && (
@@ -854,6 +939,7 @@ export default function App() {
             onChange={setInstructions}
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
+            generationProgress={generationProgress}
             error={null}
             variations={variations}
             onVariationsChange={setVariations}
@@ -868,6 +954,7 @@ export default function App() {
             activeId={activeGenerationId}
             onSelect={handleSelectHistoryEntry}
             onDelete={handleDeleteHistoryEntry}
+            onImageContextMenu={handleImageContextMenu}
           />
         </aside>
       </div>
@@ -884,6 +971,7 @@ export default function App() {
           y={imageContextMenu.y}
           onCopy={handleCopyImageFromMenu}
           onDownload={handleDownloadImageFromMenu}
+          onSetAsSketch={handleSetAsSketchFromMenu}
           onClose={() => setImageContextMenu(null)}
         />
       )}

@@ -1,8 +1,43 @@
+import { useMemo, useState } from 'react'
 import './LayersPanel.css'
 
-export default function LayersPanel({ layers, activeLayerId, onSelect, onToggleVisibility, onAdd, onRemove }) {
+function reorderDisplayLayers(displayLayers, dragId, targetId) {
+  if (!dragId || dragId === targetId) return displayLayers
+  const from = displayLayers.findIndex((l) => l.id === dragId)
+  const to = displayLayers.findIndex((l) => l.id === targetId)
+  if (from < 0 || to < 0) return displayLayers
+  const next = [...displayLayers]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
+export default function LayersPanel({
+  layers,
+  activeLayerId,
+  onSelect,
+  onToggleVisibility,
+  onAdd,
+  onRemove,
+  onReorder,
+}) {
+  const [draggingId, setDraggingId] = useState(null)
+  const [dropTargetId, setDropTargetId] = useState(null)
+
   // Topmost layer (last in the stack) shown first, matching typical design-tool convention.
-  const displayLayers = [...layers].reverse()
+  const displayLayers = useMemo(() => [...layers].reverse(), [layers])
+
+  const commitReorder = (dragId, targetId) => {
+    const reorderedDisplay = reorderDisplayLayers(displayLayers, dragId, targetId)
+    const stackBottomToTop = [...reorderedDisplay].reverse().map((l) => l.id)
+    onReorder?.(stackBottomToTop)
+  }
+
+  const handleDropOn = (targetId) => {
+    if (draggingId) commitReorder(draggingId, targetId)
+    setDraggingId(null)
+    setDropTargetId(null)
+  }
 
   return (
     <div className="layers-panel-section side-panel">
@@ -14,7 +49,45 @@ export default function LayersPanel({ layers, activeLayerId, onSelect, onToggleV
       </div>
       <div className="layers-panel-list side-panel-body">
         {displayLayers.map((layer) => (
-          <div key={layer.id} className={`layers-panel-row ${layer.id === activeLayerId ? 'active' : ''}`}>
+          <div
+            key={layer.id}
+            className={`layers-panel-row${layer.id === activeLayerId ? ' active' : ''}${layer.id === dropTargetId ? ' drop-target' : ''}${layer.id === draggingId ? ' dragging' : ''}`}
+            onDragOver={(e) => {
+              e.preventDefault()
+              if (draggingId && layer.id !== draggingId) setDropTargetId(layer.id)
+            }}
+            onDragLeave={() => {
+              if (dropTargetId === layer.id) setDropTargetId(null)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              handleDropOn(layer.id)
+            }}
+          >
+            <span
+              className="layers-drag-handle"
+              draggable
+              title="Drag to reorder"
+              aria-label={`Reorder ${layer.name}`}
+              onDragStart={(e) => {
+                setDraggingId(layer.id)
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/plain', layer.id)
+              }}
+              onDragEnd={() => {
+                setDraggingId(null)
+                setDropTargetId(null)
+              }}
+            >
+              <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden>
+                <circle cx="2.5" cy="2.5" r="1.2" />
+                <circle cx="7.5" cy="2.5" r="1.2" />
+                <circle cx="2.5" cy="7" r="1.2" />
+                <circle cx="7.5" cy="7" r="1.2" />
+                <circle cx="2.5" cy="11.5" r="1.2" />
+                <circle cx="7.5" cy="11.5" r="1.2" />
+              </svg>
+            </span>
             <button
               type="button"
               className="layers-visibility-btn"
