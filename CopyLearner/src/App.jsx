@@ -106,9 +106,19 @@ export default function App() {
       const referenceText = readySources.slice(0, 3).map((s) => s.text).join('\n\n---\n\n')
       const coveredTitles = allPosts.filter((p) => p.category === categoryId).map((p) => p.title)
       const posts = await generateLessonBatch({ categoryId, referenceText, coveredTitles, batchSize: BATCH_SIZE })
-      if (posts.length) await addPosts(categoryId, readySources.length ? readySources[0].id : null, posts)
-      failureCooldownRef.current = 0
+      if (posts.length) {
+        await addPosts(categoryId, readySources.length ? readySources[0].id : null, posts)
+        failureCooldownRef.current = 0
+      } else {
+        // Empty result (e.g. the model's response didn't parse as valid
+        // JSON) is still a failure — without a cooldown here, the topic
+        // stays "needy" forever and this refires on every render, hammering
+        // the API in a tight loop instead of ever recovering.
+        console.warn(`CopyLearner: generation for "${categoryId}" returned no usable lessons; will retry shortly.`)
+        failureCooldownRef.current = Date.now()
+      }
     } catch (err) {
+      console.warn(`CopyLearner: generation for "${categoryId}" failed:`, err)
       failureCooldownRef.current = Date.now()
     } finally {
       generatingCategoryRef.current = null

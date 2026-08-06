@@ -130,6 +130,32 @@
   color: var(--accent, #e67e22);
 }
 
+.app-header-text-btn {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--btn-radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.app-header-text-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hover);
+  border-color: var(--text-muted);
+}
+
+.app-header-text-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .app-main {
   flex: 1;
   display: flex;

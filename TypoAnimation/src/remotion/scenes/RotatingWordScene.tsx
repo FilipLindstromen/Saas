@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AbsoluteFill } from 'remotion';
 import { Chrome } from '../shared/Chrome';
 import { Line } from '../shared/Line';
 import { SceneBackdrop } from '../shared/SceneBackdrop';
 import { sceneCaptionText } from '../shared/caption';
 import { animate, Easing } from '../shared/motion';
+import { fitFontSizeToWidth } from '../shared/measureText';
 import type { SceneComponentProps } from '../shared/sceneProps';
 
+const SLOT_MAX_WIDTH = 980;
+const SLOT_BASE_SIZE = 88;
 const SLOT_DISTANCE = 60;
 
 interface SlotTiming {
@@ -58,6 +61,14 @@ export function RotatingWordScene({
 }: SceneComponentProps) {
   const words = defaultRotatingWords(scene);
   const layout = layoutSlots(words, dur);
+  const slotSizes = useMemo(
+    () =>
+      words.map((w) =>
+        fitFontSizeToWidth(w, SLOT_MAX_WIDTH, theme.fontHeading, 800, { min: 36, max: SLOT_BASE_SIZE })
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [words.join('\n'), theme.fontHeading]
+  );
 
   return (
     <AbsoluteFill style={{ background: theme.bg }}>
@@ -105,10 +116,10 @@ export function RotatingWordScene({
         <div
           style={{
             position: 'relative',
-            height: 120,
             width: '100%',
-            maxWidth: 980,
+            maxWidth: SLOT_MAX_WIDTH,
             marginTop: 8,
+            minHeight: 80,
           }}
         >
           {words.map((w, i) => {
@@ -133,10 +144,11 @@ export function RotatingWordScene({
                   t={t}
                   start={layout[i].start}
                   end={dur}
-                  size={88}
+                  size={slotSizes[i]}
                   weight={800}
                   marker
                   align="center"
+                  maxWidth={SLOT_MAX_WIDTH}
                   color={theme.ink}
                   theme={theme}
                 />

@@ -1,9 +1,18 @@
 import { chatCompletion } from '@shared/openai'
 
-export const BATCH_SIZE = 10
-// Trigger the next batch once this many (or fewer) unseen lessons remain —
-// e.g. with BATCH_SIZE 10 and threshold 4, a new batch starts after the
-// reader has swiped through 6 of the current 10.
+// Kept small on purpose: each post now carries a real point + 3-5 examples
+// + quiz + challenge + takeaway, which is a lot of JSON per post. A batch
+// of 10 of these risks running past the model's output limit and coming
+// back truncated (silently 0 usable posts) — 6 comfortably fits with room
+// to spare, and batches happen often enough that this isn't felt as fewer
+// lessons, just more frequent smaller top-ups.
+export const BATCH_SIZE = 6
+// Trigger the next batch once this many (or fewer) unseen lessons remain.
+// Kept relatively high (close to BATCH_SIZE) on purpose: the topic the
+// reader is currently viewing counts as "seen" immediately, and some
+// built-in topics only start with 4-5 lessons — a low threshold plus that
+// immediate seen-marking meant a 5-lesson topic never dipped low enough to
+// trigger a refill until the reader had almost run out.
 export const REFILL_THRESHOLD = 4
 // Circuit breaker against runaway generation from a stuck loop — not a
 // real ceiling the reader would ever hit in normal use.
@@ -26,10 +35,12 @@ const CATEGORY_FOCUS = {
 
 function buildSystemPrompt({ categoryFocus, hasReference }) {
   const groundingInstructions = hasReference
-    ? `The student has uploaded reference material below. Do not treat it as vague inspiration — actually use it: pull specific claims, product details, numbers, or lines directly from it for your "example" and "challenge" slides (quote or closely paraphrase real content, don't invent an unrelated generic scenario). Every lesson in this batch should read as if it were written specifically for this student's own material. If today's teaching focus doesn't literally appear in the material, still use the material's actual subject/product/audience as the worked example while you teach the technique — never fall back to a random unconnected example when real material is available.`
+    ? `The student has uploaded reference material below. Treat it strictly as source material to mine for copywriting lessons — never as the subject to teach. Pull specific claims, product details, numbers, or lines directly from it for your "example" and "challenge" slides (quote or closely paraphrase real content, don't invent an unrelated generic scenario). Every lesson in this batch should read as if it were written specifically for this student's own material — but every lesson is still, unmistakably, a lesson about how to WRITE, not a lesson about the material's own subject. If today's teaching focus doesn't literally appear in the material, still use the material's actual subject/product/audience as the worked example while you teach the technique — never fall back to a random unconnected example when real material is available, and never just summarize or restate the material's own advice as if it were a writing lesson.`
     : `No reference material was provided for this batch — write purely from your own expert copywriting knowledge, staying tightly on today's teaching focus below.`
 
   return `You are an expert direct-response copywriter with decades of experience — the kind who has written control-beating emails, landing pages, and ads — now working one-on-one as a copywriting mentor. Your job is to keep teaching a student copywriting through an endless stream of swipeable lessons, like an Instagram-carousel study app — but with real depth, not one-liners.
+
+NON-NEGOTIABLE: every single lesson must teach copywriting — the craft of persuasive writing itself (headlines, hooks, bullets, CTAs, structure, word choice, persuasion psychology, etc.). Never teach the underlying subject matter of the reference material as if it were the lesson. Example: if the material is about leadership, a WRONG lesson would be "Respect is Key for Leaders" (that's a leadership lesson). A RIGHT lesson uses the leadership material as the example while teaching a writing skill, e.g. "Turn Advice Into a Headline" or "Make Abstract Values Concrete in Copy," illustrated with lines from the leadership material. If you can't find a way to turn a piece of the material into a copywriting lesson, skip it and pick a different angle or technique — do not lower the bar and just restate the material's own content. Before finalizing each post, check: "does this teach the reader how to write better, or does it teach them about the material's topic?" — if the latter, rewrite it.
 
 TODAY'S TEACHING FOCUS: ${categoryFocus}
 
@@ -43,11 +54,11 @@ Return STRICT JSON only, no markdown fences, matching this shape:
     {
       "title": "short post title",
       "slides": [
-        { "kind": "title", "kicker": "1-2 word topic label", "heading": "punchy heading, under 8 words" },
+        { "kind": "title", "kicker": "1-2 word COPYWRITING concept label, e.g. 'Headlines' or 'CTAs' — never the material's own subject, e.g. never 'Leadership'", "heading": "punchy heading, under 8 words, about the writing technique" },
         { "kind": "point", "heading": "short heading", "body": "2-4 sentences with real depth — state the principle, explain the mechanism behind WHY it works, and note when to use (or not use) it. Under 500 characters." },
-        { "kind": "example", "label": "short label for the set", "items": [ { "before": "optional weak/before version, or empty string", "after": "the strong/after version or concrete example" }, "... 3 to 5 of these, each a distinct product/context so the pattern actually sinks in through repetition, not one lonely example" ] },
-        { "kind": "quiz", "prompt": "a question testing the idea", "options": ["option A", "option B"], "correct": 0, "explanation": "why that option is right, and why the other one is a common mistake, under 240 characters" },
-        { "kind": "challenge", "prompt": "a short task the reader can try", "hint": "a nudge, under 100 characters", "modelAnswer": "a fully worked example answer with brief reasoning, under 350 characters" },
+        { "kind": "example", "label": "short label for the set", "items": [ { "before": "optional weak/before version, or empty string", "after": "the strong/after version or concrete example" } ] },
+        { "kind": "quiz", "prompt": "a question testing the WRITING technique (never a trivia question about the material's own subject)", "options": ["option A", "option B"], "correct": 0, "explanation": "why that option is right, and why the other one is a common mistake, under 240 characters" },
+        { "kind": "challenge", "prompt": "a short WRITING task the reader can try — write/rewrite something, not a task about the material's subject", "hint": "a nudge, under 100 characters", "modelAnswer": "a fully worked example answer with brief reasoning, under 350 characters" },
         { "kind": "takeaway", "body": "1-2 memorable sentences to close the post — the one thing to remember" }
       ]
     }

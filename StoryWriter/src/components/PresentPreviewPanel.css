@@ -16,7 +16,8 @@
   position: relative;
   min-height: 4.5rem;
   max-height: 11rem;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 0.65rem 0.5rem;
   border-radius: 8px;
   background: var(--bg);
@@ -31,6 +32,9 @@
 
 .present-preview-panel__stage--bullets {
   text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .present-preview-panel__stage--bullets .present-rotate--bullets {

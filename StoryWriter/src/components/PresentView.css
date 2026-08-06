@@ -78,8 +78,9 @@
 
 .present-view__inner--bullets {
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: center;
   text-align: left;
+  max-width: min(1120px, 94vw);
 }
 
 .present-view__sentence-stage {
@@ -94,7 +95,7 @@
 
 .present-view__sentence-stage--bullets {
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: center;
   width: 100%;
 }
 
@@ -201,7 +202,7 @@
 
 .present-view__sentence-stage--layout-left.present-view__sentence-stage--bullets {
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .present-view__sentence-stage--layout-left .present-view__sentence--enter,
@@ -297,10 +298,8 @@
 }
 
 .present-rotate__slot-mask {
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
-  /* one line window — lines stack inside and slide through */
-  max-height: 1.45em;
   line-height: inherit;
 }
 
@@ -372,6 +371,9 @@
 .present-rotate__line {
   display: block;
   white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+  max-width: 100%;
   transform: translateY(0);
 }
 
@@ -380,6 +382,8 @@
   width: 100%;
   max-width: 100%;
   margin: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .present-rotate__mask--bullet {

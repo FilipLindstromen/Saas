@@ -343,20 +343,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const container = canvas?.parentElement
-    if (!canvas || !container) return
-    if (zoom === 1) {
-      canvas.style.width = ''
-      canvas.style.height = ''
-      return
-    }
-    const baseWidth = container.clientWidth
-    canvas.style.width = `${baseWidth * zoom}px`
-    canvas.style.height = `${baseWidth * zoom * (H() / W())}px`
-  }, [zoom])
-
+  // Must run before the zoom-sizing effect below: it sets canvas.width/height
+  // for the new format, which that effect then measures via getBoundingClientRect().
+  // React runs effects in declaration order within a commit, so this ordering
+  // is what makes "change format while zoomed" measure the new shape instead
+  // of a stale one from the previous format.
   useEffect(() => {
     formatRef.current = formatId
     const next = getSketchFormat(formatId)
@@ -379,6 +370,38 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onCommit?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formatId])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const container = canvas?.parentElement
+    if (!canvas || !container) return
+    if (zoom === 1) {
+      canvas.style.width = ''
+      canvas.style.height = ''
+      canvas.style.maxHeight = ''
+      return
+    }
+    // Measure the natural (unzoomed) rendered size first — still respecting the
+    // CSS max-height cap at this point, so this reflects the actual 100% shape
+    // rather than assuming it equals container.clientWidth (no longer true now
+    // that non-square formats are also height-constrained).
+    canvas.style.width = ''
+    canvas.style.height = ''
+    const rect = canvas.getBoundingClientRect()
+    const baseWidth = rect.width
+    const baseHeight = rect.height
+    // Once zoomed, let the box grow past the normal 85vh cap — the viewport's
+    // own overflow:auto is what keeps oversized zoomed content navigable.
+    // Without lifting the cap here, max-height would clamp height but not
+    // width, silently distorting the aspect ratio the same way the original
+    // bug did.
+    canvas.style.maxHeight = 'none'
+    canvas.style.width = `${baseWidth * zoom}px`
+    canvas.style.height = `${baseHeight * zoom}px`
+    // Re-run on formatId too: switching the aspect ratio while already zoomed
+    // must recompute against the new natural shape, not leave the previous
+    // format's stale pixel size stuck on the element.
+  }, [zoom, formatId])
 
   const drawImageFittedOnLayer = (ctx, img) => {
     ctx.clearRect(0, 0, W(), H())

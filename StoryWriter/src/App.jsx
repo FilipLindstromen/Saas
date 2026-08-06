@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import ThemeToggle from '@shared/ThemeToggle';
 import { getTheme, setTheme, initThemeSync } from '@shared/theme';
 import { getSettings, saveSettings, PRESENTATION_FONTS } from './utils/settings';
@@ -360,6 +360,46 @@ function App() {
     }
   }, [sectionOrder, sectionsData, handleSentenceImageChange]);
 
+  const hasAnyBgImages = useMemo(() => {
+    for (const sectionId of sectionOrder) {
+      const section = sectionsData[sectionId];
+      if (!section) continue;
+      if (String(section.backgroundImageUrl ?? '').trim()) return true;
+      const imgs = section.sentenceImages ?? [];
+      if (imgs.some((u) => String(u ?? '').trim())) return true;
+    }
+    return false;
+  }, [sectionOrder, sectionsData]);
+
+  const handleRemoveAllBgImages = useCallback(() => {
+    if (
+      !window.confirm(
+        'Remove all sentence backgrounds and section fallback images from this story? Locked images will be cleared too.'
+      )
+    ) {
+      return;
+    }
+    setPersisted((prev) => {
+      const nextSections = { ...prev.sectionsData };
+      for (const sectionId of prev.sectionOrder) {
+        const section = nextSections[sectionId];
+        if (!section) continue;
+        const images = section.sentenceImages;
+        const clearedImages = Array.isArray(images) ? images.map(() => '') : [];
+        const locks = section.sentenceImageLocks;
+        const clearedLocks = Array.isArray(locks) ? locks.map(() => false) : [];
+        nextSections[sectionId] = {
+          ...section,
+          sentenceImages: clearedImages,
+          sentenceImageLocks: clearedLocks,
+          backgroundImageUrl: undefined,
+          backgroundImageCredit: undefined,
+        };
+      }
+      return { ...prev, sectionsData: nextSections };
+    });
+  }, []);
+
   const createProject = useCallback(() => {
     const id = projectStorage.generateProjectId();
     const newProject = { id, name: 'Untitled', updatedAt: Date.now() };
@@ -638,6 +678,15 @@ function App() {
               </svg>
             </button>
           )}
+          <button
+            type="button"
+            className="app-header-text-btn"
+            onClick={handleRemoveAllBgImages}
+            disabled={!hasAnyBgImages}
+            title="Clear every sentence background and section fallback image in this story"
+          >
+            Remove all bg images
+          </button>
           <PresentationAnimationPopover
             rules={presentationAnimationRules}
             onApply={(rules) => setPersisted((prev) => ({ ...prev, presentationAnimationRules: rules }))}
