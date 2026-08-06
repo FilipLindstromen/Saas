@@ -48,6 +48,30 @@
   cursor: none;
 }
 
+.sketch-canvas.tool-text {
+  cursor: text;
+}
+
+.canvas-text-editor {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  min-width: 6rem;
+  max-width: min(90%, 420px);
+  border: none;
+  outline: 1px dashed var(--accent, #ff6b35);
+  outline-offset: 2px;
+  background: transparent;
+  resize: both;
+  overflow: auto;
+}
+
+.canvas-text-editor::placeholder {
+  color: var(--text-quaternary);
+  opacity: 0.85;
+}
+
 .brush-size-preview {
   position: absolute;
   pointer-events: none;

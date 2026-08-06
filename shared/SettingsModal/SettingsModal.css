@@ -13,7 +13,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--card-radius, 16px);
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-xl, 0 16px 64px rgba(0, 0, 0, 0.6));

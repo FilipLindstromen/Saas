@@ -11,6 +11,8 @@ import HistoryGallery from './components/HistoryGallery'
 import LayersPanel from './components/LayersPanel'
 import ImageContextMenu from './components/ImageContextMenu'
 import SettingsModal from '@shared/SettingsModal/SettingsModal'
+import BrandingSettings from './components/BrandingSettings'
+import { normalizeBrandColors, normalizeBrandFonts } from './constants/brand'
 import TabBar from '@shared/TabBar/TabBar'
 import { getTheme, setTheme as persistTheme, initThemeSync } from '@shared/theme'
 import { STYLES, DEFAULT_STYLE_ID } from './constants/styles'
@@ -94,8 +96,8 @@ export default function App() {
   }, [tool])
   const [smoothing, setSmoothing] = useState(savedSettings.smoothing)
   const [wobble, setWobble] = useState(savedSettings.wobble)
-  const [zoom, setZoom] = useState(1)
-  const [canvasFormat, setCanvasFormat] = useState(DEFAULT_SKETCH_FORMAT_ID)
+  const [zoom, setZoom] = useState(savedSettings.zoom)
+  const [canvasFormat, setCanvasFormat] = useState(() => normalizeSketchFormatId(savedSettings.canvasFormat))
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
 
@@ -107,6 +109,13 @@ export default function App() {
   const [variations, setVariations] = useState(savedSettings.variations)
   const [styleSectionCollapsed, setStyleSectionCollapsed] = useState(savedSettings.styleSectionCollapsed)
   const [improveGeneration, setImproveGeneration] = useState(savedSettings.improveGeneration)
+  const [brandColors, setBrandColors] = useState(() => normalizeBrandColors(savedSettings.brandColors))
+  const [brandFonts, setBrandFonts] = useState(() => normalizeBrandFonts(savedSettings.brandFonts))
+  const [useBrandColorsInGeneration, setUseBrandColorsInGeneration] = useState(savedSettings.useBrandColorsInGeneration)
+  const [textFontFamily, setTextFontFamily] = useState(savedSettings.textFontFamily)
+  const [textFontSize, setTextFontSize] = useState(savedSettings.textFontSize)
+  const [textFontBold, setTextFontBold] = useState(savedSettings.textFontBold)
+  const [brandingDraft, setBrandingDraft] = useState(null)
 
   const [view, setView] = useState('sketch')
   const [sketchSnapshot, setSketchSnapshot] = useState(null)
@@ -127,6 +136,33 @@ export default function App() {
   const [currentTabId, setCurrentTabId] = useState(null)
   const [hasHydrated, setHasHydrated] = useState(false)
 
+  const persistedSettingsRef = useRef(null)
+  persistedSettingsRef.current = {
+    tool,
+    color,
+    penSize,
+    eraserSize,
+    smoothing,
+    wobble,
+    zoom,
+    canvasFormat,
+    selectedStyleId,
+    instructions,
+    variations,
+    styleSectionCollapsed,
+    improveGeneration,
+    brandColors,
+    brandFonts,
+    useBrandColorsInGeneration,
+    textFontFamily,
+    textFontSize,
+    textFontBold,
+  }
+
+  const flushAppSettings = useCallback(() => {
+    if (persistedSettingsRef.current) saveAppSettings(persistedSettingsRef.current)
+  }, [])
+
   useEffect(() => {
     drawingKeyRef.current = currentProjectId && currentTabId ? drawingKeyFor(currentProjectId, currentTabId) : null
   }, [currentProjectId, currentTabId])
@@ -138,9 +174,12 @@ export default function App() {
   /** Loads one drawing's canvas + generation history into the (already-switched) view. */
   const loadDrawing = useCallback(async (projectId, tabId) => {
     const key = drawingKeyFor(projectId, tabId)
+    const settingsFallback = loadAppSettings()
     try {
       const snapshot = await kvGet(`canvas:${key}`)
-      const format = normalizeSketchFormatId(snapshot?.formatId)
+      const format = snapshot?.formatId != null
+        ? normalizeSketchFormatId(snapshot.formatId)
+        : normalizeSketchFormatId(settingsFallback.canvasFormat)
       setCanvasFormat(format)
       if (snapshot?.layers?.length) await canvasRef.current?.restoreLayers({ ...snapshot, formatId: format })
       else canvasRef.current?.resetBlank(format)
@@ -219,27 +258,26 @@ export default function App() {
     }
   }, [])
 
-  // Persist tool settings, style selection, instructions, and variation count
-  // so they survive a page reload — debounced since size/smoothing/wobble
-  // sliders and the instructions textarea can fire on every pixel/keystroke.
+  // Persist tool settings across reloads — debounced for sliders/text; flushed on hide/unload.
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveAppSettings({
-        tool,
-        color,
-        penSize,
-        eraserSize,
-        smoothing,
-        wobble,
-        selectedStyleId,
-        instructions,
-        variations,
-        styleSectionCollapsed,
-        improveGeneration,
-      })
+      flushAppSettings()
     }, 300)
-    return () => clearTimeout(timer)
-  }, [tool, color, penSize, eraserSize, smoothing, wobble, selectedStyleId, instructions, variations, styleSectionCollapsed, improveGeneration])
+    return () => {
+      clearTimeout(timer)
+      flushAppSettings()
+    }
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, instructions, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, flushAppSettings])
+
+  useEffect(() => {
+    const onPageHide = () => flushAppSettings()
+    window.addEventListener('pagehide', onPageHide)
+    window.addEventListener('beforeunload', onPageHide)
+    return () => {
+      window.removeEventListener('pagehide', onPageHide)
+      window.removeEventListener('beforeunload', onPageHide)
+    }
+  }, [flushAppSettings])
 
   // A persisted selectedStyleId might reference a custom/image style that was
   // deleted in a previous session — fall back once the real style list loads.
@@ -248,6 +286,23 @@ export default function App() {
       setSelectedStyleId(DEFAULT_STYLE_ID)
     }
   }, [allStyles, selectedStyleId])
+
+  const handleOpenSettings = useCallback(() => {
+    setBrandingDraft({ colors: { ...brandColors }, fonts: { ...brandFonts } })
+    setSettingsOpen(true)
+  }, [brandColors, brandFonts])
+
+  const handleSaveSettings = useCallback(() => {
+    if (brandingDraft) {
+      setBrandColors(normalizeBrandColors(brandingDraft.colors))
+      setBrandFonts(normalizeBrandFonts(brandingDraft.fonts))
+    }
+  }, [brandingDraft])
+
+  const handleApplyBrandFont = useCallback((role) => {
+    const family = brandFonts[role]
+    if (family) setTextFontFamily(family)
+  }, [brandFonts])
 
   const handleToggleTheme = useCallback((next) => {
     persistTheme(next)
@@ -498,6 +553,8 @@ export default function App() {
             instructions,
             formatId: canvasFormat,
             referenceImageDataUrl,
+            brand: { colors: brandColors, fonts: brandFonts },
+            useBrandColors: useBrandColorsInGeneration,
           })
         )
       )
@@ -529,7 +586,7 @@ export default function App() {
     } finally {
       setIsGenerating(false)
     }
-  }, [allStyles, selectedStyleId, instructions, variations, refreshHistory, canvasFormat, improveGeneration, generatedImage, sketchSnapshot])
+  }, [allStyles, selectedStyleId, instructions, variations, refreshHistory, canvasFormat, improveGeneration, generatedImage, sketchSnapshot, brandColors, brandFonts, useBrandColorsInGeneration])
 
   const handleDownload = useCallback(() => {
     if (!generatedImage) return
@@ -656,7 +713,7 @@ export default function App() {
         hasGenerated={Boolean(generatedImage)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={handleOpenSettings}
         onDownload={handleDownload}
         projects={projects}
         currentProjectId={currentProjectId}
@@ -697,6 +754,15 @@ export default function App() {
           onSmoothingChange={setSmoothing}
           wobble={wobble}
           onWobbleChange={setWobble}
+          textFontFamily={textFontFamily}
+          onTextFontFamilyChange={setTextFontFamily}
+          textFontSize={textFontSize}
+          onTextFontSizeChange={setTextFontSize}
+          textFontBold={textFontBold}
+          onTextFontBoldChange={setTextFontBold}
+          brandFonts={brandFonts}
+          brandColors={brandColors}
+          onApplyBrandFont={handleApplyBrandFont}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onClear={handleClear}
@@ -725,6 +791,9 @@ export default function App() {
               size={brushSize}
               smoothing={smoothing}
               wobble={wobble}
+              textFontFamily={textFontFamily}
+              textFontSize={textFontSize}
+              textFontBold={textFontBold}
               zoom={zoom}
               formatId={canvasFormat}
               placing={placing}
@@ -791,6 +860,8 @@ export default function App() {
             improveGeneration={improveGeneration}
             onImproveGenerationChange={setImproveGeneration}
             canImproveGeneration={Boolean(generatedImage)}
+            useBrandColors={useBrandColorsInGeneration}
+            onUseBrandColorsChange={setUseBrandColorsInGeneration}
           />
           <HistoryGallery
             items={generationHistory}
@@ -801,7 +872,11 @@ export default function App() {
         </aside>
       </div>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings}>
+        {brandingDraft ? (
+          <BrandingSettings value={brandingDraft} onChange={setBrandingDraft} />
+        ) : null}
+      </SettingsModal>
 
       {imageContextMenu && (
         <ImageContextMenu

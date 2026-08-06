@@ -1,0 +1,89 @@
+.branding-settings-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.branding-settings-desc {
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.branding-settings-subtitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  margin: 0.75rem 0 0.5rem;
+}
+
+.branding-color-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.branding-color-row {
+  display: grid;
+  grid-template-columns: 5.5rem 2rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.branding-color-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.branding-color-swatch {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.branding-color-hex {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  font-family: ui-monospace, monospace;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+}
+
+.branding-font-preview {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--button-radius);
+  border: 1px dashed var(--border-default);
+  background: var(--bg-tertiary);
+}
+
+.branding-font-preview-heading {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.branding-font-preview-body {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.branding-font-preview-accent {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent, #ff6b35);
+}

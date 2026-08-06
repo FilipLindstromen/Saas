@@ -1,14 +1,10 @@
 import { useRef } from 'react'
 import { SKETCH_FORMATS } from '../utils/canvasFormat'
+import { BRAND_FONT_ROLES, GOOGLE_FONT_OPTIONS } from '../constants/brand'
 import './OptionsBar.css'
 
 const PRESET_COLORS = ['#1a1a1a', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#9c36b5', '#ffffff']
 
-/**
- * Horizontal contextual options bar, Photoshop-style: sits under the top bar and
- * shows controls relevant to whichever tool is currently selected, plus persistent
- * canvas controls (zoom, import, undo/redo/clear) that apply regardless of tool.
- */
 export default function OptionsBar({
   tool,
   color,
@@ -19,6 +15,15 @@ export default function OptionsBar({
   onSmoothingChange,
   wobble,
   onWobbleChange,
+  textFontFamily,
+  onTextFontFamilyChange,
+  textFontSize,
+  onTextFontSizeChange,
+  textFontBold,
+  onTextFontBoldChange,
+  brandFonts,
+  brandColors,
+  onApplyBrandFont,
   onUndo,
   onRedo,
   onClear,
@@ -31,9 +36,10 @@ export default function OptionsBar({
   onCanvasFormatChange,
 }) {
   const fileInputRef = useRef(null)
-  const showColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle'
+  const showDrawColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle'
+  const showTextSettings = tool === 'text'
   const showInkDynamics = tool === 'pen' || tool === 'eraser'
-  const showSize = tool !== 'stamp' && tool !== 'move'
+  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text'
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
@@ -43,7 +49,7 @@ export default function OptionsBar({
 
   return (
     <div className="options-bar">
-      {showColor && (
+      {showDrawColor && (
         <div className="options-bar-group">
           {PRESET_COLORS.map((c) => (
             <button
@@ -66,7 +72,86 @@ export default function OptionsBar({
         </div>
       )}
 
-      {showSize && (
+      {showTextSettings && (
+        <>
+          <div className="options-bar-group options-bar-text-font-group">
+            <label htmlFor="sketch-text-font">Font</label>
+            <select
+              id="sketch-text-font"
+              className="options-bar-font-select"
+              value={textFontFamily}
+              onChange={(e) => onTextFontFamilyChange(e.target.value)}
+            >
+              {GOOGLE_FONT_OPTIONS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+          <div className="options-bar-group options-bar-brand-font-btns" role="group" aria-label="Brand fonts">
+            {BRAND_FONT_ROLES.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                className={`options-bar-brand-font-btn ${textFontFamily === brandFonts?.[key] ? 'active' : ''}`}
+                onClick={() => onApplyBrandFont(key)}
+                title={`Use brand ${label.toLowerCase()} font (${brandFonts?.[key]})`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="options-bar-group options-bar-slider-group">
+            <label htmlFor="sketch-text-size">Size</label>
+            <input
+              id="sketch-text-size"
+              type="range"
+              min="8"
+              max="120"
+              value={textFontSize}
+              onChange={(e) => onTextFontSizeChange(Number(e.target.value))}
+            />
+            <span className="options-bar-value">{textFontSize}</span>
+          </div>
+          <label className="options-bar-bold-toggle">
+            <input
+              type="checkbox"
+              checked={textFontBold}
+              onChange={(e) => onTextFontBoldChange(e.target.checked)}
+            />
+            Bold
+          </label>
+          <div className="options-bar-group">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`sketch-color-swatch ${color === c ? 'active' : ''}`}
+                style={{ '--swatch-color': c }}
+                onClick={() => onColorChange(c)}
+                title={c}
+                aria-label={`Text color ${c}`}
+              />
+            ))}
+            <button
+              type="button"
+              className={`sketch-color-swatch options-bar-brand-text-swatch ${color === brandColors?.text ? 'active' : ''}`}
+              style={{ '--swatch-color': brandColors?.text ?? '#212529' }}
+              onClick={() => onColorChange(brandColors?.text ?? '#212529')}
+              title="Brand text color"
+              aria-label="Brand text color"
+            />
+            <input
+              type="color"
+              className="sketch-color-picker"
+              value={color}
+              onChange={(e) => onColorChange(e.target.value)}
+              title="Custom text color"
+            />
+          </div>
+        </>
+      )}
+
+      {showBrushSize && (
         <div className="options-bar-group options-bar-slider-group">
           <label htmlFor="sketch-size">Size</label>
           <input

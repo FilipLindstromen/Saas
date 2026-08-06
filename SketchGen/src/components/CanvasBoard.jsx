@@ -1,5 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat'
+import { ensureGoogleFontLoaded } from '../constants/brand'
 import './CanvasBoard.css'
 
 /** @deprecated use getSketchFormat — kept for any external imports */
@@ -215,7 +216,24 @@ function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH, background = BA
 }
 
 const CanvasBoard = forwardRef(function CanvasBoard(
-  { tool, color, size, smoothing = 0, wobble = 0, zoom = 1, formatId = DEFAULT_SKETCH_FORMAT_ID, placing, onPlaced, onHistoryChange, onLayersChange, onCommit, onDropFile },
+  {
+    tool,
+    color,
+    size,
+    smoothing = 0,
+    wobble = 0,
+    zoom = 1,
+    formatId = DEFAULT_SKETCH_FORMAT_ID,
+    textFontFamily = 'Inter',
+    textFontSize = 36,
+    textFontBold = false,
+    placing,
+    onPlaced,
+    onHistoryChange,
+    onLayersChange,
+    onCommit,
+    onDropFile,
+  },
   ref
 ) {
   const canvasRef = useRef(null)
@@ -230,6 +248,9 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const sizeRef = useRef(size)
   const smoothingRef = useRef(smoothing)
   const wobbleRef = useRef(wobble)
+  const textFontFamilyRef = useRef(textFontFamily)
+  const textFontSizeRef = useRef(textFontSize)
+  const textFontBoldRef = useRef(textFontBold)
   const placingRef = useRef(placing)
   const formatRef = useRef(formatId)
   const canvasSizeRef = useRef({
@@ -256,13 +277,31 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const moveSnapshotRef = useRef(null)
   const moveStartRef = useRef(null)
   const [brushPreview, setBrushPreview] = useState(null)
+  const [textEditor, setTextEditor] = useState(null)
+  const textEditorRef = useRef(null)
+  const textInputRef = useRef(null)
 
   useEffect(() => { toolRef.current = tool }, [tool])
   useEffect(() => { colorRef.current = color }, [color])
   useEffect(() => { sizeRef.current = size }, [size])
   useEffect(() => { smoothingRef.current = smoothing }, [smoothing])
   useEffect(() => { wobbleRef.current = wobble }, [wobble])
+  useEffect(() => { textFontFamilyRef.current = textFontFamily }, [textFontFamily])
+  useEffect(() => { textFontSizeRef.current = textFontSize }, [textFontSize])
+  useEffect(() => { textFontBoldRef.current = textFontBold }, [textFontBold])
+  useEffect(() => {
+    ensureGoogleFontLoaded(textFontFamily)
+  }, [textFontFamily])
   useEffect(() => { placingRef.current = placing }, [placing])
+  useEffect(() => {
+    textEditorRef.current = textEditor
+  }, [textEditor])
+  useEffect(() => {
+    if (tool !== 'text' && textEditorRef.current) setTextEditor(null)
+  }, [tool])
+  useEffect(() => {
+    if (textEditor && textInputRef.current) textInputRef.current.focus()
+  }, [textEditor])
   useEffect(() => {
     if (!FREEHAND_INK_TOOLS.has(tool)) setBrushPreview(null)
   }, [tool])
@@ -676,12 +715,68 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   const clearBrushPreview = () => setBrushPreview(null)
 
+  const commitTextEditor = useCallback(async () => {
+    const editor = textEditorRef.current
+    if (!editor) return
+    const text = editor.value.trim()
+    if (!text) {
+      setTextEditor(null)
+      return
+    }
+    const ctx = getActiveCtx()
+    if (!ctx) {
+      setTextEditor(null)
+      return
+    }
+    const family = textFontFamilyRef.current
+    const fontSize = textFontSizeRef.current
+    const weight = textFontBoldRef.current ? 'bold' : 'normal'
+    await ensureGoogleFontLoaded(family)
+    ctx.font = `${weight} ${fontSize}px "${family}", sans-serif`
+    ctx.fillStyle = colorRef.current
+    ctx.textBaseline = 'top'
+    const lines = editor.value.replace(/\r\n/g, '\n').split('\n')
+    const lineHeight = fontSize * 1.25
+    lines.forEach((line, i) => {
+      ctx.fillText(line, editor.x, editor.y + i * lineHeight)
+    })
+    hasContentRef.current = true
+    renderComposite()
+    pushHistory()
+    setTextEditor(null)
+  }, [])
+
+  const openTextEditorAt = useCallback(async (pos) => {
+    if (textEditorRef.current) await commitTextEditor()
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const scale = rect.width / canvas.width
+    setTextEditor({
+      x: pos.x,
+      y: pos.y,
+      value: '',
+      overlayLeft: pos.x * scale,
+      overlayTop: pos.y * scale,
+      scale,
+    })
+  }, [commitTextEditor])
+
   const handlePointerDown = (e) => {
     const canvas = canvasRef.current
-    canvas.setPointerCapture(e.pointerId)
     const pos = getPos(canvas, e)
     const ctx = getActiveCtx()
     if (!ctx) return
+
+    const currentTool = toolRef.current
+
+    if (currentTool === 'text') {
+      e.preventDefault()
+      void openTextEditorAt(pos)
+      return
+    }
+
+    canvas.setPointerCapture(e.pointerId)
 
     if (placingRef.current?.img) {
       shapeSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
@@ -692,8 +787,6 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       renderComposite()
       return
     }
-
-    const currentTool = toolRef.current
 
     if (currentTool === 'move') {
       moveSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
@@ -885,6 +978,38 @@ const CanvasBoard = forwardRef(function CanvasBoard(
               ...(brushPreview.eraser ? {} : { '--brush-preview-color': color }),
             }}
             aria-hidden
+          />
+        )}
+        {textEditor && (
+          <textarea
+            ref={textInputRef}
+            className="canvas-text-editor"
+            value={textEditor.value}
+            onChange={(e) => setTextEditor((prev) => (prev ? { ...prev, value: e.target.value } : prev))}
+            onBlur={() => { void commitTextEditor() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void commitTextEditor()
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setTextEditor(null)
+              }
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              left: textEditor.overlayLeft,
+              top: textEditor.overlayTop,
+              fontSize: `${textFontSize * textEditor.scale}px`,
+              fontFamily: `"${textFontFamily}", sans-serif`,
+              fontWeight: textFontBold ? 700 : 400,
+              color,
+              lineHeight: 1.25,
+            }}
+            placeholder="Type…"
+            rows={1}
+            spellCheck={false}
           />
         )}
       </div>
