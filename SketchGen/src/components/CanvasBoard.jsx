@@ -3,6 +3,16 @@ import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat
 import { ensureGoogleFontLoaded } from '../constants/brand'
 import { drawArrowShape } from '../constants/arrowStyles'
 import { cleanUpSketchImageData, snapPointToHorizontalVertical } from '../utils/sketchAssist'
+import { separateIntoParts, hitTestPartAt } from '../utils/separateIllustration'
+import {
+  maskFromPolygon,
+  rectToPolygon,
+  polygonToSvgPath,
+  liftMaskedRegion,
+  hitTestFloatingSelection,
+  serializeFloatingSelection,
+  deserializeFloatingSelection,
+} from '../utils/selectionMask'
 import CanvasBackgroundPicker from './CanvasBackgroundPicker'
 import './CanvasBoard.css'
 
@@ -207,6 +217,28 @@ function createLayerCanvas(w, h) {
   return { canvas, ctx }
 }
 
+function partFromDef(def) {
+  const { canvas, ctx } = createLayerCanvas(def.w, def.h)
+  ctx.putImageData(def.imageData, 0, 0)
+  return { id: def.id, x: def.x, y: def.y, w: def.w, h: def.h, canvas, ctx }
+}
+
+function rebuildLayerCanvasFromParts(layer) {
+  const w = layer.canvas.width
+  const h = layer.canvas.height
+  layer.ctx.clearRect(0, 0, w, h)
+  if (!layer.parts?.length) return
+  for (const p of layer.parts) {
+    layer.ctx.drawImage(p.canvas, p.x, p.y)
+  }
+}
+
+function flattenLayerParts(layer) {
+  if (!layer.parts?.length) return
+  rebuildLayerCanvasFromParts(layer)
+  layer.parts = null
+}
+
 function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH) {
   const { canvas, ctx } = createLayerCanvas(newW, newH)
   const scale = Math.min(newW / oldW, newH / oldH)
@@ -239,6 +271,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onLayersChange,
     onCommit,
     onDropFile,
+    onSelectionChange,
   },
   ref
 ) {
@@ -285,6 +318,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const layerIdCounterRef = useRef(0)
   const moveSnapshotRef = useRef(null)
   const moveStartRef = useRef(null)
+  const partDragRef = useRef(null)
+  const floatingSelectionRef = useRef(null)
+  const lassoDraftRef = useRef(null)
+  const selectionDragRef = useRef(null)
+  const [selectedPartId, setSelectedPartId] = useState(null)
+  const [partSelectionRect, setPartSelectionRect] = useState(null)
+  const [lassoPreview, setLassoPreview] = useState(null)
+  const [selectionOutline, setSelectionOutline] = useState(null)
   const [brushPreview, setBrushPreview] = useState(null)
   const [textEditor, setTextEditor] = useState(null)
   const textEditorRef = useRef(null)
@@ -334,6 +375,28 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const getActiveLayer = () => layersRef.current.find((l) => l.id === activeLayerIdRef.current) || layersRef.current[layersRef.current.length - 1]
   const getActiveCtx = () => getActiveLayer()?.ctx
 
+  const ensureActiveLayerFlatForDrawing = () => {
+    const layer = getActiveLayer()
+    if (floatingSelectionRef.current && floatingSelectionRef.current.layerId === layer?.id) {
+      mergeFloatingSelection(true)
+    }
+    if (layer?.parts?.length) {
+      flattenLayerParts(layer)
+      setSelectedPartId(null)
+      setPartSelectionRect(null)
+    }
+  }
+
+  const syncSelectionRectForPart = (partId) => {
+    const layer = getActiveLayer()
+    if (!partId || !layer?.parts) {
+      setPartSelectionRect(null)
+      return
+    }
+    const p = layer.parts.find((item) => item.id === partId)
+    setPartSelectionRect(p ? { x: p.x, y: p.y, w: p.w, h: p.h } : null)
+  }
+
   const notifyHistory = () => {
     onHistoryChange?.({
       canUndo: historyIndexRef.current > 0,
@@ -361,7 +424,116 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     for (const layer of layersRef.current) {
       if (layer.visible) ctx.drawImage(layer.canvas, 0, 0)
     }
+    const sel = floatingSelectionRef.current
+    if (sel) {
+      const layer = layersRef.current.find((l) => l.id === sel.layerId)
+      if (layer?.visible) drawFloatingSelection(ctx, sel)
+    }
   }
+
+  /** Draws the floating selection centered on its own midpoint, rotated if needed — shared by the live composite and the final merge-down so both agree on placement. */
+  function drawFloatingSelection(targetCtx, sel) {
+    const rotation = sel.rotation || 0
+    if (!rotation) {
+      targetCtx.drawImage(sel.canvas, sel.x, sel.y)
+      return
+    }
+    const cx = sel.x + sel.w / 2
+    const cy = sel.y + sel.h / 2
+    targetCtx.save()
+    targetCtx.translate(cx, cy)
+    targetCtx.rotate(rotation)
+    targetCtx.drawImage(sel.canvas, -sel.w / 2, -sel.h / 2)
+    targetCtx.restore()
+  }
+
+  function emitSelectionChange() {
+    onSelectionChange?.({ active: Boolean(floatingSelectionRef.current) })
+  }
+
+  function updateFloatingOutline(f) {
+    if (!f) return null
+    const corners = [
+      { x: f.x, y: f.y },
+      { x: f.x + f.w, y: f.y },
+      { x: f.x + f.w, y: f.y + f.h },
+      { x: f.x, y: f.y + f.h },
+    ]
+    const rotation = f.rotation || 0
+    if (!rotation) return corners
+    const cx = f.x + f.w / 2
+    const cy = f.y + f.h / 2
+    const cos = Math.cos(rotation)
+    const sin = Math.sin(rotation)
+    return corners.map((p) => {
+      const dx = p.x - cx
+      const dy = p.y - cy
+      return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos }
+    })
+  }
+
+  /** Inverse-rotates a canvas-space point into the selection's local (unrotated) space before hit-testing. */
+  function hitTestFloatingSelectionRotated(f, x, y) {
+    if (!f) return false
+    const rotation = f.rotation || 0
+    if (!rotation) return hitTestFloatingSelection(f, x, y)
+    const cx = f.x + f.w / 2
+    const cy = f.y + f.h / 2
+    const dx = x - cx
+    const dy = y - cy
+    const cos = Math.cos(-rotation)
+    const sin = Math.sin(-rotation)
+    return hitTestFloatingSelection(f, cx + dx * cos - dy * sin, cy + dx * sin + dy * cos)
+  }
+
+  function mergeFloatingSelection(silent = false) {
+    const sel = floatingSelectionRef.current
+    if (!sel) return
+    const layer = layersRef.current.find((l) => l.id === sel.layerId)
+    if (layer) {
+      if (layer.parts?.length) flattenLayerParts(layer)
+      drawFloatingSelection(layer.ctx, sel)
+    }
+    floatingSelectionRef.current = null
+    setSelectionOutline(null)
+    renderComposite()
+    emitSelectionChange()
+    if (!silent) pushHistory()
+  }
+
+  function removeFloatingSelection() {
+    if (!floatingSelectionRef.current) return
+    floatingSelectionRef.current = null
+    setSelectionOutline(null)
+    renderComposite()
+    emitSelectionChange()
+    pushHistory()
+  }
+
+  function commitLassoPolygon(points) {
+    if (points.length < 3) return false
+    mergeFloatingSelection(true)
+    ensureActiveLayerFlatForDrawing()
+    const layer = getActiveLayer()
+    if (!layer) return false
+    const w = W()
+    const h = H()
+    const mask = maskFromPolygon(points, w, h)
+    const lifted = liftMaskedRegion(layer.ctx, mask, w, h)
+    if (!lifted) return false
+    floatingSelectionRef.current = { ...lifted, layerId: layer.id, rotation: 0 }
+    setSelectionOutline(updateFloatingOutline(floatingSelectionRef.current))
+    hasContentRef.current = true
+    renderComposite()
+    emitSelectionChange()
+    pushHistory()
+    return true
+  }
+
+  useEffect(() => {
+    if (tool !== 'select') mergeFloatingSelection(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool])
 
   useEffect(() => {
     renderComposite()
@@ -369,14 +541,28 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   const pushHistory = () => {
     if (!layersRef.current.length) return
+    const w = W()
+    const h = H()
     const snapshot = {
-      layers: layersRef.current.map((l) => ({
-        id: l.id,
-        name: l.name,
-        visible: l.visible,
-        imageData: l.ctx.getImageData(0, 0, W(), H()),
-      })),
+      layers: layersRef.current.map((l) => {
+        const base = { id: l.id, name: l.name, visible: l.visible, kind: l.kind }
+        if (l.parts?.length) {
+          return {
+            ...base,
+            parts: l.parts.map((p) => ({
+              id: p.id,
+              x: p.x,
+              y: p.y,
+              w: p.w,
+              h: p.h,
+              imageData: p.ctx.getImageData(0, 0, p.w, p.h),
+            })),
+          }
+        }
+        return { ...base, imageData: l.ctx.getImageData(0, 0, w, h) }
+      }),
       activeLayerId: activeLayerIdRef.current,
+      floatingSelection: serializeFloatingSelection(floatingSelectionRef.current),
     }
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1)
     historyRef.current.push(snapshot)
@@ -389,10 +575,21 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const restoreHistoryEntry = (entry) => {
     layersRef.current = entry.layers.map((saved) => {
       const { canvas, ctx } = createLayerCanvas(W(), H())
+      if (saved.parts?.length) {
+        const parts = saved.parts.map((p) => partFromDef(p))
+        const layer = { id: saved.id, name: saved.name, visible: saved.visible, kind: saved.kind, canvas, ctx, parts }
+        rebuildLayerCanvasFromParts(layer)
+        return layer
+      }
       ctx.putImageData(saved.imageData, 0, 0)
-      return { id: saved.id, name: saved.name, visible: saved.visible, canvas, ctx }
+      return { id: saved.id, name: saved.name, visible: saved.visible, kind: saved.kind, canvas, ctx }
     })
     activeLayerIdRef.current = entry.activeLayerId
+    floatingSelectionRef.current = deserializeFloatingSelection(entry.floatingSelection)
+    setSelectionOutline(updateFloatingOutline(floatingSelectionRef.current))
+    emitSelectionChange()
+    setSelectedPartId(null)
+    setPartSelectionRect(null)
     renderComposite()
     notifyLayers()
   }
@@ -433,9 +630,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     if (next.width === oldW && next.height === oldH) return
 
     layersRef.current = layersRef.current.map((layer) => {
+      flattenLayerParts(layer)
       const resized = resizeLayerCanvas(layer.canvas, oldW, oldH, next.width, next.height)
-      return { ...layer, canvas: resized.canvas, ctx: resized.ctx }
+      return { ...layer, canvas: resized.canvas, ctx: resized.ctx, parts: null }
     })
+    mergeFloatingSelection(true)
     canvasSizeRef.current = { w: next.width, h: next.height }
     const canvas = canvasRef.current
     if (canvas) {
@@ -450,34 +649,22 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const container = canvas?.parentElement
-    if (!canvas || !container) return
+    const stage = canvas?.parentElement
+    if (!canvas || !stage) return
     if (zoom === 1) {
-      canvas.style.width = ''
-      canvas.style.height = ''
-      canvas.style.maxHeight = ''
+      stage.style.width = ''
+      stage.style.height = ''
+      stage.style.maxHeight = ''
       return
     }
-    // Measure the natural (unzoomed) rendered size first — still respecting the
-    // CSS max-height cap at this point, so this reflects the actual 100% shape
-    // rather than assuming it equals container.clientWidth (no longer true now
-    // that non-square formats are also height-constrained).
-    canvas.style.width = ''
-    canvas.style.height = ''
-    const rect = canvas.getBoundingClientRect()
+    stage.style.width = ''
+    stage.style.height = ''
+    const rect = stage.getBoundingClientRect()
     const baseWidth = rect.width
     const baseHeight = rect.height
-    // Once zoomed, let the box grow past the normal 85vh cap — the viewport's
-    // own overflow:auto is what keeps oversized zoomed content navigable.
-    // Without lifting the cap here, max-height would clamp height but not
-    // width, silently distorting the aspect ratio the same way the original
-    // bug did.
-    canvas.style.maxHeight = 'none'
-    canvas.style.width = `${baseWidth * zoom}px`
-    canvas.style.height = `${baseHeight * zoom}px`
-    // Re-run on formatId too: switching the aspect ratio while already zoomed
-    // must recompute against the new natural shape, not leave the previous
-    // format's stale pixel size stuck on the element.
+    stage.style.maxHeight = 'none'
+    stage.style.width = `${baseWidth * zoom}px`
+    stage.style.height = `${baseHeight * zoom}px`
   }, [zoom, formatId])
 
   const drawImageFittedOnLayer = (ctx, img) => {
@@ -610,11 +797,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       notifyHistory()
     },
     /** Export every layer as a transparent PNG for autosave. */
-    exportLayers: () => ({
-      formatId: formatRef.current,
-      layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, dataUrl: l.canvas.toDataURL('image/png') })),
-      activeLayerId: activeLayerIdRef.current,
-    }),
+    exportLayers: () => {
+      for (const layer of layersRef.current) {
+        if (layer.parts?.length) rebuildLayerCanvasFromParts(layer)
+      }
+      return {
+        formatId: formatRef.current,
+        layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, dataUrl: l.canvas.toDataURL('image/png') })),
+        activeLayerId: activeLayerIdRef.current,
+      }
+    },
     getFormatId: () => formatRef.current,
     addLayer: () => {
       layerIdCounterRef.current += 1
@@ -641,8 +833,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       pushHistory()
     },
     setActiveLayer: (id) => {
+      if (floatingSelectionRef.current && activeLayerIdRef.current !== id) {
+        mergeFloatingSelection(true)
+      }
       if (!layersRef.current.some((l) => l.id === id)) return
       activeLayerIdRef.current = id
+      setSelectedPartId(null)
+      setPartSelectionRect(null)
       notifyLayers()
     },
     /** Reorder stack bottom-to-top by layer id (must include every layer exactly once). */
@@ -677,6 +874,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       onCommit?.()
     },
     cleanUpActiveLayer: () => {
+      const layer = getActiveLayer()
+      if (layer?.parts?.length) flattenLayerParts(layer)
       const ctx = getActiveCtx()
       if (!ctx) return
       const w = W()
@@ -688,6 +887,66 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       renderComposite()
       pushHistory()
       onCommit?.()
+    },
+    /** Split the active layer into connected parts (icons, labels, arrows) for individual move. */
+    separateActiveLayerIntoParts: () => {
+      mergeFloatingSelection(true)
+      const layer = getActiveLayer()
+      if (!layer) return { ok: false, reason: 'no-layer' }
+      if (layer.parts?.length) return { ok: false, reason: 'already-parts' }
+      const w = W()
+      const h = H()
+      const imageData = layer.ctx.getImageData(0, 0, w, h)
+      const defs = separateIntoParts(imageData, w, h, backgroundColorRef.current)
+      if (defs.length < 2) {
+        return { ok: false, reason: 'too-few-parts', count: defs.length }
+      }
+      layer.parts = defs.map((d) => partFromDef(d))
+      rebuildLayerCanvasFromParts(layer)
+      setSelectedPartId(null)
+      hasContentRef.current = true
+      renderComposite()
+      pushHistory()
+      onCommit?.()
+      return { ok: true, count: defs.length }
+    },
+    applyFloatingSelection: () => mergeFloatingSelection(false),
+    deleteFloatingSelection: () => removeFloatingSelection(),
+    scaleFloatingSelection: (percent) => {
+      const f = floatingSelectionRef.current
+      if (!f) return
+      const scale = Math.min(400, Math.max(25, percent)) / 100
+      const cx = f.x + f.w / 2
+      const cy = f.y + f.h / 2
+      const nw = Math.max(1, Math.round(f.w * scale))
+      const nh = Math.max(1, Math.round(f.h * scale))
+      const { canvas, ctx } = createLayerCanvas(nw, nh)
+      ctx.drawImage(f.canvas, 0, 0, f.w, f.h, 0, 0, nw, nh)
+      f.canvas = canvas
+      f.ctx = ctx
+      f.w = nw
+      f.h = nh
+      f.x = Math.round(cx - nw / 2)
+      f.y = Math.round(cy - nh / 2)
+      f.outline = updateFloatingOutline(f)
+      setSelectionOutline(f.outline)
+      renderComposite()
+      pushHistory()
+    },
+    rotateFloatingSelection: (degrees) => {
+      const f = floatingSelectionRef.current
+      if (!f) return
+      f.rotation = (degrees * Math.PI) / 180
+      f.outline = updateFloatingOutline(f)
+      setSelectionOutline(f.outline)
+      renderComposite()
+      pushHistory()
+    },
+    /** Lifts the whole active layer into a floating selection so Ctrl+T can free-transform it directly, Photoshop-style, without the user drawing a lasso first. No-op if a selection is already floating. */
+    selectAllOnActiveLayer: () => {
+      if (floatingSelectionRef.current) return false
+      ensureActiveLayerFlatForDrawing()
+      return commitLassoPolygon(rectToPolygon({ x: 0, y: 0 }, { x: W(), y: H() }))
     },
   }))
 
@@ -885,12 +1144,56 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       return
     }
 
+    if (currentTool === 'select') {
+      ensureActiveLayerFlatForDrawing()
+      const floating = floatingSelectionRef.current
+      if (floating && hitTestFloatingSelectionRotated(floating, pos.x, pos.y)) {
+        selectionDragRef.current = {
+          startX: pos.x,
+          startY: pos.y,
+          origX: floating.x,
+          origY: floating.y,
+        }
+        drawingRef.current = true
+        return
+      }
+      mergeFloatingSelection(true)
+      const mode = e.shiftKey ? 'rect' : 'lasso'
+      lassoDraftRef.current = { mode, points: [pos], start: pos, end: pos }
+      setLassoPreview({ mode, points: [pos], end: pos })
+      drawingRef.current = true
+      return
+    }
+
     if (currentTool === 'move') {
+      const layer = getActiveLayer()
+      if (layer?.parts?.length) {
+        const hit = hitTestPartAt(layer.parts, pos.x, pos.y)
+        if (hit) {
+          const part = layer.parts.find((p) => p.id === hit)
+          setSelectedPartId(hit)
+          syncSelectionRectForPart(hit)
+          partDragRef.current = {
+            partId: hit,
+            startX: pos.x,
+            startY: pos.y,
+            partStartX: part.x,
+            partStartY: part.y,
+          }
+          drawingRef.current = true
+          return
+        }
+        setSelectedPartId(null)
+        setPartSelectionRect(null)
+        return
+      }
       moveSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
       moveStartRef.current = pos
       drawingRef.current = true
       return
     }
+
+    ensureActiveLayerFlatForDrawing()
 
     if (currentTool === 'fill') {
       floodFill(ctx, pos.x, pos.y, colorRef.current)
@@ -948,7 +1251,47 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     const currentTool = toolRef.current
 
+    if (currentTool === 'select' && drawingRef.current) {
+      if (selectionDragRef.current && floatingSelectionRef.current) {
+        const drag = selectionDragRef.current
+        const f = floatingSelectionRef.current
+        f.x = Math.round(drag.origX + pos.x - drag.startX)
+        f.y = Math.round(drag.origY + pos.y - drag.startY)
+        f.outline = updateFloatingOutline(f)
+        setSelectionOutline(f.outline)
+        renderComposite()
+        return
+      }
+      const draft = lassoDraftRef.current
+      if (draft) {
+        draft.end = pos
+        if (draft.mode === 'rect') {
+          setLassoPreview({ mode: 'rect', points: rectToPolygon(draft.start, pos), end: pos })
+        } else {
+          const last = draft.points[draft.points.length - 1]
+          if (Math.hypot(pos.x - last.x, pos.y - last.y) >= 2) {
+            draft.points.push(pos)
+          }
+          setLassoPreview({ mode: 'lasso', points: [...draft.points, pos], end: pos })
+        }
+      }
+      return
+    }
+
     if (currentTool === 'move') {
+      const layer = getActiveLayer()
+      if (partDragRef.current && layer?.parts?.length) {
+        const drag = partDragRef.current
+        const part = layer.parts.find((p) => p.id === drag.partId)
+        if (part) {
+          part.x = Math.round(drag.partStartX + pos.x - drag.startX)
+          part.y = Math.round(drag.partStartY + pos.y - drag.startY)
+          rebuildLayerCanvasFromParts(layer)
+          renderComposite()
+          syncSelectionRectForPart(drag.partId)
+        }
+        return
+      }
       const dx = Math.round(pos.x - moveStartRef.current.x)
       const dy = Math.round(pos.y - moveStartRef.current.y)
       ctx.clearRect(0, 0, W(), H())
@@ -1011,11 +1354,34 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       return
     }
 
+    if (drawingRef.current && toolRef.current === 'select') {
+      drawingRef.current = false
+      if (selectionDragRef.current) {
+        selectionDragRef.current = null
+        pushHistory()
+        return
+      }
+      const draft = lassoDraftRef.current
+      const end = draft?.end
+      lassoDraftRef.current = null
+      setLassoPreview(null)
+      if (!draft || !end) return
+      const points =
+        draft.mode === 'rect' ? rectToPolygon(draft.start, end) : draft.points.length >= 3 ? draft.points : null
+      if (points) commitLassoPolygon(points)
+      return
+    }
+
     if (drawingRef.current && toolRef.current === 'move') {
       drawingRef.current = false
-      moveSnapshotRef.current = null
-      moveStartRef.current = null
-      pushHistory()
+      if (partDragRef.current) {
+        partDragRef.current = null
+        pushHistory()
+      } else {
+        moveSnapshotRef.current = null
+        moveStartRef.current = null
+        pushHistory()
+      }
       return
     }
 
@@ -1060,6 +1426,9 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   }
 
   const aspect = getSketchFormat(formatId)
+  const canvasW = W()
+  const canvasH = H()
+  const activeLayerHasParts = Boolean(getActiveLayer()?.parts?.length)
 
   return (
     <div className="sketch-canvas-viewport" onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -1073,16 +1442,54 @@ const CanvasBoard = forwardRef(function CanvasBoard(
             />
           </div>
         )}
-        <canvas
-          ref={canvasRef}
-          className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}`}
+        <div
+          className="sketch-canvas-stage"
           style={{ aspectRatio: `${aspect.width} / ${aspect.height}`, backgroundColor }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerLeave}
-          onPointerEnter={handlePointerEnter}
-        />
+        >
+          <canvas
+            ref={canvasRef}
+            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'select' ? ' tool-select' : ''}`}
+            style={{ backgroundColor }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerLeave}
+            onPointerEnter={handlePointerEnter}
+          />
+          {partSelectionRect && canvasW > 0 && canvasH > 0 && (
+            <div
+              className="canvas-part-selection"
+              style={{
+                left: `${(partSelectionRect.x / canvasW) * 100}%`,
+                top: `${(partSelectionRect.y / canvasH) * 100}%`,
+                width: `${(partSelectionRect.w / canvasW) * 100}%`,
+                height: `${(partSelectionRect.h / canvasH) * 100}%`,
+              }}
+              aria-hidden
+            />
+          )}
+          {(lassoPreview?.points?.length || selectionOutline?.length) && canvasW > 0 && canvasH > 0 && (
+            <svg
+              className="canvas-selection-overlay"
+              viewBox={`0 0 ${canvasW} ${canvasH}`}
+              preserveAspectRatio="none"
+              aria-hidden
+            >
+              {lassoPreview?.points?.length ? (
+                <path
+                  d={polygonToSvgPath(lassoPreview.points, lassoPreview.mode === 'rect')}
+                  className="canvas-lasso-preview"
+                />
+              ) : null}
+              {selectionOutline?.length ? (
+                <path
+                  d={polygonToSvgPath(selectionOutline, true)}
+                  className="canvas-selection-marching"
+                />
+              ) : null}
+            </svg>
+          )}
+        </div>
         {brushPreview && (
           <div
             className={`brush-size-preview${brushPreview.eraser ? ' eraser' : ' pen'}`}

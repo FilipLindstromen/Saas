@@ -227,3 +227,18 @@
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
   pointer-events: none;
 }
+
+.options-bar-selection-group {
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+}
+
+.options-bar-selection-scale,
+.options-bar-selection-rotation {
+  min-width: 10rem;
+}
+
+.options-bar-selection-scale input:disabled,
+.options-bar-selection-rotation input:disabled {
+  opacity: 0.45;
+}

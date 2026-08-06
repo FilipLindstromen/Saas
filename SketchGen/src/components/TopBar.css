@@ -72,3 +72,38 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
+.sketchgen-brand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sketchgen-brand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.sketchgen-brand-btn-swatches {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.sketchgen-brand-btn-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--swatch-color, #ccc);
+  border: 1px solid color-mix(in srgb, var(--swatch-color) 70%, #000);
+  box-sizing: border-box;
+}

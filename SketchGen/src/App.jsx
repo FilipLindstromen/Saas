@@ -145,6 +145,9 @@ export default function App() {
   const [layers, setLayers] = useState([])
   const [activeLayerId, setActiveLayerId] = useState(null)
   const [imageContextMenu, setImageContextMenu] = useState(null)
+  const [selectionActive, setSelectionActive] = useState(false)
+  const [selectionScale, setSelectionScale] = useState(100)
+  const [selectionRotation, setSelectionRotation] = useState(0)
 
   const [projects, setProjects] = useState([])
   const [currentProjectId, setCurrentProjectId] = useState(null)
@@ -314,11 +317,11 @@ export default function App() {
   }, [brandColors, brandFonts])
 
   const handleSaveSettings = useCallback(() => {
-    if (brandingDraft) {
-      setBrandColors(normalizeBrandColors(brandingDraft.colors))
-      setBrandFonts(normalizeBrandFonts(brandingDraft.fonts))
-    }
-  }, [brandingDraft])
+    const draft = brandingDraft ?? { colors: brandColors, fonts: brandFonts }
+    setBrandColors(normalizeBrandColors(draft.colors))
+    setBrandFonts(normalizeBrandFonts(draft.fonts))
+    setBrandingDraft(null)
+  }, [brandingDraft, brandColors, brandFonts])
 
   const handleApplyBrandFont = useCallback((role) => {
     const family = brandFonts[role]
@@ -481,6 +484,89 @@ export default function App() {
   const handleCleanUpSketch = useCallback(() => {
     canvasRef.current?.cleanUpActiveLayer?.()
   }, [])
+
+  const handleSeparateParts = useCallback(() => {
+    setError('')
+    const result = canvasRef.current?.separateActiveLayerIntoParts?.()
+    if (!result?.ok) {
+      if (result?.reason === 'already-parts') {
+        setError('This layer is already separated. Use the move tool on individual parts.')
+      } else if (result?.reason === 'too-few-parts') {
+        setError('Could not find enough separate regions. Try a flat background and clear gaps between elements.')
+      } else {
+        setError('Select a layer with an illustration to separate.')
+      }
+    } else {
+      setTool('move')
+    }
+  }, [])
+
+  const handleSelectionChange = useCallback(({ active }) => {
+    setSelectionActive(active)
+    if (!active) {
+      setSelectionScale(100)
+      setSelectionRotation(0)
+    }
+  }, [])
+
+  const handleApplySelection = useCallback(() => {
+    canvasRef.current?.applyFloatingSelection?.()
+  }, [])
+
+  const handleDeleteSelection = useCallback(() => {
+    canvasRef.current?.deleteFloatingSelection?.()
+    setSelectionScale(100)
+    setSelectionRotation(0)
+  }, [])
+
+  const handleSelectionScaleChange = useCallback((percent) => {
+    setSelectionScale(percent)
+    canvasRef.current?.scaleFloatingSelection?.(percent)
+  }, [])
+
+  const handleSelectionRotationChange = useCallback((degrees) => {
+    setSelectionRotation(degrees)
+    canvasRef.current?.rotateFloatingSelection?.(degrees)
+  }, [])
+
+  /** Ctrl+T (Photoshop's Free Transform): switch to the Select tool and, if
+   * nothing is already floating, lift the whole active layer so the user gets
+   * an immediate scale/rotate box without drawing a lasso first. */
+  const handleTransformShortcut = useCallback(() => {
+    setTool('select')
+    setSelectionScale(100)
+    setSelectionRotation(0)
+    canvasRef.current?.selectAllOnActiveLayer?.()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const target = e.target
+      const isEditable = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+      if (isEditable) return
+      if (view !== 'sketch') return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        handleTransformShortcut()
+        return
+      }
+      if (!selectionActive) return
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        handleDeleteSelection()
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleApplySelection()
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        handleApplySelection()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [view, selectionActive, handleDeleteSelection, handleApplySelection, handleTransformShortcut])
 
   const handleStartPlacing = useCallback(async ({ url, maxDim, label }) => {
     setError('')
@@ -1019,6 +1105,8 @@ export default function App() {
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}
+        onOpenBranding={handleOpenSettings}
+        brandColors={brandColors}
         onExport={handleExport}
         projects={projects}
         currentProjectId={currentProjectId}
@@ -1101,6 +1189,14 @@ export default function App() {
           penSnapHV={penSnapHV}
           onPenSnapHVChange={setPenSnapHV}
           onCleanUpSketch={handleCleanUpSketch}
+          onSeparateParts={handleSeparateParts}
+          selectionActive={selectionActive}
+          selectionScale={selectionScale}
+          onSelectionScaleChange={handleSelectionScaleChange}
+          selectionRotation={selectionRotation}
+          onSelectionRotationChange={handleSelectionRotationChange}
+          onDeleteSelection={handleDeleteSelection}
+          onApplySelection={handleApplySelection}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onClear={handleClear}
@@ -1153,6 +1249,7 @@ export default function App() {
               }}
               onLayersChange={handleLayersChange}
               onCommit={scheduleAutosave}
+              onSelectionChange={handleSelectionChange}
             />
           </div>
 
@@ -1188,36 +1285,40 @@ export default function App() {
               onCancelPlacing={() => setPlacing(null)}
             />
           )}
-          <StyleGrid
-            styles={allStyles}
-            selectedId={selectedStyleId}
-            onSelect={setSelectedStyleId}
-            onAddCustomStyle={handleAddCustomStyle}
-            onDeleteCustomStyle={handleDeleteCustomStyle}
-            onUploadImageStyle={handleUploadImageStyle}
-            onDeleteImageStyle={handleDeleteImageStyle}
-            collapsed={styleSectionCollapsed}
-            onCollapsedChange={setStyleSectionCollapsed}
-          />
-          <PromptBar
-            value={instructions}
-            onChange={setInstructions}
-            onGenerate={handleGenerate}
-            isGenerating={isGenerating}
-            generationProgress={generationProgress}
-            error={error}
-            variations={variations}
-            onVariationsChange={setVariations}
-            improveGeneration={improveGeneration}
-            onImproveGenerationChange={setImproveGeneration}
-            canImproveGeneration={Boolean(generatedImage)}
-            useBrandColors={useBrandColorsInGeneration}
-            onUseBrandColorsChange={setUseBrandColorsInGeneration}
-            generationQuality={generationQuality}
-            onGenerationQualityChange={setGenerationQuality}
-            addGenerationsAsLayers={addGenerationsAsLayers}
-            onAddGenerationsAsLayersChange={setAddGenerationsAsLayers}
-          />
+          {tool !== 'stamp' && (
+            <StyleGrid
+              styles={allStyles}
+              selectedId={selectedStyleId}
+              onSelect={setSelectedStyleId}
+              onAddCustomStyle={handleAddCustomStyle}
+              onDeleteCustomStyle={handleDeleteCustomStyle}
+              onUploadImageStyle={handleUploadImageStyle}
+              onDeleteImageStyle={handleDeleteImageStyle}
+              collapsed={styleSectionCollapsed}
+              onCollapsedChange={setStyleSectionCollapsed}
+            />
+          )}
+          {tool !== 'stamp' && (
+            <PromptBar
+              value={instructions}
+              onChange={setInstructions}
+              onGenerate={handleGenerate}
+              isGenerating={isGenerating}
+              generationProgress={generationProgress}
+              error={error}
+              variations={variations}
+              onVariationsChange={setVariations}
+              improveGeneration={improveGeneration}
+              onImproveGenerationChange={setImproveGeneration}
+              canImproveGeneration={Boolean(generatedImage)}
+              useBrandColors={useBrandColorsInGeneration}
+              onUseBrandColorsChange={setUseBrandColorsInGeneration}
+              generationQuality={generationQuality}
+              onGenerationQualityChange={setGenerationQuality}
+              addGenerationsAsLayers={addGenerationsAsLayers}
+              onAddGenerationsAsLayersChange={setAddGenerationsAsLayers}
+            />
+          )}
           <GenerationQueue
             jobs={genQueue}
             onCancel={handleCancelGenerationJob}
@@ -1236,9 +1337,10 @@ export default function App() {
       </div>
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings}>
-        {brandingDraft ? (
-          <BrandingSettings value={brandingDraft} onChange={setBrandingDraft} />
-        ) : null}
+        <BrandingSettings
+          value={brandingDraft ?? { colors: brandColors, fonts: brandFonts }}
+          onChange={setBrandingDraft}
+        />
       </SettingsModal>
 
       {imageContextMenu && (

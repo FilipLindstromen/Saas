@@ -30,6 +30,14 @@ export default function OptionsBar({
   penSnapHV,
   onPenSnapHVChange,
   onCleanUpSketch,
+  onSeparateParts,
+  selectionActive,
+  selectionScale,
+  onSelectionScaleChange,
+  selectionRotation,
+  onSelectionRotationChange,
+  onDeleteSelection,
+  onApplySelection,
   onUndo,
   onRedo,
   onClear,
@@ -46,7 +54,7 @@ export default function OptionsBar({
   const showTextSettings = tool === 'text'
   const showArrowSettings = tool === 'arrow'
   const showInkDynamics = tool === 'pen' || tool === 'eraser'
-  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text'
+  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text' && tool !== 'select'
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
@@ -243,6 +251,62 @@ export default function OptionsBar({
         >
           Clean up
         </button>
+      )}
+
+      <button
+        type="button"
+        className="options-bar-btn options-bar-separate-btn"
+        onClick={onSeparateParts}
+        title="Split illustration into movable parts (icons, labels, arrows) on the active layer"
+      >
+        Separate parts
+      </button>
+
+      {(selectionActive || tool === 'select') && (
+        <div className="options-bar-group options-bar-selection-group">
+          <button
+            type="button"
+            className="options-bar-btn"
+            onClick={onApplySelection}
+            title="Place selection on the layer (Enter)"
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            className="options-bar-btn options-bar-clear-btn"
+            onClick={onDeleteSelection}
+            title="Delete selected pixels (Delete)"
+          >
+            Delete
+          </button>
+          <div className="options-bar-slider-group options-bar-selection-scale">
+            <label htmlFor="selection-scale">Scale</label>
+            <input
+              id="selection-scale"
+              type="range"
+              min="25"
+              max="400"
+              value={selectionScale}
+              disabled={!selectionActive}
+              onChange={(e) => onSelectionScaleChange(Number(e.target.value))}
+            />
+            <span className="options-bar-value">{selectionScale}%</span>
+          </div>
+          <div className="options-bar-slider-group options-bar-selection-rotation">
+            <label htmlFor="selection-rotation">Rotate</label>
+            <input
+              id="selection-rotation"
+              type="range"
+              min="-180"
+              max="180"
+              value={selectionRotation}
+              disabled={!selectionActive}
+              onChange={(e) => onSelectionRotationChange(Number(e.target.value))}
+            />
+            <span className="options-bar-value">{selectionRotation}°</span>
+          </div>
+        </div>
       )}
 
       <div className="options-bar-spacer" />
