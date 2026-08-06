@@ -32,6 +32,7 @@ export default function OptionsBar({
   onCleanUpSketch,
   onSeparateParts,
   selectionActive,
+  selectionFloating,
   selectionScale,
   onSelectionScaleChange,
   selectionRotation,
@@ -54,7 +55,7 @@ export default function OptionsBar({
   const showTextSettings = tool === 'text'
   const showArrowSettings = tool === 'arrow'
   const showInkDynamics = tool === 'pen' || tool === 'eraser'
-  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text' && tool !== 'select'
+  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text' && tool !== 'select' && tool !== 'wand'
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
@@ -272,24 +273,26 @@ export default function OptionsBar({
         </svg>
       </button>
 
-      {(selectionActive || tool === 'select') && (
+      {(selectionActive || tool === 'select' || tool === 'wand') && (
         <div className="options-bar-group options-bar-selection-group">
           <button
             type="button"
             className="options-bar-btn"
             onClick={onApplySelection}
-            title="Place selection on the layer (Enter)"
+            title={selectionFloating ? 'Place selection on the layer (Enter)' : 'Clear color selection (Escape)'}
           >
-            Apply
+            {selectionFloating ? 'Apply' : 'Deselect'}
           </button>
           <button
             type="button"
             className="options-bar-btn options-bar-clear-btn"
             onClick={onDeleteSelection}
-            title="Delete selected pixels (Delete)"
+            title={selectionFloating ? 'Delete selected pixels (Delete)' : 'Clear selected area to transparent (Delete)'}
           >
             Delete
           </button>
+          {selectionFloating && (
+            <>
           <div className="options-bar-slider-group options-bar-selection-scale">
             <label htmlFor="selection-scale">Scale</label>
             <input
@@ -316,6 +319,8 @@ export default function OptionsBar({
             />
             <span className="options-bar-value">{selectionRotation}°</span>
           </div>
+            </>
+          )}
         </div>
       )}
 

@@ -148,6 +148,7 @@ export default function App() {
   const [activeLayerId, setActiveLayerId] = useState(null)
   const [imageContextMenu, setImageContextMenu] = useState(null)
   const [selectionActive, setSelectionActive] = useState(false)
+  const [selectionFloating, setSelectionFloating] = useState(false)
   const [selectionScale, setSelectionScale] = useState(100)
   const [selectionRotation, setSelectionRotation] = useState(0)
 
@@ -535,8 +536,9 @@ export default function App() {
     }
   }, [])
 
-  const handleSelectionChange = useCallback(({ active }) => {
+  const handleSelectionChange = useCallback(({ active, floating }) => {
     setSelectionActive(active)
+    setSelectionFloating(Boolean(floating))
     if (!active) {
       setSelectionScale(100)
       setSelectionRotation(0)
@@ -1229,6 +1231,7 @@ export default function App() {
           onCleanUpSketch={handleCleanUpSketch}
           onSeparateParts={handleSeparateParts}
           selectionActive={selectionActive}
+          selectionFloating={selectionFloating}
           selectionScale={selectionScale}
           onSelectionScaleChange={handleSelectionScaleChange}
           selectionRotation={selectionRotation}

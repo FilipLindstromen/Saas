@@ -1,3 +1,99 @@
+function parseHexRgb(hex) {
+  const clean = String(hex || '#000000').replace('#', '')
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean
+  const num = parseInt(full, 16)
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
+}
+
+/** Connected pixels matching the color at (startX, startY), same tolerance model as flood fill. */
+export function floodSelectMask(rgba, width, height, startX, startY, tolerance = 40) {
+  const mask = new Uint8Array(width * height)
+  const sx = Math.floor(startX)
+  const sy = Math.floor(startY)
+  if (sx < 0 || sx >= width || sy < 0 || sy >= height) return mask
+
+  const data = rgba
+  const startIdx = (sy * width + sx) * 4
+  const startR = data[startIdx]
+  const startG = data[startIdx + 1]
+  const startB = data[startIdx + 2]
+  const startA = data[startIdx + 3]
+
+  const tol2 = tolerance * tolerance
+  const matches = (idx) => {
+    const dr = data[idx] - startR
+    const dg = data[idx + 1] - startG
+    const db = data[idx + 2] - startB
+    const da = data[idx + 3] - startA
+    return dr * dr + dg * dg + db * db + da * da <= tol2
+  }
+
+  const stack = [[sx, sy]]
+  while (stack.length) {
+    const [x, y] = stack.pop()
+    if (x < 0 || x >= width || y < 0 || y >= height) continue
+    const pixelIdx = y * width + x
+    if (mask[pixelIdx]) continue
+    const idx = pixelIdx * 4
+    if (!matches(idx)) continue
+    mask[pixelIdx] = 1
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1])
+  }
+  return mask
+}
+
+export function maskHasPixels(mask) {
+  if (!mask?.length) return false
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i]) return true
+  }
+  return false
+}
+
+/** Fill every selected pixel on the layer with a solid color. */
+export function fillMaskOnLayer(ctx, mask, width, height, fillHex) {
+  const fill = parseHexRgb(fillHex)
+  const imageData = ctx.getImageData(0, 0, width, height)
+  const data = imageData.data
+  for (let i = 0; i < mask.length; i += 1) {
+    if (!mask[i]) continue
+    const p = i * 4
+    data[p] = fill.r
+    data[p + 1] = fill.g
+    data[p + 2] = fill.b
+    data[p + 3] = 255
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
+/** After drawing, restore pixels outside the mask from a pre-stroke snapshot. */
+export function constrainImageDataToMask(afterImageData, beforeImageData, mask) {
+  const a = afterImageData.data
+  const b = beforeImageData.data
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i]) continue
+    const p = i * 4
+    a[p] = b[p]
+    a[p + 1] = b[p + 1]
+    a[p + 2] = b[p + 2]
+    a[p + 3] = b[p + 3]
+  }
+}
+
+export function deletePixelsInMask(ctx, mask, width, height) {
+  const imageData = ctx.getImageData(0, 0, width, height)
+  const data = imageData.data
+  for (let i = 0; i < mask.length; i += 1) {
+    if (!mask[i]) continue
+    const p = i * 4
+    data[p] = 0
+    data[p + 1] = 0
+    data[p + 2] = 0
+    data[p + 3] = 0
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
 export function polygonToSvgPath(points, close = true) {
   if (!points?.length) return ''
   let d = `M ${points[0].x} ${points[0].y}`

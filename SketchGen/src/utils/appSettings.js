@@ -46,7 +46,7 @@ const DEFAULTS = {
 }
 
 const VALID_TOOLS = new Set([
-  'pen', 'eraser', 'text', 'fill', 'line', 'arrow', 'rect', 'circle', 'blur', 'select', 'move', 'stamp',
+  'pen', 'eraser', 'text', 'fill', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'select', 'move', 'stamp',
 ])
 
 export function loadAppSettings() {

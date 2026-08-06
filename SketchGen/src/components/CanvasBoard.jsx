@@ -12,6 +12,11 @@ import {
   hitTestFloatingSelection,
   serializeFloatingSelection,
   deserializeFloatingSelection,
+  floodSelectMask,
+  maskHasPixels,
+  fillMaskOnLayer,
+  constrainImageDataToMask,
+  deletePixelsInMask,
 } from '../utils/selectionMask'
 import CanvasBackgroundPicker from './CanvasBackgroundPicker'
 import './CanvasBoard.css'
@@ -320,12 +325,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const moveStartRef = useRef(null)
   const partDragRef = useRef(null)
   const floatingSelectionRef = useRef(null)
+  const pixelSelectionRef = useRef(null)
+  const maskStrokeSnapshotRef = useRef(null)
   const lassoDraftRef = useRef(null)
   const selectionDragRef = useRef(null)
   const [selectedPartId, setSelectedPartId] = useState(null)
   const [partSelectionRect, setPartSelectionRect] = useState(null)
   const [lassoPreview, setLassoPreview] = useState(null)
   const [selectionOutline, setSelectionOutline] = useState(null)
+  const [pixelSelectionOverlayUrl, setPixelSelectionOverlayUrl] = useState(null)
   const [brushPreview, setBrushPreview] = useState(null)
   const [textEditor, setTextEditor] = useState(null)
   const textEditorRef = useRef(null)
@@ -457,7 +465,86 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   }
 
   function emitSelectionChange() {
-    onSelectionChange?.({ active: Boolean(floatingSelectionRef.current) })
+    onSelectionChange?.({
+      active: Boolean(floatingSelectionRef.current) || Boolean(pixelSelectionRef.current),
+      floating: Boolean(floatingSelectionRef.current),
+      pixel: Boolean(pixelSelectionRef.current),
+    })
+  }
+
+  function updatePixelSelectionOverlay() {
+    const sel = pixelSelectionRef.current
+    if (!sel?.mask) {
+      setPixelSelectionOverlayUrl(null)
+      return
+    }
+    const w = W()
+    const h = H()
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const octx = canvas.getContext('2d')
+    if (!octx) return
+    const imgData = octx.createImageData(w, h)
+    const d = imgData.data
+    for (let i = 0; i < sel.mask.length; i += 1) {
+      if (!sel.mask[i]) continue
+      const p = i * 4
+      d[p] = 0
+      d[p + 1] = 140
+      d[p + 2] = 255
+      d[p + 3] = 72
+    }
+    octx.putImageData(imgData, 0, 0)
+    setPixelSelectionOverlayUrl(canvas.toDataURL('image/png'))
+  }
+
+  function clearPixelSelection() {
+    if (!pixelSelectionRef.current) return
+    pixelSelectionRef.current = null
+    setPixelSelectionOverlayUrl(null)
+    emitSelectionChange()
+  }
+
+  function getActivePixelSelection() {
+    const sel = pixelSelectionRef.current
+    if (!sel) return null
+    if (sel.layerId !== activeLayerIdRef.current) return null
+    return sel
+  }
+
+  function sampleMaskAtPoint(layerCtx, pos, tolerance) {
+    const w = W()
+    const h = H()
+    const layerData = layerCtx.getImageData(0, 0, w, h)
+    let mask = floodSelectMask(layerData.data, w, h, pos.x, pos.y, tolerance)
+    if (maskHasPixels(mask)) return mask
+
+    const off = document.createElement('canvas')
+    off.width = w
+    off.height = h
+    const compCtx = off.getContext('2d')
+    if (!compCtx) return mask
+    renderCompositeTo(compCtx, { includeBackground: true })
+    const compData = compCtx.getImageData(0, 0, w, h)
+    mask = floodSelectMask(compData.data, w, h, pos.x, pos.y, tolerance)
+    return mask
+  }
+
+  function commitWandSelection(pos) {
+    mergeFloatingSelection(true)
+    ensureActiveLayerFlatForDrawing()
+    const layer = getActiveLayer()
+    const ctx = layer?.ctx
+    if (!ctx) return false
+    const w = W()
+    const h = H()
+    const mask = sampleMaskAtPoint(ctx, pos, FILL_TOLERANCE)
+    if (!maskHasPixels(mask)) return false
+    pixelSelectionRef.current = { layerId: layer.id, mask }
+    updatePixelSelectionOverlay()
+    emitSelectionChange()
+    return true
   }
 
   function updateFloatingOutline(f) {
@@ -516,6 +603,17 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     setSelectionOutline(null)
     renderComposite()
     emitSelectionChange()
+    pushHistory()
+  }
+
+  function deletePixelSelectionContent() {
+    const sel = getActivePixelSelection()
+    const ctx = getActiveCtx()
+    if (!sel || !ctx) return
+    deletePixelsInMask(ctx, sel.mask, W(), H())
+    clearPixelSelection()
+    hasContentRef.current = true
+    renderComposite()
     pushHistory()
   }
 
@@ -859,6 +957,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         mergeFloatingSelection(true)
       }
       if (!layersRef.current.some((l) => l.id === id)) return
+      if (activeLayerIdRef.current !== id) clearPixelSelection()
       activeLayerIdRef.current = id
       setSelectedPartId(null)
       setPartSelectionRect(null)
@@ -932,8 +1031,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       onCommit?.()
       return { ok: true, count: defs.length }
     },
-    applyFloatingSelection: () => mergeFloatingSelection(false),
-    deleteFloatingSelection: () => removeFloatingSelection(),
+    applyFloatingSelection: () => {
+      if (floatingSelectionRef.current) mergeFloatingSelection(false)
+      else clearPixelSelection()
+    },
+    deleteFloatingSelection: () => {
+      if (floatingSelectionRef.current) removeFloatingSelection()
+      else deletePixelSelectionContent()
+    },
     scaleFloatingSelection: (percent) => {
       const f = floatingSelectionRef.current
       if (!f) return
@@ -1167,6 +1272,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
 
     if (currentTool === 'select') {
+      clearPixelSelection()
       ensureActiveLayerFlatForDrawing()
       const floating = floatingSelectionRef.current
       if (floating && hitTestFloatingSelectionRotated(floating, pos.x, pos.y)) {
@@ -1184,6 +1290,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       lassoDraftRef.current = { mode, points: [pos], start: pos, end: pos }
       setLassoPreview({ mode, points: [pos], end: pos })
       drawingRef.current = true
+      return
+    }
+
+    if (currentTool === 'wand') {
+      e.preventDefault()
+      commitWandSelection(pos)
       return
     }
 
@@ -1218,7 +1330,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     ensureActiveLayerFlatForDrawing()
 
     if (currentTool === 'fill') {
-      floodFill(ctx, pos.x, pos.y, colorRef.current)
+      const pixelSel = getActivePixelSelection()
+      if (pixelSel) {
+        fillMaskOnLayer(ctx, pixelSel.mask, W(), H(), colorRef.current)
+      } else {
+        floodFill(ctx, pos.x, pos.y, colorRef.current)
+      }
       hasContentRef.current = true
       renderComposite()
       pushHistory()
@@ -1235,6 +1352,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     drawingRef.current = true
     hasContentRef.current = true
+
+    const pixelSel = getActivePixelSelection()
+    if (pixelSel && FREEHAND_INK_TOOLS.has(currentTool)) {
+      maskStrokeSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
+    } else {
+      maskStrokeSnapshotRef.current = null
+    }
 
     if (currentTool === 'blur') {
       lastPointRef.current = pos
@@ -1424,6 +1548,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         )
         renderComposite()
       }
+      const pixelSel = getActivePixelSelection()
+      if (pixelSel && maskStrokeSnapshotRef.current && FREEHAND_INK_TOOLS.has(tool)) {
+        const after = ctx.getImageData(0, 0, W(), H())
+        constrainImageDataToMask(after, maskStrokeSnapshotRef.current, pixelSel.mask)
+        ctx.putImageData(after, 0, 0)
+        renderComposite()
+      }
+      maskStrokeSnapshotRef.current = null
       pushHistory()
     }
     drawingRef.current = false
@@ -1470,7 +1602,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         >
           <canvas
             ref={canvasRef}
-            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'select' ? ' tool-select' : ''}`}
+            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'select' ? ' tool-select' : ''}${tool === 'wand' ? ' tool-wand' : ''}`}
             style={{ backgroundColor }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -1487,6 +1619,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
                 width: `${(partSelectionRect.w / canvasW) * 100}%`,
                 height: `${(partSelectionRect.h / canvasH) * 100}%`,
               }}
+              aria-hidden
+            />
+          )}
+          {pixelSelectionOverlayUrl && canvasW > 0 && canvasH > 0 && (
+            <img
+              className="canvas-pixel-selection-overlay"
+              src={pixelSelectionOverlayUrl}
+              alt=""
               aria-hidden
             />
           )}
