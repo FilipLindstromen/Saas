@@ -11,8 +11,9 @@ import './SettingsModal.css';
  * @param {function} props.onClose
  * @param {React.ReactNode} [props.children] - App-specific settings (e.g. font picker) rendered after the API keys notice
  * @param {function} [props.onSave] - Called when Save is clicked; use to persist app-specific settings
+ * @param {string} [props.title] - Modal title (default Settings)
  */
-export default function SettingsModal({ isOpen, onClose, children, onSave }) {
+export default function SettingsModal({ isOpen, onClose, children, onSave, title = 'Settings' }) {
   const saasAppsUrl = typeof window !== 'undefined'
     ? new URL('../index.html', window.location.href).href
     : '/index.html';
@@ -39,7 +40,7 @@ export default function SettingsModal({ isOpen, onClose, children, onSave }) {
     >
       <div className="shared-settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="shared-settings-header">
-          <h2 id="shared-settings-title">Settings</h2>
+          <h2 id="shared-settings-title">{title}</h2>
           <button type="button" className="shared-settings-close" onClick={onClose} aria-label="Close">
             ×
           </button>

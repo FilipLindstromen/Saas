@@ -80,6 +80,9 @@ export default function BrandingSettings({ value, onChange }) {
           Accent callout
         </p>
       </div>
+      <p className="branding-settings-build-id" title="Deployed bundle version">
+        Build {import.meta.env.VITE_APP_BUILD_ID || 'dev'}
+      </p>
     </div>
   )
 }

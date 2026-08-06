@@ -7,6 +7,9 @@
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   box-shadow: var(--header-inset);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .sketchgen-logo {

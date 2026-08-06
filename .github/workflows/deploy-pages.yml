@@ -159,10 +159,14 @@ jobs:
           cp -r dist ../deploy/InfoGraphics
 
       - name: Build SketchGen
+        env:
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           cd SketchGen
           npm install
-          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/SketchGen/
+          npm run build:pages
+          grep -q sketchgen-brand-btn dist/assets/*.js || (echo "SketchGen bundle missing expected UI (stale or broken build)" && exit 1)
           cp -r dist ../deploy/SketchGen
 
       - name: Build CopyLearner

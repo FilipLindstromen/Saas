@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/sync-desktop.mjs",
+    "build:pages": "node scripts/build-github-pages.mjs",
     "build:electron": "vite build --mode electron && node scripts/sync-desktop.mjs",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://127.0.0.1:5177 && cross-env NODE_ENV=development electron .\"",

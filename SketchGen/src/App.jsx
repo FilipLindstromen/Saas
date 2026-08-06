@@ -141,6 +141,7 @@ export default function App() {
   const canceledJobsRef = useRef(new Set())
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsModalTitle, setSettingsModalTitle] = useState('Settings')
   const [placing, setPlacing] = useState(null)
   const [layers, setLayers] = useState([])
   const [activeLayerId, setActiveLayerId] = useState(null)
@@ -313,6 +314,13 @@ export default function App() {
 
   const handleOpenSettings = useCallback(() => {
     setBrandingDraft({ colors: { ...brandColors }, fonts: { ...brandFonts } })
+    setSettingsModalTitle('Settings')
+    setSettingsOpen(true)
+  }, [brandColors, brandFonts])
+
+  const handleOpenBranding = useCallback(() => {
+    setBrandingDraft({ colors: { ...brandColors }, fonts: { ...brandFonts } })
+    setSettingsModalTitle('Brand')
     setSettingsOpen(true)
   }, [brandColors, brandFonts])
 
@@ -1105,7 +1113,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}
-        onOpenBranding={handleOpenSettings}
+        onOpenBranding={handleOpenBranding}
         brandColors={brandColors}
         onExport={handleExport}
         projects={projects}
@@ -1336,7 +1344,12 @@ export default function App() {
         </aside>
       </div>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onSave={handleSaveSettings}>
+      <SettingsModal
+        isOpen={settingsOpen}
+        title={settingsModalTitle}
+        onClose={() => setSettingsOpen(false)}
+        onSave={handleSaveSettings}
+      >
         <BrandingSettings
           value={brandingDraft ?? { colors: brandColors, fonts: brandFonts }}
           onChange={setBrandingDraft}

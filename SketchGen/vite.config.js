@@ -22,6 +22,7 @@ export default defineConfig({
   envDir: rootEnv,
   define: {
     'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || ''),
+    'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(process.env.VITE_APP_BUILD_ID || 'dev'),
   },
   resolve: {
     dedupe: ['react', 'react-dom'],

@@ -87,3 +87,10 @@
   font-weight: 600;
   color: var(--accent, #ff6b35);
 }
+
+.branding-settings-build-id {
+  margin: 1rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-quaternary);
+  font-family: ui-monospace, monospace;
+}
