@@ -4,7 +4,7 @@ import ExportMenu from './ExportMenu'
 import './TopBar.css'
 
 export default function TopBar({
-  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onOpenBranding, brandColors, onExport,
+  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onOpenBranding, brandColors, onExport, exportDisabled,
   projects, currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject,
 }) {
   return (
@@ -49,9 +49,12 @@ export default function TopBar({
 
       <div className="sketchgen-top-bar-spacer" />
 
-      {hasGenerated && view !== 'sketch' && (
-        <ExportMenu variant="icon" className="export-menu-root-toolbar" onExport={onExport} />
-      )}
+      <ExportMenu
+        variant="icon"
+        className="export-menu-root-toolbar"
+        onExport={onExport}
+        disabled={exportDisabled}
+      />
 
       <button
         type="button"

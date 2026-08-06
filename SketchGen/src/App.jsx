@@ -26,7 +26,7 @@ import {
   addStyleReference, getAllStyleReferences, deleteStyleReference,
 } from './utils/db'
 import { loadCustomStyles, addCustomStyle, deleteCustomStyle } from './utils/customStyles'
-import { exportGeneratedImage } from './utils/imageExport'
+import { exportImageDataUrl, exportSketchComposite } from './utils/imageExport'
 import { loadAppSettings, saveAppSettings } from './utils/appSettings'
 import {
   DEFAULT_SKETCH_FORMAT_ID,
@@ -102,6 +102,7 @@ export default function App() {
   const [zoom, setZoom] = useState(savedSettings.zoom)
   const [canvasFormat, setCanvasFormat] = useState(() => normalizeSketchFormatId(savedSettings.canvasFormat))
   const [canUndo, setCanUndo] = useState(false)
+  const [hasSketchContent, setHasSketchContent] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
 
   const [customStyles, setCustomStyles] = useState(() => loadCustomStyles())
@@ -196,6 +197,10 @@ export default function App() {
     if (!generatedImage && improveGeneration) setImproveGeneration(false)
   }, [generatedImage, improveGeneration])
 
+  const syncSketchContent = useCallback(() => {
+    setHasSketchContent(Boolean(canvasRef.current?.hasContent?.()))
+  }, [])
+
   /** Loads one drawing's canvas + generation history into the (already-switched) view. */
   const loadDrawing = useCallback(async (projectId, tabId) => {
     const key = drawingKeyFor(projectId, tabId)
@@ -220,7 +225,8 @@ export default function App() {
     setSketchSnapshot(null)
     setActiveGenerationId(null)
     setView('sketch')
-  }, [])
+    requestAnimationFrame(() => syncSketchContent())
+  }, [syncSketchContent])
 
   const flushAutosave = useCallback(async () => {
     if (autosaveTimerRef.current) {
@@ -451,22 +457,42 @@ export default function App() {
     setImageContextMenu({ x: e.clientX, y: e.clientY, dataUrl })
   }, [])
 
-  const handleExportImage = useCallback(async (action, dataUrl = generatedImage) => {
-    if (!dataUrl) return
+  const handleExportImage = useCallback(async (action, { dataUrl: dataUrlOverride } = {}) => {
     setError('')
     try {
-      await exportGeneratedImage(dataUrl, action)
-    } catch {
-      setError('Export failed. Try again or use a different format.')
+      if (dataUrlOverride) {
+        await exportImageDataUrl(dataUrlOverride, action, { filenameBase: 'sketchgen-result' })
+        return
+      }
+      if (view === 'sketch') {
+        const board = canvasRef.current
+        if (!board?.hasContent?.()) {
+          setError('Nothing on the canvas to export yet.')
+          return
+        }
+        await exportSketchComposite(board, action)
+      } else {
+        if (!generatedImage) {
+          setError('No generated image to export.')
+          return
+        }
+        await exportImageDataUrl(generatedImage, action, { filenameBase: 'sketchgen-result' })
+      }
+    } catch (err) {
+      console.error(err)
+      const msg = err?.message?.includes('Clipboard')
+        ? 'Copy failed — try PNG download or allow clipboard access for this site.'
+        : 'Export failed. Try again or use a different format.'
+      setError(msg)
     }
-  }, [generatedImage])
+  }, [generatedImage, view])
 
   const handleExportFromMenu = useCallback(
     async (action) => {
       const dataUrl = imageContextMenu?.dataUrl
       setImageContextMenu(null)
       if (!dataUrl) return
-      await handleExportImage(action, dataUrl)
+      await handleExportImage(action, { dataUrl })
     },
     [imageContextMenu, handleExportImage]
   )
@@ -991,9 +1017,12 @@ export default function App() {
   ])
 
   const handleExport = useCallback(
-    (action) => handleExportImage(action, generatedImage),
-    [handleExportImage, generatedImage]
+    (action) => handleExportImage(action),
+    [handleExportImage]
   )
+
+  const exportDisabled =
+    view === 'sketch' ? !hasSketchContent : !generatedImage
 
   // --- Projects ---
 
@@ -1116,6 +1145,7 @@ export default function App() {
         onOpenBranding={handleOpenBranding}
         brandColors={brandColors}
         onExport={handleExport}
+        exportDisabled={exportDisabled}
         projects={projects}
         currentProjectId={currentProjectId}
         currentProjectName={currentProjectName}
@@ -1254,9 +1284,13 @@ export default function App() {
               onHistoryChange={({ canUndo: cu, canRedo: cr }) => {
                 setCanUndo(cu)
                 setCanRedo(cr)
+                syncSketchContent()
               }}
               onLayersChange={handleLayersChange}
-              onCommit={scheduleAutosave}
+              onCommit={() => {
+                scheduleAutosave()
+                syncSketchContent()
+              }}
               onSelectionChange={handleSelectionChange}
             />
           </div>

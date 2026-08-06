@@ -416,19 +416,28 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     })
   }
 
-  const renderComposite = () => {
-    const ctx = ctxRef.current
-    if (!ctx) return
-    ctx.fillStyle = backgroundColorRef.current
-    ctx.fillRect(0, 0, W(), H())
+  const renderCompositeTo = (targetCtx, { includeBackground = true } = {}) => {
+    if (!targetCtx) return
+    if (includeBackground) {
+      targetCtx.fillStyle = backgroundColorRef.current
+      targetCtx.fillRect(0, 0, W(), H())
+    } else {
+      targetCtx.clearRect(0, 0, W(), H())
+    }
     for (const layer of layersRef.current) {
-      if (layer.visible) ctx.drawImage(layer.canvas, 0, 0)
+      if (layer.visible) targetCtx.drawImage(layer.canvas, 0, 0)
     }
     const sel = floatingSelectionRef.current
     if (sel) {
       const layer = layersRef.current.find((l) => l.id === sel.layerId)
-      if (layer?.visible) drawFloatingSelection(ctx, sel)
+      if (layer?.visible) drawFloatingSelection(targetCtx, sel)
     }
+  }
+
+  const renderComposite = () => {
+    const ctx = ctxRef.current
+    if (!ctx) return
+    renderCompositeTo(ctx, { includeBackground: true })
   }
 
   /** Draws the floating selection centered on its own midpoint, rotated if needed — shared by the live composite and the final merge-down so both agree on placement. */
@@ -679,6 +688,19 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   useImperativeHandle(ref, () => ({
     exportPNG: () => canvasRef.current.toDataURL('image/png'),
+    /** Flattened composite PNG; transparent variants omit the canvas background color. */
+    exportCompositePNG: (includeBackground = true) => {
+      for (const layer of layersRef.current) {
+        if (layer.parts?.length) rebuildLayerCanvasFromParts(layer)
+      }
+      const off = document.createElement('canvas')
+      off.width = W()
+      off.height = H()
+      const ctx = off.getContext('2d')
+      if (!ctx) return null
+      renderCompositeTo(ctx, { includeBackground })
+      return off.toDataURL('image/png')
+    },
     hasContent: () => hasContentRef.current,
     clear: () => {
       const ctx = getActiveCtx()
