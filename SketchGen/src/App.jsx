@@ -22,6 +22,7 @@ import {
 } from './utils/db'
 import { loadCustomStyles, addCustomStyle, deleteCustomStyle } from './utils/customStyles'
 import { copyImageToClipboard } from './utils/clipboard'
+import { loadAppSettings, saveAppSettings } from './utils/appSettings'
 import {
   DEFAULT_SKETCH_FORMAT_ID,
   normalizeSketchFormatId,
@@ -79,12 +80,14 @@ export default function App() {
   const autosaveTimerRef = useRef(null)
   const drawingKeyRef = useRef(null)
 
+  const [savedSettings] = useState(() => loadAppSettings())
+
   const [theme, setThemeState] = useState(getTheme())
-  const [tool, setTool] = useState('pen')
-  const [color, setColor] = useState('#1a1a1a')
-  const [size, setSize] = useState(6)
-  const [smoothing, setSmoothing] = useState(0)
-  const [wobble, setWobble] = useState(0)
+  const [tool, setTool] = useState(savedSettings.tool)
+  const [color, setColor] = useState(savedSettings.color)
+  const [size, setSize] = useState(savedSettings.size)
+  const [smoothing, setSmoothing] = useState(savedSettings.smoothing)
+  const [wobble, setWobble] = useState(savedSettings.wobble)
   const [zoom, setZoom] = useState(1)
   const [canvasFormat, setCanvasFormat] = useState(DEFAULT_SKETCH_FORMAT_ID)
   const [canUndo, setCanUndo] = useState(false)
@@ -93,9 +96,9 @@ export default function App() {
   const [customStyles, setCustomStyles] = useState(() => loadCustomStyles())
   const [imageStyles, setImageStyles] = useState([])
   const allStyles = useMemo(() => [...STYLES, ...customStyles, ...imageStyles], [customStyles, imageStyles])
-  const [selectedStyleId, setSelectedStyleId] = useState(DEFAULT_STYLE_ID)
-  const [instructions, setInstructions] = useState('')
-  const [variations, setVariations] = useState(1)
+  const [selectedStyleId, setSelectedStyleId] = useState(savedSettings.selectedStyleId || DEFAULT_STYLE_ID)
+  const [instructions, setInstructions] = useState(savedSettings.instructions)
+  const [variations, setVariations] = useState(savedSettings.variations)
 
   const [view, setView] = useState('sketch')
   const [sketchSnapshot, setSketchSnapshot] = useState(null)
@@ -203,6 +206,24 @@ export default function App() {
       window.removeEventListener('saas-theme-change', handler)
     }
   }, [])
+
+  // Persist tool settings, style selection, instructions, and variation count
+  // so they survive a page reload — debounced since size/smoothing/wobble
+  // sliders and the instructions textarea can fire on every pixel/keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveAppSettings({ tool, color, size, smoothing, wobble, selectedStyleId, instructions, variations })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [tool, color, size, smoothing, wobble, selectedStyleId, instructions, variations])
+
+  // A persisted selectedStyleId might reference a custom/image style that was
+  // deleted in a previous session — fall back once the real style list loads.
+  useEffect(() => {
+    if (allStyles.length && !allStyles.some((s) => s.id === selectedStyleId)) {
+      setSelectedStyleId(DEFAULT_STYLE_ID)
+    }
+  }, [allStyles, selectedStyleId])
 
   const handleToggleTheme = useCallback((next) => {
     persistTheme(next)
