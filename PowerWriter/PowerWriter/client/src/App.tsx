@@ -37,7 +37,11 @@ import type { Transcription } from "./types";
 import { loadApiKeys, saveApiKeys } from "./apiKeys";
 import ThemeToggle from "@shared/ThemeToggle";
 import { getTheme, setTheme, initThemeSync } from "@shared/theme";
-import { DOCUMENT_GENERATE_TASK, gatherInstructionSectionsFromStorage } from "./lib/generationPrompt";
+import {
+  DOCUMENT_GENERATE_TASK,
+  DOCUMENT_REVIEW_TASK,
+  gatherInstructionSectionsFromStorage
+} from "./lib/generationPrompt";
 import { storageGetFolderDetails } from "./storage";
 
 type Selection =
@@ -906,6 +910,7 @@ export default function App() {
   >([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocGenerating, setIsDocGenerating] = useState(false);
+  const [isDocReviewing, setIsDocReviewing] = useState(false);
   const [isReferenceUploading, setIsReferenceUploading] = useState(false);
   const referenceFilesInputRef = useRef<HTMLInputElement | null>(null);
   const folderReferenceFilesInputRef = useRef<HTMLInputElement | null>(null);
@@ -2643,6 +2648,37 @@ export default function App() {
       setStatus({ type: "error", message });
     } finally {
       setIsDocGenerating(false);
+    }
+  };
+
+  const handleReviewForDocument = async () => {
+    if (selected?.type !== "document" || !documentDetails) return;
+    setIsDocReviewing(true);
+    try {
+      await flushPendingDocumentSave();
+      const instructionSections = buildLiveInstructionSections();
+      const response = await generateAnswer({
+        path: selected.path,
+        prompt: DOCUMENT_REVIEW_TASK,
+        apiKey: userApiKey || undefined,
+        instructionSections,
+        documentContent: documentDetails.content ?? ""
+      });
+      setChatResponses((prev) => [
+        { id: Date.now(), message: response.message },
+        ...prev
+      ]);
+      setChatVisible(true);
+      setStatus({
+        type: "success",
+        message: "Review added to the Generate panel"
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to review document";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsDocReviewing(false);
     }
   };
 
@@ -4477,17 +4513,35 @@ export default function App() {
               <div className="panel-body document-panel-body">
                 {documentDetails ? (
                   <div className="document-generate-row">
-                    <button
-                      type="button"
-                      className="primary document-generate-btn"
-                      onClick={() => void handleGenerateForDocument()}
-                      disabled={
-                        loadingSelection || !documentDetails || isDocGenerating
-                      }
-                    >
-                      <IconSparkles size={18} />
-                      {isDocGenerating ? "Generating…" : "Generate"}
-                    </button>
+                    <div className="document-generate-actions">
+                      <button
+                        type="button"
+                        className="primary document-generate-btn"
+                        onClick={() => void handleGenerateForDocument()}
+                        disabled={
+                          loadingSelection ||
+                          !documentDetails ||
+                          isDocGenerating ||
+                          isDocReviewing
+                        }
+                      >
+                        <IconSparkles size={18} />
+                        {isDocGenerating ? "Generating…" : "Generate"}
+                      </button>
+                      <button
+                        type="button"
+                        className="document-generate-btn document-review-btn"
+                        onClick={() => void handleReviewForDocument()}
+                        disabled={
+                          loadingSelection ||
+                          !documentDetails ||
+                          isDocGenerating ||
+                          isDocReviewing
+                        }
+                      >
+                        {isDocReviewing ? "Reviewing…" : "Review"}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
                 <div className="document-body-editor">

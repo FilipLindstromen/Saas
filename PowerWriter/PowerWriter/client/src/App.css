@@ -2082,6 +2082,15 @@
   padding: 2px 0 16px;
 }
 
+.document-generate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
 .folder-reference-controls {
   margin-top: 12px;
 }
@@ -2267,7 +2276,7 @@
 }
 
 .document-generate-btn {
-  align-self: center;
+  align-self: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2292,6 +2301,18 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.document-review-btn {
+  background: var(--surface, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.14));
+  box-shadow: none;
+  color: var(--text-primary);
+}
+
+.document-review-btn:hover:not(:disabled) {
+  background: var(--hover, rgba(255, 255, 255, 0.1));
+  box-shadow: none;
 }
 
 .document-body-editor {
