@@ -80,7 +80,7 @@
   align-items: stretch;
   justify-content: center;
   text-align: left;
-  max-width: min(1120px, 94vw);
+  max-width: min(1280px, 96vw);
 }
 
 .present-view__sentence-stage {
@@ -94,7 +94,8 @@
 }
 
 .present-view__sentence-stage--bullets {
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
   width: 100%;
 }
@@ -195,13 +196,19 @@
   align-items: flex-start;
 }
 
+.present-view__inner--layout-left.present-view__inner--bullets {
+  align-items: stretch;
+  justify-content: center;
+}
+
 .present-view__sentence-stage--layout-left {
   align-items: flex-start;
   justify-content: flex-start;
 }
 
 .present-view__sentence-stage--layout-left.present-view__sentence-stage--bullets {
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
 }
 

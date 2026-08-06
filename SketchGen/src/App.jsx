@@ -83,6 +83,7 @@ function ensureProjectTabs(projectId) {
 export default function App() {
   const canvasRef = useRef(null)
   const autosaveTimerRef = useRef(null)
+  const brandingOpenSnapshotRef = useRef(null)
   const drawingKeyRef = useRef(null)
 
   const [savedSettings] = useState(() => loadAppSettings())
@@ -320,23 +321,67 @@ export default function App() {
   }, [allStyles, selectedStyleId])
 
   const handleOpenSettings = useCallback(() => {
+    brandingOpenSnapshotRef.current = {
+      colors: { ...brandColors },
+      fonts: { ...brandFonts },
+    }
     setBrandingDraft({ colors: { ...brandColors }, fonts: { ...brandFonts } })
     setSettingsModalTitle('Settings')
     setSettingsOpen(true)
   }, [brandColors, brandFonts])
 
   const handleOpenBranding = useCallback(() => {
+    brandingOpenSnapshotRef.current = {
+      colors: { ...brandColors },
+      fonts: { ...brandFonts },
+    }
     setBrandingDraft({ colors: { ...brandColors }, fonts: { ...brandFonts } })
     setSettingsModalTitle('Brand')
     setSettingsOpen(true)
   }, [brandColors, brandFonts])
 
+  const persistBrandSettings = useCallback((colors, fonts) => {
+    const next = {
+      ...persistedSettingsRef.current,
+      brandColors: colors,
+      brandFonts: fonts,
+    }
+    saveAppSettings(next)
+  }, [])
+
+  const handleBrandingChange = useCallback((next) => {
+    setBrandingDraft(next)
+    const colors = normalizeBrandColors(next?.colors)
+    const fonts = normalizeBrandFonts(next?.fonts)
+    setBrandColors(colors)
+    setBrandFonts(fonts)
+    persistBrandSettings(colors, fonts)
+  }, [persistBrandSettings])
+
   const handleSaveSettings = useCallback(() => {
     const draft = brandingDraft ?? { colors: brandColors, fonts: brandFonts }
-    setBrandColors(normalizeBrandColors(draft.colors))
-    setBrandFonts(normalizeBrandFonts(draft.fonts))
+    const colors = normalizeBrandColors(draft.colors)
+    const fonts = normalizeBrandFonts(draft.fonts)
+    setBrandColors(colors)
+    setBrandFonts(fonts)
     setBrandingDraft(null)
-  }, [brandingDraft, brandColors, brandFonts])
+    brandingOpenSnapshotRef.current = null
+    persistBrandSettings(colors, fonts)
+  }, [brandingDraft, brandColors, brandFonts, persistBrandSettings])
+
+  const handleCloseSettings = useCallback(() => {
+    const snap = brandingOpenSnapshotRef.current
+    if (snap) {
+      const colors = normalizeBrandColors(snap.colors)
+      const fonts = normalizeBrandFonts(snap.fonts)
+      setBrandColors(colors)
+      setBrandFonts(fonts)
+      persistBrandSettings(colors, fonts)
+    }
+    brandingOpenSnapshotRef.current = null
+    setBrandingDraft(null)
+    setSettingsOpen(false)
+  }, [persistBrandSettings])
 
   const handleApplyBrandFont = useCallback((role) => {
     const family = brandFonts[role]
@@ -1384,12 +1429,12 @@ export default function App() {
       <SettingsModal
         isOpen={settingsOpen}
         title={settingsModalTitle}
-        onClose={() => setSettingsOpen(false)}
+        onClose={handleCloseSettings}
         onSave={handleSaveSettings}
       >
         <BrandingSettings
           value={brandingDraft ?? { colors: brandColors, fonts: brandFonts }}
-          onChange={setBrandingDraft}
+          onChange={handleBrandingChange}
         />
       </SettingsModal>
 
