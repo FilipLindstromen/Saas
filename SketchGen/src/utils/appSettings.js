@@ -17,6 +17,8 @@ const DEFAULTS = {
   selectedStyleId: null,
   instructions: '',
   variations: 1,
+  styleSectionCollapsed: false,
+  improveGeneration: false,
 }
 
 export function loadAppSettings() {

@@ -141,6 +141,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-default);
@@ -149,6 +150,44 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-tertiary);
+}
+
+.side-panel-collapsed .side-panel-header {
+  border-bottom: none;
+}
+
+.side-panel-header-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-panel-header-summary {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-secondary);
+}
+
+.side-panel-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: calc(var(--button-radius) - 2px);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.side-panel-toggle:hover {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .side-panel-body {

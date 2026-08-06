@@ -5,9 +5,12 @@ export default function HistoryGallery({ items, activeId, onSelect, onDelete }) 
 
   return (
     <div className="history-gallery-section side-panel">
-      <div className="side-panel-header">History</div>
-      <div className="side-panel-body">
-        <div className="history-gallery-strip">
+      <div className="side-panel-header">
+        <span className="side-panel-header-label">History</span>
+        <span className="side-panel-header-summary">{items.length}</span>
+      </div>
+      <div className="side-panel-body history-gallery-body">
+        <div className="history-gallery-grid">
           {items.map((item) => (
             <div key={item.id} className={`history-gallery-item ${item.id === activeId ? 'active' : ''}`}>
               <button type="button" onClick={() => onSelect(item)} title={`${item.styleName}${item.instructions ? ' — ' + item.instructions : ''}`}>

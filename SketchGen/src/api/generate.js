@@ -16,14 +16,35 @@ export function buildPrompt(style, instructions, formatId) {
 }
 
 /**
- * Generate a styled illustration from a sketch data URL.
+ * Prompt for iterating on an already-generated illustration (Improve generation).
  */
-export async function generateStyledImage({ sketchDataUrl, style, instructions, formatId = '16:9' }) {
+export function buildImprovePrompt(style, instructions, formatId) {
+  const format = getSketchFormat(formatId)
+  const aspectNote = `Keep the exact same aspect ratio and framing (${format.label}, ${format.width}×${format.height}). Do not crop to a different shape.`
+  const artist = instructions?.trim() || 'Refine and improve this illustration.'
+  if (style.type === 'image') {
+    return `Edit this finished illustration according to the artist's instructions. Preserve composition, proportions, and subject matter unless the instructions explicitly ask to change them. ${aspectNote} Keep consistency with the attached style reference where appropriate. Artist instructions: ${artist}`
+  }
+  const styleNote = style.prompt
+    ? ` Maintain the overall look: ${style.prompt}.`
+    : ''
+  return `Edit this finished illustration according to the artist's instructions. Preserve composition, proportions, and subject matter unless the instructions explicitly ask to change them. ${aspectNote}${styleNote} Artist instructions: ${artist}`
+}
+
+/**
+ * Generate a styled illustration from a sketch data URL, or refine a prior generation
+ * when referenceImageDataUrl is set (Improve generation).
+ */
+export async function generateStyledImage({ sketchDataUrl, style, instructions, formatId = '16:9', referenceImageDataUrl = null }) {
   const format = getSketchFormat(normalizeSketchFormatId(formatId))
-  const prompt = buildPrompt(style, instructions, format.id)
+  const improving = Boolean(referenceImageDataUrl)
+  const prompt = improving
+    ? buildImprovePrompt(style, instructions, format.id)
+    : buildPrompt(style, instructions, format.id)
+  const primaryImage = improving ? referenceImageDataUrl : sketchDataUrl
   const raw = await editImage({
     prompt,
-    imageDataUrl: sketchDataUrl,
+    imageDataUrl: primaryImage,
     additionalImages: style.type === 'image' ? [style.referenceImageDataUrl] : [],
     size: format.apiSize,
     quality: 'high',

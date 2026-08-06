@@ -1,7 +1,17 @@
 import { useRef, useState } from 'react'
 import './StyleGrid.css'
 
-export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomStyle, onDeleteCustomStyle, onUploadImageStyle, onDeleteImageStyle }) {
+export default function StyleGrid({
+  styles,
+  selectedId,
+  onSelect,
+  onAddCustomStyle,
+  onDeleteCustomStyle,
+  onUploadImageStyle,
+  onDeleteImageStyle,
+  collapsed = false,
+  onCollapsedChange,
+}) {
   const [formOpen, setFormOpen] = useState(false)
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -27,9 +37,31 @@ export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomSty
     else onDeleteCustomStyle(style.id)
   }
 
+  const selectedStyle = styles.find((s) => s.id === selectedId)
+
   return (
-    <div className="style-grid-section side-panel">
-      <div className="side-panel-header">Style</div>
+    <div className={`style-grid-section side-panel${collapsed ? ' side-panel-collapsed' : ''}`}>
+      <div className="side-panel-header">
+        <span className="side-panel-header-label">
+          Style
+          {collapsed && selectedStyle && (
+            <span className="side-panel-header-summary"> · {selectedStyle.name}</span>
+          )}
+        </span>
+        <button
+          type="button"
+          className="side-panel-toggle"
+          onClick={() => onCollapsedChange?.(!collapsed)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand style section' : 'Collapse style section'}
+          title={collapsed ? 'Show styles' : 'Hide styles'}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d={collapsed ? 'M9 18l6-6-6-6' : 'M6 9l6 6 6-6'} />
+          </svg>
+        </button>
+      </div>
+      {!collapsed && (
       <div className="side-panel-body">
       <div className="style-grid">
         {styles.map((style) => (
@@ -93,6 +125,7 @@ export default function StyleGrid({ styles, selectedId, onSelect, onAddCustomSty
         </form>
       )}
       </div>
+      )}
     </div>
   )
 }

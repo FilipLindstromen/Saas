@@ -30,6 +30,31 @@
   color: var(--text-quaternary);
 }
 
+.prompt-bar-improve {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.prompt-bar-improve input {
+  margin-top: 0.15rem;
+  accent-color: var(--accent-primary, #e03131);
+  cursor: pointer;
+}
+
+.prompt-bar-improve-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.prompt-bar-improve-disabled input {
+  cursor: not-allowed;
+}
+
 .prompt-bar-variations {
   display: flex;
   align-items: center;

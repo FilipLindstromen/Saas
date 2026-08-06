@@ -1,28 +1,28 @@
 .history-gallery-section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  min-height: 0;
 }
 
-.history-gallery-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-tertiary);
+.history-gallery-body {
+  min-height: 0;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
-.history-gallery-strip {
-  display: flex;
+.history-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
+  max-height: min(52vh, 480px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.15rem 0.1rem 0.15rem 0;
 }
 
 .history-gallery-item {
   position: relative;
-  flex-shrink: 0;
-  width: 84px;
+  min-width: 0;
 }
 
 .history-gallery-item button:first-child {
@@ -50,12 +50,14 @@
 }
 
 .history-gallery-label {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  width: 100%;
+  text-align: center;
 }
 
 .history-gallery-delete {
@@ -74,4 +76,5 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1;
 }

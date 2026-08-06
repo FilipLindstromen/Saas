@@ -105,6 +105,8 @@ export default function App() {
   const [selectedStyleId, setSelectedStyleId] = useState(savedSettings.selectedStyleId || DEFAULT_STYLE_ID)
   const [instructions, setInstructions] = useState(savedSettings.instructions)
   const [variations, setVariations] = useState(savedSettings.variations)
+  const [styleSectionCollapsed, setStyleSectionCollapsed] = useState(savedSettings.styleSectionCollapsed)
+  const [improveGeneration, setImproveGeneration] = useState(savedSettings.improveGeneration)
 
   const [view, setView] = useState('sketch')
   const [sketchSnapshot, setSketchSnapshot] = useState(null)
@@ -128,6 +130,10 @@ export default function App() {
   useEffect(() => {
     drawingKeyRef.current = currentProjectId && currentTabId ? drawingKeyFor(currentProjectId, currentTabId) : null
   }, [currentProjectId, currentTabId])
+
+  useEffect(() => {
+    if (!generatedImage && improveGeneration) setImproveGeneration(false)
+  }, [generatedImage, improveGeneration])
 
   /** Loads one drawing's canvas + generation history into the (already-switched) view. */
   const loadDrawing = useCallback(async (projectId, tabId) => {
@@ -218,10 +224,22 @@ export default function App() {
   // sliders and the instructions textarea can fire on every pixel/keystroke.
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveAppSettings({ tool, color, penSize, eraserSize, smoothing, wobble, selectedStyleId, instructions, variations })
+      saveAppSettings({
+        tool,
+        color,
+        penSize,
+        eraserSize,
+        smoothing,
+        wobble,
+        selectedStyleId,
+        instructions,
+        variations,
+        styleSectionCollapsed,
+        improveGeneration,
+      })
     }, 300)
     return () => clearTimeout(timer)
-  }, [tool, color, penSize, eraserSize, smoothing, wobble, selectedStyleId, instructions, variations])
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, selectedStyleId, instructions, variations, styleSectionCollapsed, improveGeneration])
 
   // A persisted selectedStyleId might reference a custom/image style that was
   // deleted in a previous session — fall back once the real style list loads.
@@ -449,17 +467,38 @@ export default function App() {
     setError('')
     const board = canvasRef.current
     const key = drawingKeyRef.current
-    if (!board?.hasContent?.()) {
+    const style = allStyles.find((s) => s.id === selectedStyleId) || allStyles[0]
+
+    if (improveGeneration) {
+      if (!generatedImage) {
+        setError('Select a generated image in History before improving.')
+        return
+      }
+      if (!instructions?.trim()) {
+        setError('Add instructions describing what to change.')
+        return
+      }
+    } else if (!board?.hasContent?.()) {
       setError('Draw something on the canvas first.')
       return
     }
-    const style = allStyles.find((s) => s.id === selectedStyleId) || allStyles[0]
-    const sketchDataUrl = board.exportPNG()
+
+    const sketchDataUrl = improveGeneration
+      ? (sketchSnapshot || board?.exportPNG?.())
+      : board.exportPNG()
+    const referenceImageDataUrl = improveGeneration ? generatedImage : null
+
     setIsGenerating(true)
     try {
       const results = await Promise.all(
         Array.from({ length: variations }, () =>
-          generateStyledImage({ sketchDataUrl, style, instructions, formatId: canvasFormat })
+          generateStyledImage({
+            sketchDataUrl,
+            style,
+            instructions,
+            formatId: canvasFormat,
+            referenceImageDataUrl,
+          })
         )
       )
       const batchId = `batch-${Date.now()}`
@@ -490,7 +529,7 @@ export default function App() {
     } finally {
       setIsGenerating(false)
     }
-  }, [allStyles, selectedStyleId, instructions, variations, refreshHistory, canvasFormat])
+  }, [allStyles, selectedStyleId, instructions, variations, refreshHistory, canvasFormat, improveGeneration, generatedImage, sketchSnapshot])
 
   const handleDownload = useCallback(() => {
     if (!generatedImage) return
@@ -738,6 +777,8 @@ export default function App() {
             onDeleteCustomStyle={handleDeleteCustomStyle}
             onUploadImageStyle={handleUploadImageStyle}
             onDeleteImageStyle={handleDeleteImageStyle}
+            collapsed={styleSectionCollapsed}
+            onCollapsedChange={setStyleSectionCollapsed}
           />
           <PromptBar
             value={instructions}
@@ -747,6 +788,9 @@ export default function App() {
             error={null}
             variations={variations}
             onVariationsChange={setVariations}
+            improveGeneration={improveGeneration}
+            onImproveGenerationChange={setImproveGeneration}
+            canImproveGeneration={Boolean(generatedImage)}
           />
           <HistoryGallery
             items={generationHistory}
