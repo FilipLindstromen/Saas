@@ -64,6 +64,24 @@ export const STYLES = [
     prompt: 'a low-poly 3D illustration made of faceted geometric shapes with flat-shaded lighting',
   },
   {
+    id: 'pixels',
+    name: 'Pixels',
+    emoji: '👾',
+    prompt: 'a retro pixel-art illustration with a visible square pixel grid, limited color palette, crisp hard edges, and no anti-aliasing — like classic 8-bit or 16-bit video game art',
+  },
+  {
+    id: 'infographic',
+    name: 'Info Graphic',
+    emoji: '📊',
+    prompt: 'a clean modern infographic illustration: flat vector shapes, clear visual hierarchy, simple icons, labeled sections, arrows and connectors, minimal text placeholders, balanced layout, and a cohesive limited color palette — like a polished editorial or presentation graphic',
+  },
+  {
+    id: 'simple-shapes',
+    name: 'Simple Shapes',
+    emoji: '⬡',
+    prompt: 'a minimalist illustration built from simple geometric shapes — circles, rectangles, triangles, and smooth curves — with flat solid colors, clean edges, and no texture or shading, like modern icon-style or Bauhaus-inspired graphic design',
+  },
+  {
     id: 'sketchnote',
     name: 'Sketchnote',
     emoji: '🗒️',
