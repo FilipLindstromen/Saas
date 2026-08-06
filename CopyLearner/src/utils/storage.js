@@ -312,15 +312,15 @@ export function subscribePosts(onChange) {
   }
 }
 
-export async function addPosts(sourceId, posts) {
+export async function addPosts(category, sourceId, posts) {
   const cloud = await getCloud()
   if (!cloud) {
     const list = readLocalPosts()
     posts.forEach((p, i) => {
       list.unshift({
-        id: `mine-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-        category: 'mine',
-        sourceId,
+        id: `${category}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        category,
+        sourceId: sourceId || null,
         createdAt: Date.now(),
         ...p,
       })
@@ -332,7 +332,7 @@ export async function addPosts(sourceId, posts) {
   const batch = cloud.writeBatch(cloud.db)
   posts.forEach((p) => {
     const ref = cloud.doc(cloud.collection(cloud.db, 'workspaces', code, 'posts'))
-    batch.set(ref, { category: 'mine', sourceId, createdAt: cloud.serverTimestamp(), ...p })
+    batch.set(ref, { category, sourceId: sourceId || null, createdAt: cloud.serverTimestamp(), ...p })
   })
   await batch.commit()
 }

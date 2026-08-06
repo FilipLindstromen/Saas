@@ -28,6 +28,7 @@ import {
   SKETCH_FORMATS,
 } from './utils/canvasFormat'
 import {
+  generateProjectId, drawingKeyFor,
   loadProjects, saveProjects,
   loadCurrentProjectId, saveCurrentProjectId,
   loadCurrentTabId, saveCurrentTabId,

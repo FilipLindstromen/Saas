@@ -43,11 +43,11 @@ export default function App() {
   const [quizPick, setQuizPick] = useState(null)
   const [isRestocking, setIsRestocking] = useState(false)
 
-  // Lessons from uploaded content are generated progressively, in the
-  // background, as the reader swipes through them — not up front on
-  // upload. These refs track that without persisting to storage.
-  const seenMineIdsRef = useRef(new Set())
-  const generatingRef = useRef(false)
+  // Lessons — for every topic, not just "My Content" — are generated
+  // progressively in the background as the reader swipes, so no topic ever
+  // runs dry or repeats. generatingCategoryRef holds the topic currently
+  // being written (or null when idle); only one topic generates at a time.
+  const generatingCategoryRef = useRef(null)
   const failureCooldownRef = useRef(0)
 
   // Keep a ref of custom posts so the sources subscription (set up once per
@@ -91,43 +91,50 @@ export default function App() {
 
   const post = feed[postIdx] || null
   const slide = post ? post.slides[slideIdx] : null
-  const isLastSlide = post ? slideIdx === post.slides.length - 1 : false
   const isFav = post ? favorites.includes(post.id) : false
 
-  const generateNextBatch = useCallback(async () => {
-    generatingRef.current = true
+  // Generate the next batch of lessons for one topic. Grounded in the
+  // reader's uploaded content when any is ready (so "Headlines", "CTAs",
+  // etc. all pull examples from their own material, not just "My
+  // Content"); falls back to the mentor's own expertise on that topic
+  // when there's nothing uploaded, so every topic can still flow forever.
+  const generateNextBatch = useCallback(async (categoryId) => {
+    generatingCategoryRef.current = categoryId
     setIsRestocking(true)
     try {
       const readySources = sources.filter((s) => s.status === 'ready' && s.text)
-      if (!readySources.length) return
       const referenceText = readySources.slice(0, 3).map((s) => s.text).join('\n\n---\n\n')
-      const coveredTitles = customPosts.map((p) => p.title)
-      const posts = await generateLessonBatch({ referenceText, coveredTitles, batchSize: BATCH_SIZE })
-      if (posts.length) await addPosts(readySources[0].id, posts)
+      const coveredTitles = allPosts.filter((p) => p.category === categoryId).map((p) => p.title)
+      const posts = await generateLessonBatch({ categoryId, referenceText, coveredTitles, batchSize: BATCH_SIZE })
+      if (posts.length) await addPosts(categoryId, readySources.length ? readySources[0].id : null, posts)
       failureCooldownRef.current = 0
     } catch (err) {
       failureCooldownRef.current = Date.now()
     } finally {
-      generatingRef.current = false
+      generatingCategoryRef.current = null
       setIsRestocking(false)
     }
-  }, [sources, customPosts])
+  }, [sources, allPosts])
 
-  // Keep the "My Content" flow topped up: whenever the reader has swiped
-  // through most of what's been generated so far, quietly generate the
-  // next batch in the background — an endless stream instead of a single
-  // upfront generation.
+  // Keep every selected topic topped up: whenever the reader has swiped
+  // through most of what's available for a topic this session, quietly
+  // generate its next batch in the background — an endless, non-repeating
+  // stream per topic instead of a small fixed pool that loops.
   useEffect(() => {
     if (view !== 'feed') return
-    if (!selectedCats.includes('mine')) return
-    if (post && post.category === 'mine') seenMineIdsRef.current.add(post.id)
-    if (generatingRef.current) return
+    if (generatingCategoryRef.current) return
     if (customPosts.length >= MAX_TOTAL_LESSONS) return
     if (Date.now() - failureCooldownRef.current < 30000) return
-    const seenCount = customPosts.filter((p) => seenMineIdsRef.current.has(p.id)).length
-    const remaining = customPosts.length - seenCount
-    if (remaining <= REFILL_THRESHOLD) generateNextBatch()
-  }, [view, selectedCats, post, customPosts, generateNextBatch])
+    const hasReadySource = sources.some((s) => s.status === 'ready' && s.text)
+    const sessionSeen = getSessionSeenPostIds(workspaceCode)
+    const needyCategory = selectedCats.find((catId) => {
+      if (catId === 'mine' && !hasReadySource) return false // nothing to teach from yet
+      const postsInCat = allPosts.filter((p) => p.category === catId)
+      const seenCount = postsInCat.filter((p) => sessionSeen.has(p.id)).length
+      return postsInCat.length - seenCount <= REFILL_THRESHOLD
+    })
+    if (needyCategory) generateNextBatch(needyCategory)
+  }, [view, selectedCats, post, customPosts, allPosts, sources, workspaceCode, generateNextBatch])
 
   const feedRef = useRef(feed)
   const progressRef = useRef(progress)
@@ -181,11 +188,25 @@ export default function App() {
     if (postIdx >= feed.length && feed.length > 0) repositionToFeedStart()
   }, [feed.length, postIdx, repositionToFeedStart])
 
+  // Reaching the end of a lesson (by swiping past its last slide, or
+  // swiping down to skip to a new one) counts as "learned it" — there's no
+  // rating button to tap, so it's recorded automatically.
+  const completeAndAdvance = useCallback(() => {
+    if (post) {
+      const prev = progress[post.id] || { box: 0 }
+      const box = prev.box + 1
+      const next = { ...progress, [post.id]: { box, due: nextDue(box), lastSeen: Date.now() } }
+      setProgress(next)
+      saveState({ progress: next })
+    }
+    goPost(1)
+  }, [post, progress, goPost])
+
   const goSlide = (delta) => {
     if (!post) return
     const n = slideIdx + delta
     if (n < 0) { goPost(-1); return }
-    if (n >= post.slides.length) { goPost(1); return }
+    if (n >= post.slides.length) { completeAndAdvance(); return }
     setSlideIdx(n)
     setQuizPick(null)
   }
@@ -197,16 +218,6 @@ export default function App() {
     saveState({ favorites: next })
   }
 
-  const rate = (gotIt) => {
-    if (!post) return
-    const prev = progress[post.id] || { box: 0 }
-    const box = gotIt ? prev.box + 1 : 0
-    const next = { ...progress, [post.id]: { box, due: nextDue(box), lastSeen: Date.now() } }
-    setProgress(next)
-    saveState({ progress: next })
-    goPost(1)
-  }
-
   const toggleCat = (id) => {
     const next = selectedCats.includes(id) ? selectedCats.filter((c) => c !== id) : [...selectedCats, id]
     const safe = next.length ? next : selectedCats
@@ -214,9 +225,9 @@ export default function App() {
     saveState({ selectedCats: safe })
   }
 
-  // Uploading only extracts and stores the text — no AI call here. Lessons
-  // for it are generated later, progressively, as the reader swipes
-  // through the "My Content" category (see generateNextBatch above).
+  // Uploading only extracts and stores the text — no AI call here. It
+  // becomes reference material for generateNextBatch above, across
+  // whichever topics the reader is swiping through.
   const onAddFile = async (file) => {
     const type = guessFileType(file)
     const sourceId = await createSource({ title: file.name, type, text: '' })
@@ -281,7 +292,7 @@ export default function App() {
           <SwipeStage
             onSwipeLeft={() => goSlide(1)}
             onSwipeRight={() => goSlide(-1)}
-            onSwipeDown={() => goPost(1)}
+            onSwipeDown={completeAndAdvance}
             onSwipeUp={() => goPost(-1)}
           >
             <PostCard
@@ -296,8 +307,6 @@ export default function App() {
               quizPick={quizPick}
               setQuizPick={setQuizPick}
               onToggleFav={toggleFavorite}
-              onRate={rate}
-              isLastSlide={isLastSlide}
             />
           </SwipeStage>
         )}
@@ -305,7 +314,7 @@ export default function App() {
 
       {view !== 'transform' && post && (
         <div style={{ textAlign: 'center', paddingBottom: 10 }}>
-          <button onClick={() => goPost(1)} style={{ background: 'none', border: 'none', color: '#5C5C61', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+          <button onClick={completeAndAdvance} style={{ background: 'none', border: 'none', color: '#5C5C61', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
             swipe down for a new learning <ChevronDown size={14} />
           </button>
           {isRestocking && <div style={{ color: '#4A4A50', fontSize: 10.5, marginTop: 2 }}>writing more lessons…</div>}

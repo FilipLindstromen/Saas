@@ -1,11 +1,11 @@
 import React from 'react'
-import { Star, Check, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, ChevronLeft, ChevronRight } from 'lucide-react'
 import SlideBody from './SlideBody.jsx'
 
 export default function PostCard({
   post, slide, slideIdx, accent, label, isFav,
   revealed, setRevealed, quizPick, setQuizPick,
-  onToggleFav, onRate, isLastSlide,
+  onToggleFav,
 }) {
   const total = post.slides.length
 
@@ -48,23 +48,11 @@ export default function PostCard({
       </div>
 
       {/* nav chevrons (visual affordance — swipe handles the actual nav) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 10px 10px', pointerEvents: 'none' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 10px 16px', pointerEvents: 'none' }}>
         <ChevronLeft size={16} color={slideIdx > 0 ? '#4E4E54' : 'transparent'} />
         <span style={{ fontSize: 10.5, color: '#4E4E54' }}>{slideIdx + 1} / {total}</span>
         <ChevronRight size={16} color="#4E4E54" />
       </div>
-
-      {/* rating footer only on the last slide */}
-      {isLastSlide && (
-        <div style={{ display: 'flex', gap: 8, padding: '0 16px 16px' }}>
-          <button onClick={(e) => { e.stopPropagation(); onRate(false) }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#232327', border: 'none', borderRadius: 12, padding: '10px 0', fontWeight: 600, fontSize: 13, color: '#C6C6CB', cursor: 'pointer', zIndex: 5, position: 'relative' }}>
-            <RotateCcw size={14} /> Review again soon
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); onRate(true) }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#F4F4F5', border: 'none', borderRadius: 12, padding: '10px 0', fontWeight: 700, fontSize: 13, color: '#0B0B0C', cursor: 'pointer', zIndex: 5, position: 'relative' }}>
-            <Check size={14} /> Got it
-          </button>
-        </div>
-      )}
     </div>
   )
 }

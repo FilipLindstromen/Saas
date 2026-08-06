@@ -22,18 +22,31 @@ export default function SlideBody({ slide, slideKey, accent, revealed, setReveal
   }
 
   if (slide.kind === 'example') {
+    // New posts carry a list of 3-5 examples; older posts (the built-in
+    // deck, or anything generated before this shape existed) still carry a
+    // single before/after pair — normalize both to one list here.
+    const items = Array.isArray(slide.items) ? slide.items : (slide.after ? [{ before: slide.before, after: slide.after }] : [])
     return (
       <div>
         <div className="select-text" style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14 }}>{slide.label}</div>
-        {slide.before && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: '#6B6B70', marginBottom: 4 }}>BEFORE</div>
-            <div className="select-text" style={{ fontSize: 15, color: '#7C7C82', textDecoration: 'line-through', lineHeight: 1.4 }}>{slide.before}</div>
-          </div>
-        )}
-        <div>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: accent, marginBottom: 4 }}>{slide.before ? 'AFTER' : 'EXAMPLE'}</div>
-          <div className="select-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.4 }}>{slide.after}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {items.map((item, i) => (
+            <div key={i} style={{ paddingBottom: i < items.length - 1 ? 14 : 0, borderBottom: i < items.length - 1 ? '1px solid #232327' : 'none' }}>
+              {items.length > 1 && (
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#55555B', marginBottom: 6 }}>#{i + 1}</div>
+              )}
+              {item.before && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#6B6B70', marginBottom: 4 }}>BEFORE</div>
+                  <div className="select-text" style={{ fontSize: 14.5, color: '#7C7C82', textDecoration: 'line-through', lineHeight: 1.4 }}>{item.before}</div>
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: accent, marginBottom: 4 }}>{item.before ? 'AFTER' : 'EXAMPLE'}</div>
+                <div className="select-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 17, fontWeight: 700, color: '#F4F4F5', lineHeight: 1.4 }}>{item.after}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

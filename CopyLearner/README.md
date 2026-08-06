@@ -11,9 +11,17 @@ Swipeable micro-lessons, like an Instagram carousel you learn from. The AI writi
 
 ## Uploading your own content
 
-Tap the settings icon (top-right) → **My Content** → upload a PDF, ZIP, or text file, or paste text directly. The file is only read and stored at this point — no AI call yet, so uploading is instant.
+Tap the settings icon (top-right) → **My Content** → upload a PDF, Word doc, ZIP, or text file, or paste text directly. The file is only read and stored at this point — no AI call yet, so uploading is instant.
 
-Lessons are generated progressively, in the background, as you swipe through the **My Content** topic: the first batch of 10 is written once you start swiping through it, and once you're down to the last 4, the next 10 are already being written behind the scenes. If your uploaded material runs out of distinct ideas, the mentor persona keeps going using its own copywriting expertise (staying relevant to your material's subject) — so the flow doesn't dry up even from a short upload.
+Every topic — not just **My Content** — generates lessons progressively in the background as you swipe: whenever a topic is down to its last few unseen lessons, the next batch is already being written behind the scenes, so no topic ever repeats or runs dry, even on the built-in deck. When you have material uploaded, **every** topic (Headlines, Bullets, CTAs, Intros, Basics, and My Content) pulls its examples from that material specifically — a real claim, product detail, or line from your upload, not a generic stand-in — so the lessons feel written for what you're actually working on. Without any upload, topics still generate endlessly from the mentor persona's own copywriting expertise.
+
+## Choosing what to learn
+
+Tap the topic pill under the Learn/Saved/Transform tabs to quickly switch which topics are mixed into your feed, without opening full Settings.
+
+## Transform
+
+The **Transform** tab is a separate tool: paste a piece of your own copy, give it instructions ("make it punchier", "apply AIDA", "turn into 3 headline options"), and get an expert-copywriter rewrite back. Every instruction you've given is remembered and applied to future transforms too, so it keeps adapting to how you like your copy written.
 
 This uses the same OpenAI key as the rest of the SaaS apps — set `OPENAI_API_KEY` in the repo root `.env`, or add your key in another app's Settings (keys are shared via `localStorage` across all apps here).
 
