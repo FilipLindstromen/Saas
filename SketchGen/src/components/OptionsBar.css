@@ -115,6 +115,38 @@
   color: var(--text-primary);
 }
 
+.options-bar-format-select-group {
+  gap: 0.4rem;
+}
+
+.options-bar-format-select-group label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.options-bar-format-select {
+  min-width: 4.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.options-bar-format-select:hover {
+  border-color: var(--border-strong);
+}
+
+.options-bar-format-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
 .options-bar-format-group {
   gap: 0;
   padding: 0.1rem;

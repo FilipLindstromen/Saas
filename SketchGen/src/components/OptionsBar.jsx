@@ -373,18 +373,21 @@ export default function OptionsBar({
         </div>
       )}
 
-      <div className="options-bar-group options-bar-format-group" role="group" aria-label="Canvas aspect ratio">
-        {SKETCH_FORMATS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className={`options-bar-format-btn ${canvasFormat === f.id ? 'active' : ''}`}
-            onClick={() => onCanvasFormatChange?.(f.id)}
-            title={`Sketch format ${f.label}`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="options-bar-group options-bar-format-select-group">
+        <label htmlFor="sketch-format">Format</label>
+        <select
+          id="sketch-format"
+          className="options-bar-format-select"
+          value={canvasFormat}
+          onChange={(e) => onCanvasFormatChange?.(e.target.value)}
+          title="Canvas aspect ratio"
+        >
+          {SKETCH_FORMATS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="options-bar-group options-bar-zoom-group">

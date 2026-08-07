@@ -1404,6 +1404,7 @@ export default function App() {
           {view !== 'sketch' && generatedImage && (
             <ResultView
               view={view}
+              formatId={canvasFormat}
               sketchDataUrl={sketchSnapshot}
               generatedDataUrl={generatedImage}
               onUseAsSketch={handleUseAsSketch}

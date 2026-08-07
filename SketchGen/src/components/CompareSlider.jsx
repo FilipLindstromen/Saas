@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react'
+import { getSketchFormat } from '../utils/canvasFormat'
+import './ResultView.css'
 import './CompareSlider.css'
 
-export default function CompareSlider({ beforeSrc, afterSrc, onAfterContextMenu }) {
+export default function CompareSlider({ beforeSrc, afterSrc, formatId, onAfterContextMenu }) {
+  const format = getSketchFormat(formatId)
   const containerRef = useRef(null)
   const [position, setPosition] = useState(50)
   const draggingRef = useRef(false)
@@ -28,7 +31,11 @@ export default function CompareSlider({ beforeSrc, afterSrc, onAfterContextMenu 
   }
 
   return (
-    <div className="compare-slider" ref={containerRef}>
+    <div
+      className="result-view-stage compare-slider-stage"
+      style={{ aspectRatio: `${format.width} / ${format.height}` }}
+    >
+      <div className="compare-slider" ref={containerRef}>
       <img className="compare-slider-image compare-slider-before" src={beforeSrc} alt="Sketch" />
       <div className="compare-slider-after-wrap" style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}>
         <img
@@ -54,6 +61,7 @@ export default function CompareSlider({ beforeSrc, afterSrc, onAfterContextMenu 
             <path d="M16 5l5 7-5 7" />
           </svg>
         </div>
+      </div>
       </div>
     </div>
   )
