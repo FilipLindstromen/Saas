@@ -4,6 +4,7 @@ import CanvasBoard from './components/CanvasBoard'
 import ToolRail from './components/ToolRail'
 import OptionsBar from './components/OptionsBar'
 import StylePickerOverlay from './components/StylePickerOverlay'
+import GenerationGalleryOverlay from './components/GenerationGalleryOverlay'
 import PromptBar from './components/PromptBar'
 import GenerationProgress from './components/GenerationProgress'
 import GenerationQueue from './components/GenerationQueue'
@@ -114,6 +115,8 @@ export default function App() {
   const [variations, setVariations] = useState(savedSettings.variations)
   const [styleSectionCollapsed, setStyleSectionCollapsed] = useState(savedSettings.styleSectionCollapsed)
   const [stylePickerOpen, setStylePickerOpen] = useState(false)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [galleryItems, setGalleryItems] = useState([])
   const [selectedTextItem, setSelectedTextItem] = useState(null)
   const [improveGeneration, setImproveGeneration] = useState(savedSettings.improveGeneration)
   const [brandColors, setBrandColors] = useState(() => normalizeBrandColors(savedSettings.brandColors))
@@ -809,6 +812,7 @@ export default function App() {
     const key = drawingKeyRef.current
     const history = await getAllGenerations(key)
     setGenerationHistory(history)
+    setGalleryItems(await getAllGenerations())
     if (id === activeGenerationId) {
       if (history.length) {
         setGeneratedImage(history[0].dataUrl)
@@ -1229,6 +1233,49 @@ export default function App() {
     }
   }, [tabs.length, currentTabId, currentProjectId, loadDrawing])
 
+  const handleOpenGallery = useCallback(async () => {
+    setGalleryItems(await getAllGenerations())
+    setGalleryOpen(true)
+  }, [])
+
+  const handleGallerySelect = useCallback(
+    async (entry) => {
+      setGalleryOpen(false)
+      const key = entry.drawingKey
+      if (key && key !== drawingKeyRef.current) {
+        const colon = key.indexOf(':')
+        if (colon > 0) {
+          const projectId = key.slice(0, colon)
+          const tabId = key.slice(colon + 1)
+          if (projectId !== currentProjectId) {
+            await switchProject(projectId)
+          }
+          await flushDrawingState()
+          saveCurrentTabId(projectId, tabId)
+          setCurrentTabId(tabId)
+          setTabs(getProjectTabs(projectId))
+          await loadDrawing(projectId, tabId)
+        }
+      }
+      setSketchSnapshot(entry.sketchDataUrl)
+      setGeneratedImage(entry.dataUrl)
+      setActiveGenerationId(entry.id)
+      setView('generated')
+      const historyKey = drawingKeyRef.current
+      if (historyKey) {
+        setGenerationHistory(await getAllGenerations(historyKey))
+      }
+    },
+    [currentProjectId, switchProject, flushDrawingState, loadDrawing]
+  )
+
+  const handleGalleryDelete = useCallback(
+    (id) => {
+      void handleDeleteHistoryEntry(id)
+    },
+    [handleDeleteHistoryEntry]
+  )
+
   const currentProjectName = projects.find((p) => p.id === currentProjectId)?.name
 
   return (
@@ -1241,6 +1288,7 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}
         onOpenBranding={handleOpenBranding}
+        onOpenGallery={handleOpenGallery}
         brandColors={brandColors}
         onExport={handleExport}
         exportDisabled={exportDisabled}
@@ -1507,6 +1555,15 @@ export default function App() {
         onDeleteCustomStyle={handleDeleteCustomStyle}
         onUploadImageStyle={handleUploadImageStyle}
         onDeleteImageStyle={handleDeleteImageStyle}
+      />
+
+      <GenerationGalleryOverlay
+        isOpen={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        items={galleryItems}
+        activeId={activeGenerationId}
+        onSelect={handleGallerySelect}
+        onDelete={handleGalleryDelete}
       />
     </div>
   )
