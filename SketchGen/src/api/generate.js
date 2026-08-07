@@ -15,46 +15,55 @@ import {
   normalizeHexColor,
 } from '../constants/brand'
 
-function buildBrandDirective(brand, useBrandColors, documentBackgroundHex) {
-  if (!useBrandColors || !brand?.colors) return ''
-  const c = normalizeBrandColors(brand.colors)
-  const palette = [
-    `primary ${c.primary}`,
-    `secondary ${c.secondary}`,
-    `tertiary ${c.tertiary}`,
-    `accent ${c.accent}`,
-    `bright background ${c.brightBg}`,
-    `dark background ${c.darkBg}`,
-    `colored background ${c.coloredBg}`,
-    `border and linework ${c.border}`,
-    `text ${c.text}`,
-  ].join(', ')
-  const fonts = normalizeBrandFonts(brand.fonts)
-  const fontNote = fonts.headline && fonts.body && fonts.accent
-    ? ` For typography, use "${fonts.headline}" for headlines, "${fonts.body}" for body text and labels, and "${fonts.accent}" for accent callouts (Google Font styles).`
-    : fonts.headline && fonts.body
-      ? ` For typography, use "${fonts.headline}" for headlines and "${fonts.body}" for body text and labels (Google Font styles).`
-      : ''
+function buildBrandDirective(brand, useBrandColors, useBrandFonts, documentBackgroundHex) {
+  if ((!useBrandColors && !useBrandFonts) || !brand) return ''
 
-  let canvasBgNote = ''
-  const docBg = documentBackgroundHex
-    ? normalizeHexColor(documentBackgroundHex, c.brightBg)
-    : null
-  if (docBg) {
-    const role = BRAND_BACKGROUND_COLOR_FIELDS.find(
-      ({ key }) => c[key]?.toLowerCase() === docBg.toLowerCase()
+  let colorNote = ''
+  if (useBrandColors && brand.colors) {
+    const c = normalizeBrandColors(brand.colors)
+    const palette = [
+      `primary ${c.primary}`,
+      `secondary ${c.secondary}`,
+      `tertiary ${c.tertiary}`,
+      `accent ${c.accent}`,
+      `bright background ${c.brightBg}`,
+      `dark background ${c.darkBg}`,
+      `colored background ${c.coloredBg}`,
+      `border and linework ${c.border}`,
+      `text ${c.text}`,
+    ].join(', ')
+
+    let canvasBgNote = ''
+    const docBg = documentBackgroundHex
+      ? normalizeHexColor(documentBackgroundHex, c.brightBg)
+      : null
+    if (docBg) {
+      const role = BRAND_BACKGROUND_COLOR_FIELDS.find(
+        ({ key }) => c[key]?.toLowerCase() === docBg.toLowerCase()
+      )
+      canvasBgNote = role
+        ? ` The main canvas/slide background must be ${docBg} (brand ${role.label}).`
+        : ` The main canvas/slide background must be ${docBg}.`
+    }
+
+    colorNote = (
+      ' MANDATORY BRAND PALETTE — you must color the finished illustration using only these exact hex values'
+      + ` for backgrounds, fills, accents, typography, icons, and charts: ${palette}.${canvasBgNote}`
+      + ' Do not introduce other hues unless the artist instructions explicitly require a specific different color.'
     )
-    canvasBgNote = role
-      ? ` The main canvas/slide background must be ${docBg} (brand ${role.label}).`
-      : ` The main canvas/slide background must be ${docBg}.`
   }
 
-  return (
-    ' MANDATORY BRAND PALETTE — you must color the finished illustration using only these exact hex values'
-    + ` for backgrounds, fills, accents, typography, icons, and charts: ${palette}.${canvasBgNote}`
-    + ' Do not introduce other hues unless the artist instructions explicitly require a specific different color.'
-    + fontNote
-  )
+  let fontNote = ''
+  if (useBrandFonts && brand.fonts) {
+    const fonts = normalizeBrandFonts(brand.fonts)
+    fontNote = fonts.headline && fonts.body && fonts.accent
+      ? ` For typography, use "${fonts.headline}" for headlines, "${fonts.body}" for body text and labels, and "${fonts.accent}" for accent callouts (Google Font styles).`
+      : fonts.headline && fonts.body
+        ? ` For typography, use "${fonts.headline}" for headlines and "${fonts.body}" for body text and labels (Google Font styles).`
+        : ''
+  }
+
+  return colorNote + fontNote
 }
 
 /** Ensures the model keeps all artwork inside the output frame (avoids clipped titles/graphics). */
@@ -81,11 +90,11 @@ function multiVariantInstructionsNote(variantCount) {
 /**
  * Build the image-edit prompt from a style preset and optional free-text instructions.
  */
-export function buildPrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1, documentBackgroundHex = null) {
+export function buildPrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1, documentBackgroundHex = null, useBrandFonts = false) {
   const format = getSketchFormat(formatId)
   const aspectNote = `The finished image must keep the exact same aspect ratio and framing as the sketch (${format.label}, ${format.width}×${format.height}). Do not crop to a different shape.`
   const boundsNote = buildSafeCompositionNote()
-  const brandNote = buildBrandDirective(brand, useBrandColors, documentBackgroundHex)
+  const brandNote = buildBrandDirective(brand, useBrandColors, useBrandFonts, documentBackgroundHex)
   const variantNote = multiVariantPromptNote(variantCount)
   const extra = instructions?.trim() ? ` Additional instructions from the artist: ${instructions.trim()}` : ''
   if (style.type === 'image') {
@@ -101,11 +110,11 @@ export function buildPrompt(style, instructions, formatId, brand, useBrandColors
 /**
  * Prompt for iterating on an already-generated illustration (Improve generation).
  */
-export function buildImprovePrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1, documentBackgroundHex = null) {
+export function buildImprovePrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1, documentBackgroundHex = null, useBrandFonts = false) {
   const format = getSketchFormat(formatId)
   const aspectNote = `Keep the exact same aspect ratio and framing (${format.label}, ${format.width}×${format.height}). Do not crop to a different shape.`
   const boundsNote = buildSafeCompositionNote()
-  const brandNote = buildBrandDirective(brand, useBrandColors, documentBackgroundHex)
+  const brandNote = buildBrandDirective(brand, useBrandColors, useBrandFonts, documentBackgroundHex)
   const variantNote = multiVariantPromptNote(variantCount)
   const artist = instructions?.trim() || 'Refine and improve this illustration.'
   if (style.type === 'image') {
@@ -131,13 +140,14 @@ export function buildInstructionsOnlyPrompt(
   useBrandColors,
   variantCount = 1,
   documentBackgroundHex = null,
+  useBrandFonts = false,
 ) {
   const format = getSketchFormat(formatId)
   const artist = instructions?.trim()
   if (!artist) throw new Error('Instructions are required when the canvas is empty.')
   const aspectNote = `The illustration must fit a ${format.label} frame (${format.width}×${format.height} pixel proportions).`
   const boundsNote = buildSafeCompositionNote()
-  const brandNote = buildBrandDirective(brand, useBrandColors, documentBackgroundHex)
+  const brandNote = buildBrandDirective(brand, useBrandColors, useBrandFonts, documentBackgroundHex)
   const variantNote = multiVariantInstructionsNote(variantCount)
   if (style.type === 'image') {
     const styleRefNote = useBrandColors
@@ -166,6 +176,7 @@ export async function generateStyledImage({
   referenceImageDataUrl = null,
   brand = null,
   useBrandColors = false,
+  useBrandFonts = false,
   documentBackgroundColor = null,
   instructionsOnly = false,
   quality = 'high',
@@ -197,6 +208,7 @@ export async function generateStyledImage({
       useBrandColors,
       count,
       docBg,
+      useBrandFonts,
     )
     if (style.type === 'image' && style.referenceImageDataUrl) {
       const blank = createBlankCanvasDataUrl(format.width, format.height, fitBg)
@@ -221,8 +233,8 @@ export async function generateStyledImage({
     }
   } else {
     const prompt = improving
-      ? buildImprovePrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
-      : buildPrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
+      ? buildImprovePrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg, useBrandFonts)
+      : buildPrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg, useBrandFonts)
     const primaryImage = improving ? referenceImageDataUrl : sketchDataUrl
     if (!primaryImage) throw new Error('Sketch image is required.')
     raw = await editImage({

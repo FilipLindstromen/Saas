@@ -80,6 +80,10 @@ export const GOOGLE_FONT_OPTIONS = [
   'Fira Sans',
   'Rubik',
   'Manrope',
+  'Nerko One',
+  'Permanent Marker',
+  'Archivo Black',
+  'Anton',
 ]
 
 const HEX_RE = /^#[0-9a-f]{6}$/i

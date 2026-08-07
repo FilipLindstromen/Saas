@@ -19,6 +19,8 @@ export default function PromptBar({
   canImproveGeneration,
   useBrandColors,
   onUseBrandColorsChange,
+  useBrandFonts,
+  onUseBrandFontsChange,
   generationQuality,
   onGenerationQualityChange,
   addGenerationsAsLayers,
@@ -68,7 +70,7 @@ export default function PromptBar({
 
       <label
         className="prompt-bar-improve"
-        title="Apply your brand palette and fonts from Settings to this generation"
+        title="Apply your brand palette from Settings to this generation"
       >
         <input
           type="checkbox"
@@ -76,6 +78,18 @@ export default function PromptBar({
           onChange={(e) => onUseBrandColorsChange(e.target.checked)}
         />
         <span>Use brand colors</span>
+      </label>
+
+      <label
+        className="prompt-bar-improve"
+        title="Apply your brand fonts from Settings to this generation"
+      >
+        <input
+          type="checkbox"
+          checked={useBrandFonts}
+          onChange={(e) => onUseBrandFontsChange(e.target.checked)}
+        />
+        <span>Use brand fonts</span>
       </label>
 
       <label

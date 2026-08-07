@@ -136,6 +136,7 @@ export default function App() {
   const [brandColors, setBrandColors] = useState(() => normalizeBrandColors(savedSettings.brandColors))
   const [brandFonts, setBrandFonts] = useState(() => normalizeBrandFonts(savedSettings.brandFonts))
   const [useBrandColorsInGeneration, setUseBrandColorsInGeneration] = useState(savedSettings.useBrandColorsInGeneration)
+  const [useBrandFontsInGeneration, setUseBrandFontsInGeneration] = useState(savedSettings.useBrandFontsInGeneration)
   const [textFontFamily, setTextFontFamily] = useState(savedSettings.textFontFamily)
   const [textFontSize, setTextFontSize] = useState(savedSettings.textFontSize)
   const [textFontBold, setTextFontBold] = useState(savedSettings.textFontBold)
@@ -201,6 +202,7 @@ export default function App() {
     brandColors,
     brandFonts,
     useBrandColorsInGeneration,
+    useBrandFontsInGeneration,
     textFontFamily,
     textFontSize,
     textFontBold,
@@ -380,7 +382,7 @@ export default function App() {
       clearTimeout(timer)
       flushAppSettings()
     }
-  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, penSnapHV, generationQuality, addGenerationsAsLayers, showSafeZone, defringeMode, defringeStrength, flushAppSettings])
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, useBrandFontsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, penSnapHV, generationQuality, addGenerationsAsLayers, showSafeZone, defringeMode, defringeStrength, flushAppSettings])
 
   // Per-drawing instructions (IndexedDB), debounced while typing.
   useEffect(() => {
@@ -1048,6 +1050,7 @@ export default function App() {
         referenceImageDataUrl: batch.referenceImageDataUrl,
         brand: batch.brand,
         useBrandColors: Boolean(batch.useBrandColors),
+        useBrandFonts: Boolean(batch.useBrandFonts),
         documentBackgroundColor: batch.documentBackgroundColor,
         instructionsOnly: Boolean(batch.instructionsOnly),
         quality,
@@ -1353,6 +1356,7 @@ export default function App() {
         formatId: canvasFormat,
         brand: { colors: normalizeBrandColors(brandColors), fonts: normalizeBrandFonts(brandFonts) },
         useBrandColors: useBrandColorsInGeneration,
+        useBrandFonts: useBrandFontsInGeneration,
         documentBackgroundColor: canvasBackgroundColor,
         instructionsOnly,
         key,
@@ -1392,6 +1396,7 @@ export default function App() {
     brandColors,
     brandFonts,
     useBrandColorsInGeneration,
+    useBrandFontsInGeneration,
     canvasBackgroundColor,
     generationQuality,
     addGenerationsAsLayers,
@@ -1868,6 +1873,8 @@ export default function App() {
               canImproveGeneration={Boolean(generatedImage)}
               useBrandColors={useBrandColorsInGeneration}
               onUseBrandColorsChange={setUseBrandColorsInGeneration}
+              useBrandFonts={useBrandFontsInGeneration}
+              onUseBrandFontsChange={setUseBrandFontsInGeneration}
               generationQuality={generationQuality}
               onGenerationQualityChange={setGenerationQuality}
               addGenerationsAsLayers={addGenerationsAsLayers}

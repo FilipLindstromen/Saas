@@ -36,6 +36,7 @@ const DEFAULTS = {
   brandColors: { ...DEFAULT_BRAND_COLORS },
   brandFonts: { ...DEFAULT_BRAND_FONTS },
   useBrandColorsInGeneration: false,
+  useBrandFontsInGeneration: false,
   textFontFamily: DEFAULT_BRAND_FONTS.body,
   textFontSize: 36,
   textFontBold: false,
@@ -77,6 +78,7 @@ export function loadAppSettings() {
     merged.styleSectionCollapsed = Boolean(merged.styleSectionCollapsed)
     merged.improveGeneration = Boolean(merged.improveGeneration)
     merged.useBrandColorsInGeneration = Boolean(merged.useBrandColorsInGeneration)
+    merged.useBrandFontsInGeneration = Boolean(merged.useBrandFontsInGeneration)
     merged.brandColors = normalizeBrandColors(merged.brandColors)
     merged.brandFonts = normalizeBrandFonts(merged.brandFonts)
     merged.textFontSize = clampInt(merged.textFontSize, 8, 120, DEFAULTS.textFontSize)
