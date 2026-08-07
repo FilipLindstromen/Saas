@@ -2,9 +2,10 @@ import ThemeToggle from '@shared/ThemeToggle'
 import ProjectSelector from '@shared/ProjectSelector/ProjectSelector'
 import ExportMenu from './ExportMenu'
 import './TopBar.css'
+import './CanvaConnectOverlay.css'
 
 export default function TopBar({
-  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onOpenBranding, onOpenGallery, brandColors, onExport, exportDisabled,
+  view, onViewChange, hasGenerated, theme, onToggleTheme, onOpenSettings, onOpenBranding, onOpenGallery, onSendToCanva, canvaConnected, canvaBusy, brandColors, onExport, exportDisabled,
   projects, currentProjectId, currentProjectName, onSwitchProject, onCreateProject, onRenameProject, onDeleteProject,
 }) {
   return (
@@ -66,6 +67,17 @@ export default function TopBar({
         </svg>
       </button>
 
+      <button
+        type="button"
+        className="sketchgen-canva-btn"
+        onClick={onSendToCanva}
+        disabled={canvaBusy}
+        title={canvaConnected ? 'Upload current image to Canva' : 'Connect Canva to upload images'}
+      >
+        <span className={`sketchgen-canva-btn-dot${canvaConnected ? '' : ' off'}`} aria-hidden />
+        Send to Canva
+      </button>
+
       <ExportMenu
         variant="icon"
         className="export-menu-root-toolbar"
@@ -80,7 +92,7 @@ export default function TopBar({
         title="Brand colors, fonts, and palette"
       >
         <span className="sketchgen-brand-btn-swatches" aria-hidden>
-          {[brandColors?.main, brandColors?.accent, brandColors?.line].map((c, i) => (
+          {[brandColors?.primary, brandColors?.accent, brandColors?.border].map((c, i) => (
             <span key={i} className="sketchgen-brand-btn-swatch" style={{ '--swatch-color': c ?? '#ccc' }} />
           ))}
         </span>

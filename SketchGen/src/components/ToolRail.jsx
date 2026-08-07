@@ -2,6 +2,35 @@ import './ToolRail.css'
 
 export const TOOLS = [
   {
+    id: 'move',
+    label: 'Move & transform — drag layers or floating selections; Ctrl+T free transform',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3v18M3 12h18" />
+        <path d="M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'lasso',
+    label: 'Lasso — draw a selection (Shift for rectangle); fill or transform after',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4l4 16 3-7 7-3z" strokeDasharray="3 2" />
+      </svg>
+    ),
+  },
+  {
+    id: 'lasso-fill',
+    label: 'Lasso fill — draw a closed shape and fill with the current color',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 6l5 14 2-6 6-2z" strokeDasharray="3 2" />
+        <path d="M19 14c0 2-1.5 3.5-1.5 3.5S16 16 16 14a1.5 1.5 0 0 1 3 0z" />
+      </svg>
+    ),
+  },
+  {
     id: 'pen',
     label: 'Pen',
     icon: (
@@ -42,6 +71,17 @@ export const TOOLS = [
         <path d="M10 2l9 9-9 9-9-9 2-2" />
         <path d="M2 11l8-8" />
         <path d="M19 14c0 2-1.5 3.5-1.5 3.5S16 16 16 14a1.5 1.5 0 0 1 3 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'eyedropper',
+    label: 'Color picker — click to sample color (copies hex to clipboard)',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m2 22 1-1h3l9-9-3-3-9 9v3z" />
+        <path d="M15 6l3 3" />
+        <path d="m18 3 3 3-2 2-3-3 2-2z" />
       </svg>
     ),
   },
@@ -115,25 +155,6 @@ export const TOOLS = [
         <rect x="3" y="3" width="18" height="18" rx="3" />
         <path d="M8.5 13.5l2.5-3 2 2.5 2-2.5 3.5 4.5" />
         <circle cx="8" cy="8" r="1.5" />
-      </svg>
-    ),
-  },
-  {
-    id: 'select',
-    label: 'Selection & Transform (lasso — hold Shift for rectangle; Ctrl+T to transform the whole layer)',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 4l4 16 3-7 7-3z" strokeDasharray="3 2" />
-      </svg>
-    ),
-  },
-  {
-    id: 'move',
-    label: 'Move (drag to shift the whole layer)',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3v18M3 12h18" />
-        <path d="M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4" />
       </svg>
     ),
   },

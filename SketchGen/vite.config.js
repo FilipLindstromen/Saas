@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
+import { canvaConnectProxyPlugin } from './vite-canva-proxy-plugin.js'
 
 // This file runs as a real ES module (package.json has "type": "module"), so
 // `require(...)` isn't available here — it throws "Dynamic require... is not
@@ -23,6 +24,9 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY || ''),
     'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(process.env.VITE_APP_BUILD_ID || 'dev'),
+    'import.meta.env.VITE_CANVA_CLIENT_ID': JSON.stringify(
+      process.env.VITE_CANVA_CLIENT_ID || process.env.CANVA_CLIENT_ID || ''
+    ),
   },
   resolve: {
     dedupe: ['react', 'react-dom'],
@@ -37,7 +41,7 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react/jsx-runtime']
   },
-  plugins: [react()],
+  plugins: [react(), canvaConnectProxyPlugin()],
   server: {
     port: 5177,
     strictPort: false,

@@ -21,6 +21,14 @@ function dataUrlToPngBlob(dataUrl) {
   })
 }
 
+/** Copies a hex color string (e.g. #1a2b3c) to the clipboard. */
+export async function copyHexToClipboard(hex) {
+  if (!navigator.clipboard?.writeText) {
+    throw new Error('Clipboard not supported in this browser')
+  }
+  await navigator.clipboard.writeText(hex)
+}
+
 /** Copies an image (data URL) to the OS clipboard as real image bytes, not just the URL string. */
 export async function copyImageToClipboard(dataUrl) {
   if (!navigator.clipboard?.write) {

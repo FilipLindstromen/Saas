@@ -1,23 +1,41 @@
-/** Default brand palette (7 roles — bg, line, main, secondary, accent, accent2, text). */
+/** Default brand palette — primary / secondary / tertiary / accent + neutrals. */
 export const DEFAULT_BRAND_COLORS = {
-  bg: '#ffffff',
-  line: '#1a1a1a',
-  main: '#1971c2',
+  primary: '#1971c2',
   secondary: '#495057',
+  tertiary: '#9c36b5',
   accent: '#ff6b35',
-  accent2: '#9c36b5',
+  background: '#ffffff',
+  border: '#1a1a1a',
   text: '#212529',
 }
 
 export const BRAND_COLOR_FIELDS = [
-  { key: 'bg', label: 'Background' },
-  { key: 'line', label: 'Line' },
-  { key: 'main', label: 'Main' },
+  { key: 'primary', label: 'Primary' },
   { key: 'secondary', label: 'Secondary' },
+  { key: 'tertiary', label: 'Tertiary' },
   { key: 'accent', label: 'Accent' },
-  { key: 'accent2', label: 'Accent 2' },
+  { key: 'background', label: 'Background' },
+  { key: 'border', label: 'Border' },
   { key: 'text', label: 'Text' },
 ]
+
+/** Map persisted keys from older SketchGen builds. */
+const LEGACY_BRAND_COLOR_KEY_MAP = {
+  bg: 'background',
+  line: 'border',
+  main: 'primary',
+  accent2: 'tertiary',
+}
+
+export function migrateBrandColorInput(input) {
+  if (!input || typeof input !== 'object') return {}
+  const out = { ...input }
+  for (const [legacyKey, key] of Object.entries(LEGACY_BRAND_COLOR_KEY_MAP)) {
+    if (out[legacyKey] != null && out[key] == null) out[key] = out[legacyKey]
+    delete out[legacyKey]
+  }
+  return out
+}
 
 export const DEFAULT_BRAND_FONTS = {
   headline: 'Montserrat',
@@ -70,10 +88,10 @@ export function normalizeHexColor(value, fallback) {
 }
 
 export function normalizeBrandColors(input) {
+  const migrated = migrateBrandColorInput(input)
   const base = { ...DEFAULT_BRAND_COLORS }
-  if (!input || typeof input !== 'object') return base
   for (const { key } of BRAND_COLOR_FIELDS) {
-    base[key] = normalizeHexColor(input[key], DEFAULT_BRAND_COLORS[key])
+    base[key] = normalizeHexColor(migrated[key], DEFAULT_BRAND_COLORS[key])
   }
   return base
 }

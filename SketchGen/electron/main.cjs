@@ -2,6 +2,14 @@ const { app, BrowserWindow, shell, dialog, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
+const { handleCanvaTokenRequest } = require('../server/canvaTokenExchange.cjs')
+
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') })
+  require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.local') })
+} catch {
+  // dotenv optional when running from packaged app without devDependencies
+}
 
 const UI_PORT = Number(process.env.SKETCHGEN_UI_PORT) || 5177
 const DEV_URL = process.env.SKETCHGEN_DEV_URL || 'http://127.0.0.1:5177'
@@ -85,8 +93,14 @@ function safeFilePath(rootDir, requestPath) {
 function startUiServer(rootDir) {
   return new Promise((resolve, reject) => {
     uiServer = http.createServer((req, res) => {
-      const urlPath = req.url === '/' ? '/index.html' : req.url
-      const filePath = safeFilePath(rootDir, urlPath)
+      const urlPath = req.url?.split('?')[0] || '/'
+      if (urlPath === '/api/canva/token') {
+        void handleCanvaTokenRequest(req, res)
+        return
+      }
+
+      const fileUrlPath = req.url === '/' ? '/index.html' : req.url
+      const filePath = safeFilePath(rootDir, fileUrlPath)
       if (!filePath) {
         res.writeHead(403)
         res.end('Forbidden')

@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat } from '../utils/canvasFormat'
+import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat, GENERATION_SAFE_ZONE_INSET } from '../utils/canvasFormat'
 import { ensureGoogleFontLoaded } from '../constants/brand'
 import { drawArrowShape } from '../constants/arrowStyles'
 import { cleanUpSketchImageData, snapPointToHorizontalVertical } from '../utils/sketchAssist'
@@ -25,6 +25,8 @@ import {
   serializeTextItems,
   measureTextItem,
 } from '../utils/textLayerItems'
+import { copyHexToClipboard } from '../utils/clipboard'
+import { blendModeToCompositeOperation, normalizeBlendMode } from '../utils/layerBlend'
 import './CanvasBoard.css'
 
 /** @deprecated use getSketchFormat — kept for any external imports */
@@ -35,6 +37,7 @@ const MAX_HISTORY = 40
 const FILL_TOLERANCE = 40
 const SHAPE_TOOLS = new Set(['line', 'rect', 'circle', 'arrow'])
 const FREEHAND_INK_TOOLS = new Set(['pen', 'eraser'])
+const LASSO_TOOLS = new Set(['lasso', 'lasso-fill'])
 
 function lerp(a, b, t) {
   return a + (b - a) * t
@@ -44,6 +47,12 @@ function hexToRgb(hex) {
   const clean = String(hex || '#000000').replace('#', '')
   const num = parseInt(clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean, 16)
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
+}
+
+function rgbToHex(r, g, b) {
+  const clamp = (n) => Math.max(0, Math.min(255, Math.round(n)))
+  const h = (n) => clamp(n).toString(16).padStart(2, '0')
+  return `#${h(r)}${h(g)}${h(b)}`
 }
 
 function getPos(canvas, e) {
@@ -261,6 +270,47 @@ function cloneTextItems(items) {
   return items.map((t) => ({ ...t }))
 }
 
+function defaultLayerProps(overrides = {}) {
+  return {
+    opacity: 1,
+    locked: false,
+    blendMode: 'normal',
+    ...overrides,
+  }
+}
+
+function drawLayerContentTo(targetCtx, layer) {
+  if (layer.parts?.length) {
+    for (const p of layer.parts) {
+      targetCtx.drawImage(p.canvas, p.x, p.y)
+    }
+  } else {
+    targetCtx.drawImage(layer.canvas, 0, 0)
+  }
+  drawTextItemsSync(targetCtx, layer.textItems)
+}
+
+function layerThumbnailDataUrl(layer, canvasW, canvasH, size = 36) {
+  const preview = document.createElement('canvas')
+  preview.width = canvasW
+  preview.height = canvasH
+  const pctx = preview.getContext('2d')
+  if (!pctx) return null
+  drawLayerContentTo(pctx, layer)
+  const thumb = document.createElement('canvas')
+  thumb.width = size
+  thumb.height = size
+  const tctx = thumb.getContext('2d')
+  if (!tctx) return null
+  const scale = Math.min(size / canvasW, size / canvasH)
+  const dw = canvasW * scale
+  const dh = canvasH * scale
+  tctx.fillStyle = '#3a3a3a'
+  tctx.fillRect(0, 0, size, size)
+  tctx.drawImage(preview, (size - dw) / 2, (size - dh) / 2, dw, dh)
+  return thumb.toDataURL('image/png')
+}
+
 function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH) {
   const { canvas, ctx } = createLayerCanvas(newW, newH)
   const scale = Math.min(newW / oldW, newH / oldH)
@@ -285,6 +335,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     arrowStyleId = 'straight',
     penSnapHV = false,
     backgroundColor = BACKGROUND_COLOR,
+    showSafeZone = false,
     placing,
     onPlaced,
     onHistoryChange,
@@ -293,6 +344,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onDropFile,
     onSelectionChange,
     onTextSelectionChange,
+    onColorChange,
   },
   ref
 ) {
@@ -401,7 +453,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   }, [size])
 
   const getActiveLayer = () => layersRef.current.find((l) => l.id === activeLayerIdRef.current) || layersRef.current[layersRef.current.length - 1]
-  const getActiveCtx = () => getActiveLayer()?.ctx
+  const getActiveCtx = () => {
+    const layer = getActiveLayer()
+    if (layer?.locked) return null
+    return layer?.ctx
+  }
 
   const ensureActiveLayerFlatForDrawing = () => {
     const layer = getActiveLayer()
@@ -465,16 +521,37 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     })
   }
 
+  const layerNotifyTimerRef = useRef(null)
+
   const notifyLayers = () => {
+    const w = W()
+    const h = H()
     onLayersChange?.({
       layers: layersRef.current.map((l) => ({
         id: l.id,
         name: l.name,
         visible: l.visible,
         kind: l.kind || 'sketch',
+        opacity: l.opacity ?? 1,
+        locked: Boolean(l.locked),
+        blendMode: normalizeBlendMode(l.blendMode),
+        thumbnail: layerThumbnailDataUrl(l, w, h),
       })),
       activeLayerId: activeLayerIdRef.current,
     })
+  }
+
+  const scheduleNotifyLayers = (immediate = false) => {
+    if (immediate) {
+      if (layerNotifyTimerRef.current) clearTimeout(layerNotifyTimerRef.current)
+      notifyLayers()
+      return
+    }
+    if (layerNotifyTimerRef.current) clearTimeout(layerNotifyTimerRef.current)
+    layerNotifyTimerRef.current = setTimeout(() => {
+      layerNotifyTimerRef.current = null
+      notifyLayers()
+    }, 280)
   }
 
   const renderCompositeTo = (targetCtx, { includeBackground = true } = {}) => {
@@ -486,10 +563,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       targetCtx.clearRect(0, 0, W(), H())
     }
     for (const layer of layersRef.current) {
-      if (layer.visible) {
-        targetCtx.drawImage(layer.canvas, 0, 0)
-        drawTextItemsSync(targetCtx, layer.textItems)
-      }
+      if (!layer.visible) continue
+      targetCtx.save()
+      targetCtx.globalAlpha = layer.opacity ?? 1
+      targetCtx.globalCompositeOperation = blendModeToCompositeOperation(layer.blendMode)
+      drawLayerContentTo(targetCtx, layer)
+      targetCtx.restore()
     }
     const sel = floatingSelectionRef.current
     if (sel) {
@@ -684,6 +763,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     const mask = maskFromPolygon(points, w, h)
     const lifted = liftMaskedRegion(layer.ctx, mask, w, h)
     if (!lifted) return false
+    clearPixelSelection()
     floatingSelectionRef.current = { ...lifted, layerId: layer.id, rotation: 0 }
     setSelectionOutline(updateFloatingOutline(floatingSelectionRef.current))
     hasContentRef.current = true
@@ -693,8 +773,87 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     return true
   }
 
+  function commitLassoPixelSelection(points) {
+    if (points.length < 3) return false
+    mergeFloatingSelection(true)
+    ensureActiveLayerFlatForDrawing()
+    const layer = getActiveLayer()
+    if (!layer) return false
+    const w = W()
+    const h = H()
+    const mask = maskFromPolygon(points, w, h)
+    if (!maskHasPixels(mask)) return false
+    pixelSelectionRef.current = { layerId: layer.id, mask }
+    updatePixelSelectionOverlay()
+    emitSelectionChange()
+    return true
+  }
+
+  function commitLassoFill(points) {
+    if (points.length < 3) return false
+    ensureActiveLayerFlatForDrawing()
+    const layer = getActiveLayer()
+    const ctx = layer?.ctx
+    if (!ctx) return false
+    const w = W()
+    const h = H()
+    const mask = maskFromPolygon(points, w, h)
+    if (!maskHasPixels(mask)) return false
+    fillMaskOnLayer(ctx, mask, w, h, colorRef.current)
+    hasContentRef.current = true
+    renderComposite()
+    pushHistory()
+    return true
+  }
+
+  function liftPixelSelectionToFloating() {
+    const pixelSel = getActivePixelSelection()
+    if (!pixelSel) return false
+    mergeFloatingSelection(true)
+    ensureActiveLayerFlatForDrawing()
+    const layer = getActiveLayer()
+    if (!layer) return false
+    const w = W()
+    const h = H()
+    const lifted = liftMaskedRegion(layer.ctx, pixelSel.mask, w, h)
+    if (!lifted) return false
+    clearPixelSelection()
+    floatingSelectionRef.current = { ...lifted, layerId: layer.id, rotation: 0 }
+    setSelectionOutline(updateFloatingOutline(floatingSelectionRef.current))
+    hasContentRef.current = true
+    renderComposite()
+    emitSelectionChange()
+    pushHistory()
+    return true
+  }
+
+  function beginLassoDraft(pos, shiftKey) {
+    clearPixelSelection()
+    mergeFloatingSelection(true)
+    const mode = shiftKey ? 'rect' : 'lasso'
+    lassoDraftRef.current = { mode, points: [pos], start: pos, end: pos }
+    setLassoPreview({ mode, points: [pos], end: pos })
+    drawingRef.current = true
+  }
+
+  function lassoPointsFromDraft(draft) {
+    if (!draft?.end) return null
+    if (draft.mode === 'rect') return rectToPolygon(draft.start, draft.end)
+    return draft.points.length >= 3 ? draft.points : null
+  }
+
+  function finishLassoDraft(toolId) {
+    const draft = lassoDraftRef.current
+    lassoDraftRef.current = null
+    setLassoPreview(null)
+    const points = lassoPointsFromDraft(draft)
+    if (!points) return
+    if (toolId === 'lasso-fill') commitLassoFill(points)
+    else if (toolId === 'lasso') commitLassoPixelSelection(points)
+  }
+
   useEffect(() => {
-    if (tool !== 'select') mergeFloatingSelection(true)
+    if (tool !== 'move' && floatingSelectionRef.current) mergeFloatingSelection(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool])
 
@@ -708,7 +867,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     const h = H()
     const snapshot = {
       layers: layersRef.current.map((l) => {
-        const base = { id: l.id, name: l.name, visible: l.visible, kind: l.kind }
+        const base = {
+          id: l.id,
+          name: l.name,
+          visible: l.visible,
+          kind: l.kind,
+          opacity: l.opacity ?? 1,
+          locked: Boolean(l.locked),
+          blendMode: normalizeBlendMode(l.blendMode),
+        }
         if (l.parts?.length) {
           return {
             ...base,
@@ -733,6 +900,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     historyIndexRef.current = historyRef.current.length - 1
     notifyHistory()
     onCommit?.()
+    scheduleNotifyLayers()
   }
 
   const restoreHistoryEntry = (entry) => {
@@ -742,7 +910,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         const parts = saved.parts.map((p) => partFromDef(p))
         const layer = { id: saved.id, name: saved.name, visible: saved.visible, kind: saved.kind, canvas, ctx, parts }
         rebuildLayerCanvasFromParts(layer)
-        return layer
+        return { ...layer, ...defaultLayerProps({ opacity: saved.opacity, locked: saved.locked, blendMode: saved.blendMode }) }
       }
       ctx.putImageData(saved.imageData, 0, 0)
       return {
@@ -753,6 +921,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         canvas,
         ctx,
         textItems: cloneTextItems(saved.textItems),
+        ...defaultLayerProps({ opacity: saved.opacity, locked: saved.locked, blendMode: saved.blendMode }),
       }
     })
     activeLayerIdRef.current = entry.activeLayerId
@@ -777,7 +946,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     if (layersRef.current.length === 0) {
       const { canvas: layerCanvas, ctx: layerCtx } = createLayerCanvas(W(), H())
       layerIdCounterRef.current += 1
-      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas: layerCanvas, ctx: layerCtx }
+      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas: layerCanvas, ctx: layerCtx, ...defaultLayerProps() }
       layersRef.current = [layer]
       activeLayerIdRef.current = layer.id
       pushHistory()
@@ -918,6 +1087,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         visible: true,
         canvas,
         ctx,
+        ...defaultLayerProps(),
       }
       layersRef.current = [layer]
       activeLayerIdRef.current = layer.id
@@ -956,6 +1126,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
           canvas,
           ctx,
           textItems: cloneTextItems(saved.textItems),
+          ...defaultLayerProps({
+            opacity: saved.opacity,
+            locked: saved.locked,
+            blendMode: saved.blendMode,
+          }),
         })
         const num = parseInt(String(saved.id).replace('layer-', ''), 10)
         if (!Number.isNaN(num)) maxCounter = Math.max(maxCounter, num)
@@ -993,12 +1168,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       }
       const { canvas, ctx } = createLayerCanvas(W(), H())
       layerIdCounterRef.current += 1
-      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx }
+      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx, ...defaultLayerProps() }
       layersRef.current = [layer]
       activeLayerIdRef.current = layer.id
       hasContentRef.current = false
       renderComposite()
-      notifyLayers()
+      scheduleNotifyLayers(true)
       historyRef.current = [{
         layers: [{ id: layer.id, name: layer.name, visible: layer.visible, imageData: ctx.getImageData(0, 0, W(), H()) }],
         activeLayerId: layer.id,
@@ -1017,6 +1192,9 @@ const CanvasBoard = forwardRef(function CanvasBoard(
           id: l.id,
           name: l.name,
           visible: l.visible,
+          opacity: l.opacity ?? 1,
+          locked: Boolean(l.locked),
+          blendMode: normalizeBlendMode(l.blendMode),
           dataUrl: l.canvas.toDataURL('image/png'),
           textItems: serializeTextItems(l.textItems),
         })),
@@ -1024,13 +1202,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       }
     },
     getFormatId: () => formatRef.current,
+    refreshLayerPanel: () => scheduleNotifyLayers(true),
     addLayer: () => {
       layerIdCounterRef.current += 1
       const { canvas, ctx } = createLayerCanvas(W(), H())
-      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx }
+      const layer = { id: `layer-${layerIdCounterRef.current}`, name: `Layer ${layerIdCounterRef.current}`, visible: true, canvas, ctx, ...defaultLayerProps() }
       layersRef.current = [...layersRef.current, layer]
       activeLayerIdRef.current = layer.id
-      notifyLayers()
+      scheduleNotifyLayers(true)
       pushHistory()
     },
     removeLayer: (id) => {
@@ -1069,6 +1248,57 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       notifyLayers()
       pushHistory()
     },
+    renameLayer: (id, name) => {
+      const trimmed = String(name ?? '').trim()
+      if (!trimmed) return
+      layersRef.current = layersRef.current.map((l) => (l.id === id ? { ...l, name: trimmed } : l))
+      notifyLayers()
+    },
+    setLayerOpacity: (id, opacity) => {
+      const value = Math.min(1, Math.max(0, opacity))
+      layersRef.current = layersRef.current.map((l) => (l.id === id ? { ...l, opacity: value } : l))
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+    },
+    setLayerBlendMode: (id, blendMode) => {
+      const mode = normalizeBlendMode(blendMode)
+      layersRef.current = layersRef.current.map((l) => (l.id === id ? { ...l, blendMode: mode } : l))
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+    },
+    toggleLayerLock: (id) => {
+      layersRef.current = layersRef.current.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l))
+      notifyLayers()
+    },
+    duplicateLayer: (id) => {
+      const src = layersRef.current.find((l) => l.id === id)
+      if (!src) return
+      if (src.parts?.length) rebuildLayerCanvasFromParts(src)
+      layerIdCounterRef.current += 1
+      const { canvas, ctx } = createLayerCanvas(W(), H())
+      ctx.drawImage(src.canvas, 0, 0)
+      const layer = {
+        id: `layer-${layerIdCounterRef.current}`,
+        name: `${src.name} copy`,
+        visible: src.visible,
+        canvas,
+        ctx,
+        kind: src.kind,
+        textItems: cloneTextItems(src.textItems),
+        ...defaultLayerProps({ opacity: src.opacity ?? 1, blendMode: src.blendMode }),
+      }
+      const idx = layersRef.current.findIndex((l) => l.id === id)
+      const next = [...layersRef.current]
+      next.splice(idx + 1, 0, layer)
+      layersRef.current = next
+      activeLayerIdRef.current = layer.id
+      hasContentRef.current = true
+      renderComposite()
+      notifyLayers()
+      pushHistory()
+    },
     addLayerFromImage: async (dataUrl, name = 'Generation') => {
       const img = await loadHtmlImage(dataUrl)
       layerIdCounterRef.current += 1
@@ -1081,6 +1311,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         canvas,
         ctx,
         kind: 'generation',
+        ...defaultLayerProps(),
       }
       layersRef.current = [...layersRef.current, layer]
       activeLayerIdRef.current = layer.id
@@ -1171,6 +1402,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       ensureActiveLayerFlatForDrawing()
       return commitLassoPolygon(rectToPolygon({ x: 0, y: 0 }, { x: W(), y: H() }))
     },
+    liftPixelSelectionToFloating: () => liftPixelSelectionToFloating(),
   }))
 
   const strokeTo = (ctx, from, to, strokeColor, width, eraser = false) => {
@@ -1327,6 +1559,23 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     setTextEditor(null)
   }, [])
 
+  const pickColorAt = useCallback(async (pos) => {
+    const composite = ctxRef.current
+    if (!composite) return
+    const px = Math.floor(pos.x)
+    const py = Math.floor(pos.y)
+    if (px < 0 || py < 0 || px >= W() || py >= H()) return
+    const [r, g, b] = composite.getImageData(px, py, 1, 1).data
+    const hex = rgbToHex(r, g, b)
+    colorRef.current = hex
+    onColorChange?.(hex)
+    try {
+      await copyHexToClipboard(hex)
+    } catch {
+      /* color still applied if clipboard is blocked */
+    }
+  }, [onColorChange])
+
   const openTextEditorAt = useCallback(async (pos) => {
     if (textEditorRef.current) await commitTextEditor()
     const canvas = canvasRef.current
@@ -1345,11 +1594,19 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
   const handlePointerDown = (e) => {
     const canvas = canvasRef.current
+    if (!canvas) return
     const pos = getPos(canvas, e)
+    const currentTool = toolRef.current
+
+    if (currentTool === 'eyedropper') {
+      e.preventDefault()
+      canvas.setPointerCapture(e.pointerId)
+      void pickColorAt(pos)
+      return
+    }
+
     const ctx = getActiveCtx()
     if (!ctx) return
-
-    const currentTool = toolRef.current
 
     if (currentTool === 'text') {
       e.preventDefault()
@@ -1369,25 +1626,10 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       return
     }
 
-    if (currentTool === 'select') {
-      clearPixelSelection()
-      ensureActiveLayerFlatForDrawing()
-      const floating = floatingSelectionRef.current
-      if (floating && hitTestFloatingSelectionRotated(floating, pos.x, pos.y)) {
-        selectionDragRef.current = {
-          startX: pos.x,
-          startY: pos.y,
-          origX: floating.x,
-          origY: floating.y,
-        }
-        drawingRef.current = true
-        return
-      }
-      mergeFloatingSelection(true)
-      const mode = e.shiftKey ? 'rect' : 'lasso'
-      lassoDraftRef.current = { mode, points: [pos], start: pos, end: pos }
-      setLassoPreview({ mode, points: [pos], end: pos })
-      drawingRef.current = true
+    if (LASSO_TOOLS.has(currentTool)) {
+      e.preventDefault()
+      canvas.setPointerCapture(e.pointerId)
+      beginLassoDraft(pos, e.shiftKey)
       return
     }
 
@@ -1398,7 +1640,20 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
 
     if (currentTool === 'move') {
+      const floating = floatingSelectionRef.current
+      if (floating && hitTestFloatingSelectionRotated(floating, pos.x, pos.y)) {
+        canvas.setPointerCapture(e.pointerId)
+        selectionDragRef.current = {
+          startX: pos.x,
+          startY: pos.y,
+          origX: floating.x,
+          origY: floating.y,
+        }
+        drawingRef.current = true
+        return
+      }
       const layer = getActiveLayer()
+      if (layer?.locked) return
       const compositeCtx = ctxRef.current
       if (layer?.textItems?.length && compositeCtx) {
         for (let i = layer.textItems.length - 1; i >= 0; i -= 1) {
@@ -1516,17 +1771,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     const currentTool = toolRef.current
 
-    if (currentTool === 'select' && drawingRef.current) {
-      if (selectionDragRef.current && floatingSelectionRef.current) {
-        const drag = selectionDragRef.current
-        const f = floatingSelectionRef.current
-        f.x = Math.round(drag.origX + pos.x - drag.startX)
-        f.y = Math.round(drag.origY + pos.y - drag.startY)
-        f.outline = updateFloatingOutline(f)
-        setSelectionOutline(f.outline)
-        renderComposite()
-        return
-      }
+    if (LASSO_TOOLS.has(currentTool) && drawingRef.current) {
       const draft = lassoDraftRef.current
       if (draft) {
         draft.end = pos
@@ -1541,6 +1786,19 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         }
       }
       return
+    }
+
+    if (currentTool === 'move' && drawingRef.current) {
+      if (selectionDragRef.current && floatingSelectionRef.current) {
+        const drag = selectionDragRef.current
+        const f = floatingSelectionRef.current
+        f.x = Math.round(drag.origX + pos.x - drag.startX)
+        f.y = Math.round(drag.origY + pos.y - drag.startY)
+        f.outline = updateFloatingOutline(f)
+        setSelectionOutline(f.outline)
+        renderComposite()
+        return
+      }
     }
 
     if (currentTool === 'move') {
@@ -1641,26 +1899,19 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       return
     }
 
-    if (drawingRef.current && toolRef.current === 'select') {
+    if (drawingRef.current && LASSO_TOOLS.has(toolRef.current)) {
+      drawingRef.current = false
+      finishLassoDraft(toolRef.current)
+      return
+    }
+
+    if (drawingRef.current && toolRef.current === 'move') {
       drawingRef.current = false
       if (selectionDragRef.current) {
         selectionDragRef.current = null
         pushHistory()
         return
       }
-      const draft = lassoDraftRef.current
-      const end = draft?.end
-      lassoDraftRef.current = null
-      setLassoPreview(null)
-      if (!draft || !end) return
-      const points =
-        draft.mode === 'rect' ? rectToPolygon(draft.start, end) : draft.points.length >= 3 ? draft.points : null
-      if (points) commitLassoPolygon(points)
-      return
-    }
-
-    if (drawingRef.current && toolRef.current === 'move') {
-      drawingRef.current = false
       if (textDragRef.current) {
         textDragRef.current = null
         pushHistory()
@@ -1733,6 +1984,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const canvasW = W()
   const canvasH = H()
   const activeLayerHasParts = Boolean(getActiveLayer()?.parts?.length)
+  const safeInsetPct = GENERATION_SAFE_ZONE_INSET * 100
+  const safeSizePct = 100 - safeInsetPct * 2
 
   return (
     <div className="sketch-canvas-viewport" onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -1743,7 +1996,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         >
           <canvas
             ref={canvasRef}
-            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'select' ? ' tool-select' : ''}${tool === 'wand' ? ' tool-wand' : ''}`}
+            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'wand' ? ' tool-wand' : ''}`}
             style={{ backgroundColor }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -1751,6 +2004,20 @@ const CanvasBoard = forwardRef(function CanvasBoard(
             onPointerLeave={handlePointerLeave}
             onPointerEnter={handlePointerEnter}
           />
+          {showSafeZone && (
+            <div
+              className="canvas-safe-zone-overlay"
+              style={{
+                left: `${safeInsetPct}%`,
+                top: `${safeInsetPct}%`,
+                width: `${safeSizePct}%`,
+                height: `${safeSizePct}%`,
+              }}
+              aria-hidden
+            >
+              <span className="canvas-safe-zone-label">Safe zone</span>
+            </div>
+          )}
           {partSelectionRect && canvasW > 0 && canvasH > 0 && (
             <div
               className="canvas-part-selection"

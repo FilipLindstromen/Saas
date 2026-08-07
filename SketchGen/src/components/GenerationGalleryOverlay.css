@@ -166,3 +166,36 @@
 .generation-gallery-delete:hover {
   filter: brightness(1.08);
 }
+
+.generation-gallery-copy {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  border: none;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+.generation-gallery-copy:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.generation-gallery-copy-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: #ff6b7a;
+}

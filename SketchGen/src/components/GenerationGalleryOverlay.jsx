@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { copyImageToClipboard } from '../utils/clipboard'
 import './GenerationGalleryOverlay.css'
 
 function formatWhen(createdAt) {
@@ -23,8 +24,21 @@ export default function GenerationGalleryOverlay({
   onSelect,
   onDelete,
 }) {
+  const [copiedId, setCopiedId] = useState(null)
+  const [copyError, setCopyError] = useState('')
+
   useEffect(() => {
-    if (!isOpen) return
+    if (!copiedId) return
+    const t = setTimeout(() => setCopiedId(null), 2000)
+    return () => clearTimeout(t)
+  }, [copiedId])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCopiedId(null)
+      setCopyError('')
+      return
+    }
     const onKey = (e) => {
       if (e.key === 'Escape') onClose()
     }
@@ -39,6 +53,17 @@ export default function GenerationGalleryOverlay({
 
   if (!isOpen) return null
 
+  const handleCopy = async (item, e) => {
+    e.stopPropagation()
+    setCopyError('')
+    try {
+      await copyImageToClipboard(item.dataUrl)
+      setCopiedId(item.id)
+    } catch (err) {
+      setCopyError(err?.message || 'Could not copy to clipboard.')
+    }
+  }
+
   return (
     <>
       <button type="button" className="generation-gallery-backdrop" aria-label="Close gallery" onClick={onClose} />
@@ -51,6 +76,7 @@ export default function GenerationGalleryOverlay({
           </button>
         </div>
         <div className="generation-gallery-body">
+          {copyError ? <p className="generation-gallery-copy-error">{copyError}</p> : null}
           {!items.length ? (
             <p className="generation-gallery-empty">No generated images yet. Create one from the sketch view.</p>
           ) : (
@@ -71,6 +97,22 @@ export default function GenerationGalleryOverlay({
                       <span className="generation-gallery-style">{item.styleName || 'Generation'}</span>
                       <span className="generation-gallery-date">{formatWhen(item.createdAt)}</span>
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="generation-gallery-copy"
+                    onClick={(e) => { void handleCopy(item, e) }}
+                    aria-label="Copy full-size image to clipboard"
+                    title="Copy full-size PNG to clipboard"
+                  >
+                    {copiedId === item.id ? (
+                      'Copied'
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                    )}
                   </button>
                   <button
                     type="button"

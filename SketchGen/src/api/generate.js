@@ -1,17 +1,17 @@
 import { editImage } from '@shared/openai'
-import { fitDataUrlToSketchSize, getSketchFormat, normalizeSketchFormatId } from '../utils/canvasFormat'
+import { fitDataUrlToSketchSize, getSketchFormat, normalizeSketchFormatId, GENERATION_SAFE_ZONE_INSET } from '../utils/canvasFormat'
 
 function buildBrandDirective(brand, useBrandColors) {
   if (!useBrandColors || !brand?.colors) return ''
   const c = brand.colors
   const palette = [
-    `background ${c.bg}`,
-    `linework/outlines ${c.line}`,
-    `primary brand ${c.main}`,
+    `primary ${c.primary}`,
     `secondary ${c.secondary}`,
+    `tertiary ${c.tertiary}`,
     `accent ${c.accent}`,
-    `second accent ${c.accent2}`,
-    `text and label color ${c.text}`,
+    `background ${c.background}`,
+    `border and linework ${c.border}`,
+    `text ${c.text}`,
   ].join(', ')
   const fonts = brand.fonts
   const fontNote = fonts?.headline && fonts?.body && fonts?.accent
@@ -24,9 +24,10 @@ function buildBrandDirective(brand, useBrandColors) {
 
 /** Ensures the model keeps all artwork inside the output frame (avoids clipped titles/graphics). */
 export function buildSafeCompositionNote() {
+  const pct = Math.round(GENERATION_SAFE_ZONE_INSET * 100)
   return (
     'Critical composition rule: the entire finished illustration must fit completely inside the image rectangle — nothing may be clipped or cut off. '
-    + 'Keep all titles, body text, labels, icons, charts, tables, and decorative graphics fully visible with at least 6% clear margin from every edge (top, bottom, left, right). '
+    + `Keep all titles, body text, labels, icons, charts, tables, and decorative graphics fully visible with at least ${pct}% clear margin from every edge (top, bottom, left, right). `
     + 'If the layout is tight, scale the whole design down uniformly so everything stays inside the frame. '
     + 'Do not place text or graphics outside the canvas, past card/panel borders, or so close to edges that they would be cropped.'
   )
@@ -95,5 +96,5 @@ export async function generateStyledImage({
     quality: quality === 'low' ? 'low' : 'high',
     signal,
   })
-  return fitDataUrlToSketchSize(raw, format.width, format.height, brand?.colors?.bg ?? '#ffffff')
+  return fitDataUrlToSketchSize(raw, format.width, format.height, brand?.colors?.background ?? '#ffffff')
 }

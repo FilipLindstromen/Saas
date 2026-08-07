@@ -43,11 +43,13 @@ const DEFAULTS = {
   penSnapHV: false,
   generationQuality: 'high',
   addGenerationsAsLayers: true,
-  canvasBackgroundColor: DEFAULT_BRAND_COLORS.bg,
+  canvasBackgroundColor: DEFAULT_BRAND_COLORS.background,
+  showSafeZone: false,
 }
 
 const VALID_TOOLS = new Set([
-  'pen', 'eraser', 'text', 'fill', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'select', 'move', 'stamp',
+  'move', 'lasso', 'lasso-fill',
+  'pen', 'eraser', 'text', 'fill', 'eyedropper', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'stamp',
 ])
 
 export function loadAppSettings() {
@@ -62,6 +64,7 @@ export function loadAppSettings() {
     }
     delete merged.size
     if (!VALID_TOOLS.has(merged.tool)) merged.tool = DEFAULTS.tool
+    if (merged.tool === 'select') merged.tool = 'lasso'
     merged.penSize = clampInt(merged.penSize, 1, 60, DEFAULTS.penSize)
     merged.eraserSize = clampInt(merged.eraserSize, 1, 60, DEFAULTS.eraserSize)
     merged.smoothing = clampNum(merged.smoothing, 0, 1, DEFAULTS.smoothing)
@@ -84,6 +87,7 @@ export function loadAppSettings() {
     merged.addGenerationsAsLayers = merged.addGenerationsAsLayers !== false
     merged.penSnapHV = Boolean(merged.penSnapHV)
     merged.canvasBackgroundColor = normalizeHexColor(merged.canvasBackgroundColor, DEFAULTS.canvasBackgroundColor)
+    merged.showSafeZone = Boolean(merged.showSafeZone)
     if (typeof merged.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(merged.color)) {
       merged.color = DEFAULTS.color
     }

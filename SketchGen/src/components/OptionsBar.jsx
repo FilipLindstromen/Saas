@@ -40,6 +40,7 @@ export default function OptionsBar({
   onSelectionRotationChange,
   onDeleteSelection,
   onApplySelection,
+  onBeginTransform,
   onUndo,
   onRedo,
   onClear,
@@ -54,9 +55,11 @@ export default function OptionsBar({
   onCanvasBackgroundColorChange,
   selectedTextItem,
   onUpdateSelectedText,
+  showSafeZone,
+  onShowSafeZoneChange,
 }) {
   const fileInputRef = useRef(null)
-  const showDrawColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle' || tool === 'arrow'
+  const showDrawColor = tool === 'pen' || tool === 'fill' || tool === 'lasso-fill' || tool === 'line' || tool === 'rect' || tool === 'circle' || tool === 'arrow'
   const showTextSettings = tool === 'text' || Boolean(selectedTextItem)
   const textFamily = selectedTextItem?.fontFamily ?? textFontFamily
   const textSize = selectedTextItem?.fontSize ?? textFontSize
@@ -64,7 +67,7 @@ export default function OptionsBar({
   const textColor = selectedTextItem?.color ?? color
   const showArrowSettings = tool === 'arrow'
   const showInkDynamics = tool === 'pen' || tool === 'eraser'
-  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text' && tool !== 'select' && tool !== 'wand'
+  const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text' && tool !== 'lasso' && tool !== 'lasso-fill' && tool !== 'wand'
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
@@ -310,8 +313,18 @@ export default function OptionsBar({
         </svg>
       </button>
 
-      {(selectionActive || tool === 'select' || tool === 'wand') && (
+      {(selectionActive || tool === 'move' || tool === 'lasso' || tool === 'lasso-fill' || tool === 'wand') && (
         <div className="options-bar-group options-bar-selection-group">
+          {selectionActive && !selectionFloating && onBeginTransform && (
+            <button
+              type="button"
+              className="options-bar-btn"
+              onClick={onBeginTransform}
+              title="Free transform selected area (Ctrl+T)"
+            >
+              Transform
+            </button>
+          )}
           <button
             type="button"
             className="options-bar-btn"
@@ -372,6 +385,18 @@ export default function OptionsBar({
           />
         </div>
       )}
+
+      <label
+        className="options-bar-bold-toggle options-bar-safe-zone-toggle"
+        title="Show a 6% inset guide — matches what the generator is asked to keep clear of the edges"
+      >
+        <input
+          type="checkbox"
+          checked={showSafeZone}
+          onChange={(e) => onShowSafeZoneChange?.(e.target.checked)}
+        />
+        Safe zone
+      </label>
 
       <div className="options-bar-group options-bar-format-select-group">
         <label htmlFor="sketch-format">Format</label>

@@ -5,6 +5,7 @@ import ToolRail from './components/ToolRail'
 import OptionsBar from './components/OptionsBar'
 import StylePickerOverlay from './components/StylePickerOverlay'
 import GenerationGalleryOverlay from './components/GenerationGalleryOverlay'
+import CanvaConnectOverlay from './components/CanvaConnectOverlay'
 import PromptBar from './components/PromptBar'
 import GenerationProgress from './components/GenerationProgress'
 import GenerationQueue from './components/GenerationQueue'
@@ -35,13 +36,21 @@ import {
   SKETCH_FORMATS,
 } from './utils/canvasFormat'
 import {
-  generateProjectId, drawingKeyFor,
+  generateProjectId,
+  drawingKeyFor,
   loadProjects, saveProjects,
   loadCurrentProjectId, saveCurrentProjectId,
   loadCurrentTabId, saveCurrentTabId,
   getProjectTabs, addProjectTab, removeProjectTab, renameProjectTab,
   deleteProjectStorage,
 } from './utils/projectStorage'
+import {
+  completeCanvaOAuthFromRedirect,
+  getCanvaAccessToken,
+  isCanvaConnected,
+} from './utils/canva/canvaAuth'
+import { uploadImageDataUrlToCanva } from './utils/canva/canvaUpload'
+import { canvaProjectsUrl } from './utils/canva/canvaConfig'
 import './App.css'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
@@ -117,6 +126,11 @@ export default function App() {
   const [stylePickerOpen, setStylePickerOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [galleryItems, setGalleryItems] = useState([])
+  const [canvaOverlayOpen, setCanvaOverlayOpen] = useState(false)
+  const [canvaBusy, setCanvaBusy] = useState(false)
+  const [canvaError, setCanvaError] = useState('')
+  const [canvaSuccess, setCanvaSuccess] = useState('')
+  const [canvaLinked, setCanvaLinked] = useState(() => isCanvaConnected())
   const [selectedTextItem, setSelectedTextItem] = useState(null)
   const [improveGeneration, setImproveGeneration] = useState(savedSettings.improveGeneration)
   const [brandColors, setBrandColors] = useState(() => normalizeBrandColors(savedSettings.brandColors))
@@ -130,8 +144,9 @@ export default function App() {
   const [generationQuality, setGenerationQuality] = useState(savedSettings.generationQuality)
   const [addGenerationsAsLayers, setAddGenerationsAsLayers] = useState(savedSettings.addGenerationsAsLayers)
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState(() =>
-    normalizeHexColor(savedSettings.canvasBackgroundColor, DEFAULT_BRAND_COLORS.bg)
+    normalizeHexColor(savedSettings.canvasBackgroundColor, DEFAULT_BRAND_COLORS.background)
   )
+  const [showSafeZone, setShowSafeZone] = useState(Boolean(savedSettings.showSafeZone))
   const [brandingDraft, setBrandingDraft] = useState(null)
 
   const [view, setView] = useState('sketch')
@@ -194,6 +209,7 @@ export default function App() {
     generationQuality,
     addGenerationsAsLayers,
     canvasBackgroundColor,
+    showSafeZone,
   }
 
   const flushAppSettings = useCallback(() => {
@@ -207,6 +223,23 @@ export default function App() {
   useEffect(() => {
     if (!generatedImage && improveGeneration) setImproveGeneration(false)
   }, [generatedImage, improveGeneration])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.get('code')) return
+    completeCanvaOAuthFromRedirect()
+      .then((completed) => {
+        if (completed) {
+          setCanvaLinked(true)
+          setCanvaOverlayOpen(true)
+          setCanvaSuccess('Canva connected. Click Send to Canva again to upload.')
+        }
+      })
+      .catch((err) => {
+        setCanvaError(err?.message || 'Canva sign-in failed.')
+        setCanvaOverlayOpen(true)
+      })
+  }, [])
 
   const syncSketchContent = useCallback(() => {
     setHasSketchContent(Boolean(canvasRef.current?.hasContent?.()))
@@ -662,14 +695,13 @@ export default function App() {
     canvasRef.current?.rotateFloatingSelection?.(degrees)
   }, [])
 
-  /** Ctrl+T (Photoshop's Free Transform): switch to the Select tool and, if
-   * nothing is already floating, lift the whole active layer so the user gets
-   * an immediate scale/rotate box without drawing a lasso first. */
+  /** Ctrl+T (Photoshop free transform): Move tool + lift pixel selection or whole layer for scale/rotate. */
   const handleTransformShortcut = useCallback(() => {
-    setTool('select')
+    setTool('move')
     setSelectionScale(100)
     setSelectionRotation(0)
-    canvasRef.current?.selectAllOnActiveLayer?.()
+    const lifted = canvasRef.current?.liftPixelSelectionToFloating?.()
+    if (!lifted) canvasRef.current?.selectAllOnActiveLayer?.()
   }, [])
 
   useEffect(() => {
@@ -726,6 +758,26 @@ export default function App() {
   const handleSelectLayer = useCallback((id) => canvasRef.current?.setActiveLayer(id), [])
   const handleReorderLayers = useCallback((orderedIdsBottomToTop) => {
     canvasRef.current?.reorderLayers(orderedIdsBottomToTop)
+  }, [])
+
+  const handleRenameLayer = useCallback((id, name) => {
+    canvasRef.current?.renameLayer?.(id, name)
+  }, [])
+
+  const handleDuplicateLayer = useCallback((id) => {
+    canvasRef.current?.duplicateLayer?.(id)
+  }, [])
+
+  const handleToggleLayerLock = useCallback((id) => {
+    canvasRef.current?.toggleLayerLock?.(id)
+  }, [])
+
+  const handleLayerOpacityChange = useCallback((id, opacity) => {
+    canvasRef.current?.setLayerOpacity?.(id, opacity)
+  }, [])
+
+  const handleLayerBlendModeChange = useCallback((id, blendMode) => {
+    canvasRef.current?.setLayerBlendMode?.(id, blendMode)
   }, [])
 
   const handleTextSelectionChange = useCallback((item) => {
@@ -1276,6 +1328,45 @@ export default function App() {
     [handleDeleteHistoryEntry]
   )
 
+  const getImageDataUrlForCanva = useCallback(() => {
+    if (view !== 'sketch' && generatedImage) return generatedImage
+    const board = canvasRef.current
+    return board?.exportCompositePNG?.(true) ?? board?.exportPNG?.() ?? null
+  }, [view, generatedImage])
+
+  const handleSendToCanva = useCallback(async () => {
+    setCanvaError('')
+    setCanvaSuccess('')
+    if (!isCanvaConnected()) {
+      setCanvaOverlayOpen(true)
+      return
+    }
+    const dataUrl = getImageDataUrlForCanva()
+    if (!dataUrl) {
+      setCanvaError('Nothing to send — draw on the sketch or open a generated image first.')
+      setCanvaOverlayOpen(true)
+      return
+    }
+    setCanvaBusy(true)
+    setCanvaOverlayOpen(true)
+    try {
+      const token = await getCanvaAccessToken()
+      if (!token) {
+        setCanvaLinked(false)
+        setCanvaError('Canva session expired. Connect again.')
+        return
+      }
+      const filename = `SketchGen-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`
+      await uploadImageDataUrlToCanva(token, dataUrl, filename)
+      setCanvaSuccess('Image uploaded to your Canva library.')
+      window.open(canvaProjectsUrl(), '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setCanvaError(err?.message || 'Send to Canva failed.')
+    } finally {
+      setCanvaBusy(false)
+    }
+  }, [getImageDataUrlForCanva])
+
   const currentProjectName = projects.find((p) => p.id === currentProjectId)?.name
 
   return (
@@ -1289,6 +1380,9 @@ export default function App() {
         onOpenSettings={handleOpenSettings}
         onOpenBranding={handleOpenBranding}
         onOpenGallery={handleOpenGallery}
+        onSendToCanva={() => { void handleSendToCanva() }}
+        canvaConnected={canvaLinked}
+        canvaBusy={canvaBusy}
         brandColors={brandColors}
         onExport={handleExport}
         exportDisabled={exportDisabled}
@@ -1382,6 +1476,7 @@ export default function App() {
           onSelectionRotationChange={handleSelectionRotationChange}
           onDeleteSelection={handleDeleteSelection}
           onApplySelection={handleApplySelection}
+          onBeginTransform={handleTransformShortcut}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onClear={handleClear}
@@ -1402,6 +1497,8 @@ export default function App() {
           }}
           selectedTextItem={selectedTextItem}
           onUpdateSelectedText={handleUpdateSelectedText}
+          showSafeZone={showSafeZone}
+          onShowSafeZoneChange={setShowSafeZone}
         />
       )}
 
@@ -1428,6 +1525,7 @@ export default function App() {
               arrowStyleId={arrowStyleId}
               penSnapHV={penSnapHV}
               backgroundColor={canvasBackgroundColor}
+              showSafeZone={showSafeZone}
               brandColors={brandColors}
               zoom={zoom}
               formatId={canvasFormat}
@@ -1443,9 +1541,11 @@ export default function App() {
               onCommit={() => {
                 scheduleAutosave()
                 syncSketchContent()
+                canvasRef.current?.refreshLayerPanel?.()
               }}
               onSelectionChange={handleSelectionChange}
               onTextSelectionChange={handleTextSelectionChange}
+              onColorChange={setColor}
             />
           </div>
 
@@ -1469,9 +1569,14 @@ export default function App() {
               activeLayerId={activeLayerId}
               onSelect={handleSelectLayer}
               onToggleVisibility={handleToggleLayerVisibility}
+              onToggleLock={handleToggleLayerLock}
               onAdd={handleAddLayer}
+              onDuplicate={handleDuplicateLayer}
               onRemove={handleRemoveLayer}
               onReorder={handleReorderLayers}
+              onRename={handleRenameLayer}
+              onOpacityChange={handleLayerOpacityChange}
+              onBlendModeChange={handleLayerBlendModeChange}
             />
           )}
           {view === 'sketch' && tool === 'stamp' && (
@@ -1564,6 +1669,21 @@ export default function App() {
         activeId={activeGenerationId}
         onSelect={handleGallerySelect}
         onDelete={handleGalleryDelete}
+      />
+
+      <CanvaConnectOverlay
+        isOpen={canvaOverlayOpen}
+        onClose={() => {
+          if (canvaBusy) return
+          setCanvaOverlayOpen(false)
+          setCanvaSuccess('')
+          setCanvaError('')
+        }}
+        onConnected={() => setCanvaLinked(isCanvaConnected())}
+        error={canvaError}
+        onClearError={() => setCanvaError('')}
+        sending={canvaBusy}
+        sendSuccess={canvaSuccess}
       />
     </div>
   )
