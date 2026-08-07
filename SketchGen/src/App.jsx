@@ -890,16 +890,54 @@ export default function App() {
       return { ok: false, canceled: true }
     }
 
+    if (batch.multiVariant && batch.jobIndex > 0) {
+      const leaderId = `${batch.batchId}-0`
+      const leaderBatch = genBatchesRef.current.get(leaderId)
+      const dataUrl = leaderBatch?.multiVariantResults?.[batch.jobIndex]
+      if (dataUrl) {
+        setGenQueue((prev) => {
+          const next = prev.map((j) =>
+            j.id === jobId
+              ? { ...j, status: 'done', dataUrl, historyId: jobId, sketchDataUrl: batch.sketchDataUrl }
+              : j
+          )
+          genQueueRef.current = next
+          return next
+        })
+        return { ok: true, dataUrl, jobId }
+      }
+      const leaderJob = genQueueRef.current.find((j) => j.id === leaderId)
+      if (leaderJob?.status === 'error') {
+        setGenQueue((prev) =>
+          prev.map((j) => (j.id === jobId ? { ...j, status: 'error', error: leaderJob.error } : j))
+        )
+        return { ok: false, error: new Error(leaderJob.error || 'Generation failed.') }
+      }
+      if (leaderJob?.status === 'canceled') {
+        return { ok: false, canceled: true }
+      }
+      return { ok: false }
+    }
+
     const ac = new AbortController()
     genAbortRef.current.set(jobId, ac)
+    const batchJobIds =
+      batch.multiVariant && batch.variantCount > 1
+        ? Array.from({ length: batch.variantCount }, (_, i) => `${batch.batchId}-${i}`)
+        : [jobId]
     setGenQueue((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, status: 'running', error: null } : j))
+      prev.map((j) =>
+        batchJobIds.includes(j.id) && (j.status === 'queued' || j.status === 'running')
+          ? { ...j, status: 'running', error: null }
+          : j
+      )
     )
 
     const quality = qualityOverride ?? batch.quality
+    const variantCount = batch.multiVariant ? batch.variantCount : 1
 
     try {
-      const dataUrl = await generateStyledImage({
+      const result = await generateStyledImage({
         sketchDataUrl: batch.sketchDataUrl,
         style: batch.style,
         instructions: batch.instructions,
@@ -908,16 +946,61 @@ export default function App() {
         brand: batch.brand,
         useBrandColors: batch.useBrandColors,
         quality,
+        variantCount,
         signal: ac.signal,
       })
 
+      const dataUrls = Array.isArray(result) ? result : [result]
+
       if (canceledJobsRef.current.has(jobId)) {
         setGenQueue((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, status: 'canceled' } : j))
+          prev.map((j) => (batchJobIds.includes(j.id) ? { ...j, status: 'canceled' } : j))
         )
         return { ok: false, canceled: true }
       }
 
+      if (batch.multiVariant) {
+        genBatchesRef.current.set(jobId, { ...batch, multiVariantResults: dataUrls })
+        for (let i = 0; i < batch.variantCount; i += 1) {
+          const siblingId = `${batch.batchId}-${i}`
+          const dataUrl = dataUrls[i]
+          if (!dataUrl) continue
+          await addGeneration({
+            id: siblingId,
+            batchId: batch.batchId,
+            drawingKey: batch.key,
+            createdAt: batch.createdAtBase + i,
+            dataUrl,
+            sketchDataUrl: batch.sketchDataUrl,
+            styleId: batch.style.id,
+            styleName: batch.style.name,
+            instructions: batch.instructions,
+          })
+          if (batch.addGenerationsAsLayers && batch.key === drawingKeyRef.current) {
+            await canvasRef.current?.addLayerFromImage?.(dataUrl, `Generation ${i + 1}`)
+          }
+        }
+        setGenQueue((prev) => {
+          const next = prev.map((j) => {
+            if (j.batchId !== batch.batchId) return j
+            const idx = j.index
+            const dataUrl = dataUrls[idx]
+            if (!dataUrl) return { ...j, status: 'error', error: 'Missing variant output' }
+            return {
+              ...j,
+              status: 'done',
+              dataUrl,
+              historyId: `${batch.batchId}-${idx}`,
+              sketchDataUrl: batch.sketchDataUrl,
+            }
+          })
+          genQueueRef.current = next
+          return next
+        })
+        return { ok: true, dataUrl: dataUrls[0], jobId }
+      }
+
+      const dataUrl = dataUrls[0]
       const entry = {
         id: jobId,
         batchId: batch.batchId,
@@ -946,13 +1029,13 @@ export default function App() {
     } catch (err) {
       if (err?.name === 'AbortError' || canceledJobsRef.current.has(jobId)) {
         setGenQueue((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, status: 'canceled', error: null } : j))
+          prev.map((j) => (batchJobIds.includes(j.id) ? { ...j, status: 'canceled', error: null } : j))
         )
         return { ok: false, canceled: true }
       }
       const msg = err?.message || 'Generation failed.'
       setGenQueue((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, status: 'error', error: msg } : j))
+        prev.map((j) => (batchJobIds.includes(j.id) ? { ...j, status: 'error', error: msg } : j))
       )
       return { ok: false, error: err }
     } finally {
@@ -989,7 +1072,9 @@ export default function App() {
         const labelPrefix = job.drawingLabel ? `${job.drawingLabel} — ` : ''
 
         setGenerationProgress({
-          message: `${labelPrefix}${verb} variation ${job.index + 1}…`,
+          message: batch?.multiVariant
+            ? `${labelPrefix}${verb} ${batch.variantCount} variations (one request)…`
+            : `${labelPrefix}${verb} variation ${job.index + 1}…`,
           completed: genQueueRef.current.filter((j) => j.status === 'done' && j.batchId === job.batchId).length,
           total: genQueueRef.current.filter((j) => j.batchId === job.batchId).length,
           percent: 12,
@@ -1007,13 +1092,16 @@ export default function App() {
         softTimer = null
 
         if (result.ok && job.drawingKey === drawingKeyRef.current) {
+          const showResult = !batch?.multiVariant || job.index === 0
           await pruneGenerations(job.drawingKey)
           await refreshHistory()
-          setSketchSnapshot(batch?.sketchDataUrl ?? sketchSnapshot)
-          setGeneratedImage(result.dataUrl)
-          setActiveGenerationId(result.jobId)
-          setView('generated')
-        } else if (result.error && job.drawingKey === drawingKeyRef.current) {
+          if (showResult) {
+            setSketchSnapshot(batch?.sketchDataUrl ?? sketchSnapshot)
+            setGeneratedImage(result.dataUrl)
+            setActiveGenerationId(batch?.multiVariant ? `${batch.batchId}-0` : result.jobId)
+            setView('generated')
+          }
+        } else if (result.error && job.drawingKey === drawingKeyRef.current && (!batch?.multiVariant || job.index === 0)) {
           const classified = classifyGenerationError(result.error)
           setGenerationErrorDetail(classified)
           setError(classified.message)
@@ -1129,6 +1217,8 @@ export default function App() {
         key,
         quality: generationQuality,
         addGenerationsAsLayers,
+        multiVariant: total > 1,
+        variantCount: total,
       })
       return {
         id,

@@ -11,13 +11,16 @@ export function normalizeGenerationQuality(q) {
 export function estimateGenerationCost(quality, count = 1) {
   const q = normalizeGenerationQuality(quality)
   const per = ESTIMATE_PER_IMAGE_USD[q]
-  const total = per * count
+  const n = Math.max(1, Math.min(3, Math.floor(count) || 1))
+  const total = per * n
+  const multi = n > 1
   return {
     quality: q,
     perImageUsd: per,
     totalUsd: total,
-    label: `~$${total.toFixed(2)} est.`,
+    label: multi ? `~$${total.toFixed(2)} est. · 1 request` : `~$${total.toFixed(2)} est.`,
     perLabel: q === 'low' ? 'Draft' : 'Standard',
+    singleRequest: multi,
   }
 }
 

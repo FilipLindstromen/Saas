@@ -115,6 +115,12 @@
   color: #ffffff;
 }
 
+.prompt-bar-variations-hint {
+  font-size: 0.68rem;
+  color: var(--text-quaternary);
+  margin-left: 0.35rem;
+}
+
 .prompt-bar-error {
   font-size: 0.8rem;
   color: var(--accent-secondary);

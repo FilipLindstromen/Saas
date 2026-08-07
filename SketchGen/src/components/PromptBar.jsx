@@ -124,11 +124,15 @@ export default function PromptBar({
               type="button"
               className={variations === n ? 'active' : ''}
               onClick={() => onVariationsChange(n)}
+              title={n > 1 ? `${n} variants in one API request (local fill-in if needed)` : 'Single image'}
             >
               {n}
             </button>
           ))}
         </div>
+        {variations > 1 && (
+          <span className="prompt-bar-variations-hint">1 request</span>
+        )}
       </div>
 
       {error && <div className="prompt-bar-error">{error}</div>}

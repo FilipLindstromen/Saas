@@ -111,15 +111,28 @@ function imageItemToDataUrl(item) {
 }
 
 async function resolveImageResponse(data) {
-  const item = data?.data?.[0];
-  const fromBase64 = imageItemToDataUrl(item);
-  if (fromBase64) return fromBase64;
-  if (item?.url) {
-    const imgRes = await fetch(item.url);
-    if (!imgRes.ok) throw new Error('Failed to download generated image.');
-    return blobToDataUrl(await imgRes.blob());
+  const items = await resolveAllImageResponses(data)
+  if (!items.length) throw new Error('Image API returned no image data.')
+  return items[0]
+}
+
+async function resolveAllImageResponses(data) {
+  const list = data?.data
+  if (!Array.isArray(list) || !list.length) return []
+  const urls = []
+  for (const item of list) {
+    const fromBase64 = imageItemToDataUrl(item)
+    if (fromBase64) {
+      urls.push(fromBase64)
+      continue
+    }
+    if (item?.url) {
+      const imgRes = await fetch(item.url)
+      if (!imgRes.ok) throw new Error('Failed to download generated image.')
+      urls.push(await blobToDataUrl(await imgRes.blob()))
+    }
   }
-  throw new Error('Image API returned no image data.');
+  return urls
 }
 
 /**
@@ -177,8 +190,9 @@ export async function generateImage({
  * @param {string} [options.size]
  * @param {string} [options.model]
  * @param {string} [options.quality]
+ * @param {number} [options.n] - number of images (1–10), gpt-image models
  * @param {string} [options.apiKey]
- * @returns {Promise<string>} data URL
+ * @returns {Promise<string|string[]>} data URL, or array when n > 1
  */
 export async function editImage({
   prompt,
@@ -187,6 +201,7 @@ export async function editImage({
   size = '1536x1024',
   model = 'gpt-image-1',
   quality = 'high',
+  n = 1,
   apiKey,
   signal,
 }) {
@@ -195,12 +210,15 @@ export async function editImage({
   if (!prompt?.trim()) throw new Error('Prompt is required.');
   if (!imageDataUrl) throw new Error('Reference image is required.');
 
+  const count = Math.min(10, Math.max(1, Math.floor(n) || 1));
+
   const form = new FormData();
   form.append('model', model);
   form.append('prompt', prompt.trim());
   form.append('size', size);
   form.append('quality', quality);
   form.append('input_fidelity', 'high');
+  if (count > 1) form.append('n', String(count));
 
   if (additionalImages.length > 0) {
     const primaryBlob = await dataUrlToBlob(imageDataUrl);
@@ -226,5 +244,9 @@ export async function editImage({
     throw new Error(err.error?.message || `Image edit failed: ${res.status}`);
   }
 
-  return resolveImageResponse(await res.json());
+  const payload = await res.json();
+  if (count === 1) return resolveImageResponse(payload);
+  const all = await resolveAllImageResponses(payload);
+  if (!all.length) throw new Error('Image API returned no image data.');
+  return all;
 }
