@@ -664,8 +664,26 @@ export default function App() {
 
   const handleDefringeLayer = useCallback(() => {
     setError('')
-    const ok = canvasRef.current?.defringeActiveLayer?.()
-    if (!ok) setError('Select a layer with artwork to defringe.')
+    const result = canvasRef.current?.defringeActiveLayer?.()
+    if (!result?.ok) {
+      if (result?.reason === 'no-change') {
+        setError('No halos detected on this layer. Try Light or Dark halo type.')
+      } else {
+        setError('Select a layer with artwork to defringe.')
+      }
+    }
+  }, [])
+
+  const handleRemoveLayerBackground = useCallback(() => {
+    setError('')
+    const result = canvasRef.current?.removeActiveLayerBackground?.()
+    if (!result?.ok) {
+      if (result?.reason === 'nothing-removed') {
+        setError('No edge background found on this layer. Try a flat backdrop that touches the canvas edges.')
+      } else {
+        setError('Select a layer with artwork to remove its background.')
+      }
+    }
   }, [])
 
   const handleSeparateParts = useCallback(() => {

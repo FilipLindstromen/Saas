@@ -50,7 +50,7 @@ const DEFAULTS = {
 
 const VALID_TOOLS = new Set([
   'move', 'lasso', 'lasso-fill',
-  'pen', 'eraser', 'text', 'fill', 'eyedropper', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'defringe', 'stamp',
+  'pen', 'eraser', 'text', 'fill', 'eyedropper', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'stamp',
 ])
 
 export function loadAppSettings() {
@@ -66,6 +66,7 @@ export function loadAppSettings() {
     delete merged.size
     if (!VALID_TOOLS.has(merged.tool)) merged.tool = DEFAULTS.tool
     if (merged.tool === 'select') merged.tool = 'lasso'
+    if (merged.tool === 'defringe') merged.tool = 'pen'
     merged.penSize = clampInt(merged.penSize, 1, 60, DEFAULTS.penSize)
     merged.eraserSize = clampInt(merged.eraserSize, 1, 60, DEFAULTS.eraserSize)
     merged.smoothing = clampNum(merged.smoothing, 0, 1, DEFAULTS.smoothing)

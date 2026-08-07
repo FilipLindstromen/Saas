@@ -319,43 +319,6 @@ export default function OptionsBar({
         </svg>
       </button>
 
-      {tool === 'defringe' && (
-        <div className="options-bar-group options-bar-defringe-group">
-          <label htmlFor="defringe-mode">Halo</label>
-          <select
-            id="defringe-mode"
-            className="options-bar-font-select"
-            value={defringeMode}
-            onChange={(e) => onDefringeModeChange(e.target.value)}
-            title="Whether to remove light (white) or dark edge halos"
-          >
-            <option value="auto">Auto</option>
-            <option value="light">Light / white</option>
-            <option value="dark">Dark</option>
-          </select>
-          <div className="options-bar-slider-group">
-            <label htmlFor="defringe-strength">Strength</label>
-            <input
-              id="defringe-strength"
-              type="range"
-              min="35"
-              max="100"
-              value={Math.round(defringeStrength * 100)}
-              onChange={(e) => onDefringeStrengthChange(Number(e.target.value) / 100)}
-            />
-            <span className="options-bar-value">{Math.round(defringeStrength * 100)}%</span>
-          </div>
-          <button
-            type="button"
-            className="options-bar-btn"
-            onClick={onDefringeLayer}
-            title="Remove halos on the entire active layer"
-          >
-            Whole layer
-          </button>
-        </div>
-      )}
-
       {(selectionActive || tool === 'move' || tool === 'lasso' || tool === 'lasso-fill' || tool === 'wand') && (
         <div className="options-bar-group options-bar-selection-group">
           {selectionActive && !selectionFloating && onBeginTransform && (
@@ -430,6 +393,44 @@ export default function OptionsBar({
             >
               Remove background
             </button>
+          )}
+          {onDefringeLayer && (
+            <div className="options-bar-defringe-inline">
+              <button
+                type="button"
+                className="options-bar-remove-bg-btn options-bar-defringe-btn"
+                onClick={onDefringeLayer}
+                title="Smooth white or dark halos on the entire active layer"
+              >
+                Defringe
+              </button>
+              <label className="options-bar-defringe-halo" htmlFor="defringe-mode">
+                Halo
+                <select
+                  id="defringe-mode"
+                  className="options-bar-font-select"
+                  value={defringeMode}
+                  onChange={(e) => onDefringeModeChange(e.target.value)}
+                  title="Whether to remove light (white) or dark edge halos"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </label>
+              <div className="options-bar-slider-group options-bar-defringe-strength">
+                <label htmlFor="defringe-strength">Strength</label>
+                <input
+                  id="defringe-strength"
+                  type="range"
+                  min="35"
+                  max="100"
+                  value={Math.round(defringeStrength * 100)}
+                  onChange={(e) => onDefringeStrengthChange(Number(e.target.value) / 100)}
+                />
+                <span className="options-bar-value">{Math.round(defringeStrength * 100)}%</span>
+              </div>
+            </div>
           )}
           <CanvasBackgroundPicker
             value={canvasBackgroundColor}

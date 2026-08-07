@@ -3,7 +3,7 @@ import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat, GENERATION_SAFE_ZONE_INSET }
 import { ensureGoogleFontLoaded } from '../constants/brand'
 import { drawArrowShape } from '../constants/arrowStyles'
 import { cleanUpSketchImageData, snapPointToHorizontalVertical } from '../utils/sketchAssist'
-import { defringeImageData, defringeRegion } from '../utils/defringe'
+import { defringeImageData } from '../utils/defringe'
 import { removeEdgeConnectedBackground } from '../utils/imageBackground'
 import { separateIntoParts, hitTestPartAt } from '../utils/separateIllustration'
 import {
@@ -1370,20 +1370,26 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       const layer = getActiveLayer()
       if (layer?.parts?.length) flattenLayerParts(layer)
       const ctx = getActiveCtx()
-      if (!ctx) return false
+      if (!ctx) return { ok: false, reason: 'no-layer' }
       const w = W()
       const h = H()
+      const before = ctx.getImageData(0, 0, w, h)
       const imageData = ctx.getImageData(0, 0, w, h)
       defringeImageData(imageData, w, h, {
         mode: defringeModeRef.current,
         strength: defringeStrengthRef.current,
       })
+      let changed = 0
+      for (let i = 0; i < before.data.length; i += 1) {
+        if (before.data[i] !== imageData.data[i]) changed += 1
+      }
+      if (changed === 0) return { ok: false, reason: 'no-change' }
       ctx.putImageData(imageData, 0, 0)
       hasContentRef.current = true
       renderComposite()
       pushHistory()
       onCommit?.()
-      return true
+      return { ok: true }
     },
     removeActiveLayerBackground: () => {
       const layer = getActiveLayer()
@@ -1856,13 +1862,6 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       lastPointRef.current = pos
       blurRegion(ctx, pos.x, pos.y, sizeRef.current)
       renderComposite()
-    } else if (currentTool === 'defringe') {
-      lastPointRef.current = pos
-      defringeRegion(ctx, pos.x, pos.y, sizeRef.current, {
-        mode: defringeModeRef.current,
-        strength: defringeStrengthRef.current,
-      })
-      renderComposite()
     } else {
       smoothPointRef.current = null
       wobblePhaseRef.current = 0
@@ -1988,16 +1987,6 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     if (currentTool === 'blur') {
       blurRegion(ctx, pos.x, pos.y, sizeRef.current)
-      lastPointRef.current = pos
-      renderComposite()
-      return
-    }
-
-    if (currentTool === 'defringe') {
-      defringeRegion(ctx, pos.x, pos.y, sizeRef.current, {
-        mode: defringeModeRef.current,
-        strength: defringeStrengthRef.current,
-      })
       lastPointRef.current = pos
       renderComposite()
       return
@@ -2129,7 +2118,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         >
           <canvas
             ref={canvasRef}
-            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'wand' ? ' tool-wand' : ''}${tool === 'defringe' ? ' tool-defringe' : ''}`}
+            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'wand' ? ' tool-wand' : ''}`}
             style={{ backgroundColor }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}

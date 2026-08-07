@@ -302,6 +302,29 @@
   border-color: var(--border-strong);
 }
 
+.options-bar-defringe-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}
+
+.options-bar-defringe-halo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.options-bar-defringe-strength {
+  min-width: 9rem;
+}
+
+.options-bar-defringe-btn {
+  font-weight: 600;
+}
+
 .options-bar-bg-group .canvas-bg-picker {
   position: relative;
   top: auto;
