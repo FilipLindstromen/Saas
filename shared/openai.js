@@ -150,11 +150,15 @@ export async function generateImage({
   size = '1536x1024',
   model = 'gpt-image-1',
   quality = 'high',
+  n = 1,
   apiKey,
+  signal,
 }) {
   const key = getKey(apiKey);
   if (!key) throw new Error('OpenAI API key is not set. Open Settings to add your key.');
   if (!prompt?.trim()) throw new Error('Prompt is required.');
+
+  const count = Math.min(10, Math.max(1, Math.floor(n) || 1));
 
   const res = await fetch(`${OPENAI_API}/images/generations`, {
     method: 'POST',
@@ -167,8 +171,9 @@ export async function generateImage({
       prompt: prompt.trim(),
       size,
       quality,
-      n: 1,
+      n: count,
     }),
+    signal,
   });
 
   if (!res.ok) {
@@ -176,7 +181,11 @@ export async function generateImage({
     throw new Error(err.error?.message || `Image generation failed: ${res.status}`);
   }
 
-  return resolveImageResponse(await res.json());
+  const payload = await res.json();
+  if (count === 1) return resolveImageResponse(payload);
+  const all = await resolveAllImageResponses(payload);
+  if (!all.length) throw new Error('Image API returned no image data.');
+  return all;
 }
 
 /**

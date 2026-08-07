@@ -1031,6 +1031,7 @@ export default function App() {
         brand: batch.brand,
         useBrandColors: Boolean(batch.useBrandColors),
         documentBackgroundColor: batch.documentBackgroundColor,
+        instructionsOnly: Boolean(batch.instructionsOnly),
         quality,
         variantCount,
         signal: ac.signal,
@@ -1151,16 +1152,22 @@ export default function App() {
         if (!job) break
 
         const batch = genBatchesRef.current.get(job.id)
-        const verb = batch?.referenceImageDataUrl ? 'Improving' : 'Generating'
+        const verb = batch?.referenceImageDataUrl
+          ? 'Improving'
+          : batch?.instructionsOnly
+            ? 'Creating'
+            : 'Generating'
         const labelPrefix = job.drawingLabel ? `${job.drawingLabel} — ` : ''
         const batchJobs = genQueueRef.current.filter((j) => j.batchId === job.batchId)
         const batchTotal = batchJobs.length
         const batchDone = batchJobs.filter((j) => j.status === 'done').length
 
         setGenerationProgress({
-          message: batch?.multiVariant
-            ? `${labelPrefix}${verb} ${batch.variantCount} variations (one request)…`
-            : `${labelPrefix}${verb} variation ${job.index + 1}…`,
+          message: batch?.instructionsOnly
+            ? `${labelPrefix}${verb} from instructions${batch?.multiVariant ? ` (${batch.variantCount} variations)…` : '…'}`
+            : batch?.multiVariant
+              ? `${labelPrefix}${verb} ${batch.variantCount} variations (one request)…`
+              : `${labelPrefix}${verb} variation ${job.index + 1}…`,
           completed: batchDone,
           total: batchTotal,
           percent: 12,
@@ -1296,15 +1303,20 @@ export default function App() {
         return
       }
     } else if (!board?.hasContent?.()) {
-      setError('Draw something on the canvas first.')
-      return
+      if (!instructions?.trim()) {
+        setError('Add instructions to generate without a sketch, or draw on the canvas first.')
+        return
+      }
     }
 
+    const instructionsOnly = !improveGeneration && !board?.hasContent?.()
     const sketchDataUrl = improveGeneration
       ? (sketchSnapshot || board?.exportPNG?.())
-      : useBrandColorsInGeneration
-        ? (board.exportCompositePNG?.(false) ?? board.exportPNG())
-        : board.exportPNG()
+      : instructionsOnly
+        ? null
+        : useBrandColorsInGeneration
+          ? (board.exportCompositePNG?.(false) ?? board.exportPNG())
+          : board.exportPNG()
     const referenceImageDataUrl = improveGeneration ? generatedImage : null
     const total = variations
 
@@ -1324,6 +1336,7 @@ export default function App() {
         brand: { colors: normalizeBrandColors(brandColors), fonts: normalizeBrandFonts(brandFonts) },
         useBrandColors: useBrandColorsInGeneration,
         documentBackgroundColor: canvasBackgroundColor,
+        instructionsOnly,
         key,
         quality: generationQuality,
         addGenerationsAsLayers,
@@ -1353,8 +1366,6 @@ export default function App() {
     allStyles,
     selectedStyleId,
     instructions,
-    variations,
-    canvasFormat,
     improveGeneration,
     generatedImage,
     sketchSnapshot,

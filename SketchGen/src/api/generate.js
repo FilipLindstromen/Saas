@@ -1,5 +1,12 @@
-import { editImage } from '@shared/openai'
-import { fitDataUrlToSketchSize, getSketchFormat, normalizeSketchFormatId, GENERATION_SAFE_ZONE_INSET } from '../utils/canvasFormat'
+import { editImage, generateImage } from '@shared/openai'
+import {
+  createBlankCanvasDataUrl,
+  DEFAULT_SKETCH_FORMAT_ID,
+  fitDataUrlToSketchSize,
+  getSketchFormat,
+  normalizeSketchFormatId,
+  GENERATION_SAFE_ZONE_INSET,
+} from '../utils/canvasFormat'
 import { createLocalImageVariants } from '../utils/localImageVariants'
 import {
   BRAND_BACKGROUND_COLOR_FIELDS,
@@ -66,6 +73,11 @@ function multiVariantPromptNote(variantCount) {
   return ` Produce ${variantCount} clearly distinct visual interpretations (color, rendering, or mood) while keeping the same composition, layout, and subject matter as the sketch.`
 }
 
+function multiVariantInstructionsNote(variantCount) {
+  if (variantCount <= 1) return ''
+  return ` Produce ${variantCount} clearly distinct visual interpretations (color, rendering, or mood) while fulfilling the same brief.`
+}
+
 /**
  * Build the image-edit prompt from a style preset and optional free-text instructions.
  */
@@ -108,6 +120,34 @@ export function buildImprovePrompt(style, instructions, formatId, brand, useBran
   return `Edit this finished illustration according to the artist's instructions. Preserve composition, proportions, and subject matter unless the instructions explicitly ask to change them. ${aspectNote} ${boundsNote}${styleNote}${brandNote}${variantNote} Artist instructions: ${artist}`
 }
 
+/**
+ * Text-only generation when the sketch canvas is empty — uses instructions + style (no layout to preserve).
+ */
+export function buildInstructionsOnlyPrompt(
+  style,
+  instructions,
+  formatId,
+  brand,
+  useBrandColors,
+  variantCount = 1,
+  documentBackgroundHex = null,
+) {
+  const format = getSketchFormat(formatId)
+  const artist = instructions?.trim()
+  if (!artist) throw new Error('Instructions are required when the canvas is empty.')
+  const aspectNote = `The illustration must fit a ${format.label} frame (${format.width}×${format.height} pixel proportions).`
+  const boundsNote = buildSafeCompositionNote()
+  const brandNote = buildBrandDirective(brand, useBrandColors, documentBackgroundHex)
+  const variantNote = multiVariantInstructionsNote(variantCount)
+  if (style.type === 'image') {
+    const styleRefNote = useBrandColors
+      ? ' The attached image is a style reference — match its linework, rendering technique, and mood, but apply the mandatory brand hex palette for all colors (not the reference colors).'
+      : ' The attached image is a style reference — match its visual style: color palette, linework, rendering technique, and overall mood.'
+    return `Create a finished illustration from scratch based on the artist's instructions. There is no sketch — invent composition, layout, and subject matter from the brief. ${aspectNote} ${boundsNote}${styleRefNote}${brandNote}${variantNote} Artist instructions: ${artist}`
+  }
+  return `Create a finished illustration from scratch based on the artist's instructions. There is no sketch — invent composition, layout, and subject matter from the brief. ${aspectNote} ${boundsNote} Render in this style: ${style.prompt}.${brandNote}${variantNote} Artist instructions: ${artist}`
+}
+
 async function fitVariantOutputs(raw, format, background) {
   const list = Array.isArray(raw) ? raw : [raw]
   return Promise.all(list.map((url) => fitDataUrlToSketchSize(url, format.width, format.height, background)))
@@ -127,6 +167,7 @@ export async function generateStyledImage({
   brand = null,
   useBrandColors = false,
   documentBackgroundColor = null,
+  instructionsOnly = false,
   quality = 'high',
   variantCount = 1,
   signal = null,
@@ -134,28 +175,66 @@ export async function generateStyledImage({
   const format = getSketchFormat(normalizeSketchFormatId(formatId))
   const count = Math.min(3, Math.max(1, Math.floor(variantCount) || 1))
   const improving = Boolean(referenceImageDataUrl)
+  const fromInstructions = Boolean(instructionsOnly && !improving)
   const normalizedBrand = brand
     ? { colors: normalizeBrandColors(brand.colors), fonts: normalizeBrandFonts(brand.fonts) }
     : null
   const docBg = useBrandColors && documentBackgroundColor
     ? normalizeHexColor(documentBackgroundColor, normalizedBrand?.colors?.brightBg ?? '#ffffff')
     : null
-  const prompt = improving
-    ? buildImprovePrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
-    : buildPrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
-  const primaryImage = improving ? referenceImageDataUrl : sketchDataUrl
   const fitBg = useBrandColors
     ? (docBg ?? normalizedBrand?.colors?.brightBg ?? '#ffffff')
     : (normalizedBrand?.colors?.brightBg ?? '#ffffff')
-  const raw = await editImage({
-    prompt,
-    imageDataUrl: primaryImage,
-    additionalImages: style.type === 'image' ? [style.referenceImageDataUrl] : [],
-    size: format.apiSize,
-    quality: quality === 'low' ? 'low' : 'high',
-    n: count,
-    signal,
-  })
+  const qualityVal = quality === 'low' ? 'low' : 'high'
+
+  let raw
+  if (fromInstructions) {
+    const prompt = buildInstructionsOnlyPrompt(
+      style,
+      instructions,
+      format.id,
+      normalizedBrand,
+      useBrandColors,
+      count,
+      docBg,
+    )
+    if (style.type === 'image' && style.referenceImageDataUrl) {
+      const blank = createBlankCanvasDataUrl(format.width, format.height, fitBg)
+      if (!blank) throw new Error('Could not prepare canvas for generation.')
+      raw = await editImage({
+        prompt,
+        imageDataUrl: blank,
+        additionalImages: [style.referenceImageDataUrl],
+        size: format.apiSize,
+        quality: qualityVal,
+        n: count,
+        signal,
+      })
+    } else {
+      raw = await generateImage({
+        prompt,
+        size: format.apiSize,
+        quality: qualityVal,
+        n: count,
+        signal,
+      })
+    }
+  } else {
+    const prompt = improving
+      ? buildImprovePrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
+      : buildPrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
+    const primaryImage = improving ? referenceImageDataUrl : sketchDataUrl
+    if (!primaryImage) throw new Error('Sketch image is required.')
+    raw = await editImage({
+      prompt,
+      imageDataUrl: primaryImage,
+      additionalImages: style.type === 'image' ? [style.referenceImageDataUrl] : [],
+      size: format.apiSize,
+      quality: qualityVal,
+      n: count,
+      signal,
+    })
+  }
 
   let fitted = await fitVariantOutputs(raw, format, fitBg)
 

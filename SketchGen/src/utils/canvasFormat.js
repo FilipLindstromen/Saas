@@ -20,6 +20,18 @@ export function getSketchFormat(id) {
   return SKETCH_FORMATS.find((f) => f.id === normalized) ?? SKETCH_FORMATS.find((f) => f.id === DEFAULT_SKETCH_FORMAT_ID)
 }
 
+/** Solid-color canvas PNG for instruction-only generation (style edit with no sketch). */
+export function createBlankCanvasDataUrl(width, height, fill = '#ffffff') {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.fillStyle = fill
+  ctx.fillRect(0, 0, width, height)
+  return canvas.toDataURL('image/png')
+}
+
 function loadImage(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image()
