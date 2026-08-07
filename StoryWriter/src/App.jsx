@@ -11,7 +11,7 @@ import {
   FRAMEWORKS,
 } from './constants/frameworks';
 import { TARGET_OUTCOMES, DEFAULT_TARGET_OUTCOME_ID, getTargetOutcome } from './constants/targetOutcomes';
-import { getSceneStartForSentenceIndex } from './utils/sentences';
+import { getSceneStartForSentenceIndex, getPresentScenes } from './utils/sentences';
 import {
   normalizePresentSceneImages,
   normalizePresentSceneImageLocks,

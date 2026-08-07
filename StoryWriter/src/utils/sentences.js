@@ -161,16 +161,53 @@ function buildRawSentenceSegments(content) {
   return segments;
 }
 
+/** Present screens (blank-line blocks) with sentence indices — no styling/image side effects. */
+function enumeratePresentSceneChunks(content, segments) {
+  const raw = String(content ?? '');
+  if (!raw.trim()) return [];
+
+  const chunks = [];
+  let chunkStart = 0;
+  let match;
+
+  const pushChunk = (rawStart, rawEnd) => {
+    const text = raw.slice(rawStart, rawEnd).replace(/^\s+|\s+$/g, '');
+    if (!text) return;
+
+    const sentenceIndices = [];
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (seg.end > rawStart && seg.start < rawEnd) sentenceIndices.push(i);
+    }
+    chunks.push({ start: rawStart, end: rawEnd, text, sentenceIndices });
+  };
+
+  PRESENT_SCENE_BREAK.lastIndex = 0;
+  while ((match = PRESENT_SCENE_BREAK.exec(raw)) !== null) {
+    pushChunk(chunkStart, match.index);
+    chunkStart = match.index + match[0].length;
+  }
+  pushChunk(chunkStart, raw.length);
+
+  return chunks;
+}
+
 /** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
 export function getSentenceSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
   const base = buildRawSentenceSegments(content);
   if (!base.length) return [];
 
-  const scenes = getPresentScenes(content, { presentSceneImages, sentenceImages: legacySentenceImages });
+  const chunks = enumeratePresentSceneChunks(content, base);
   const sentenceHasSceneImage = new Set();
-  for (const sc of scenes) {
-    if (!sc.imageUrl) continue;
-    for (const i of sc.sentenceIndices) sentenceHasSceneImage.add(i);
+  for (const ch of chunks) {
+    const url = resolveSceneImageUrl(
+      ch.start,
+      presentSceneImages,
+      legacySentenceImages,
+      ch.sentenceIndices
+    );
+    if (!url) continue;
+    for (const i of ch.sentenceIndices) sentenceHasSceneImage.add(i);
   }
 
   return base.map((seg, i) => ({
@@ -206,18 +243,10 @@ export function getPresentScenes(
   const { presentSceneImages, sentenceImages } = parseImageArgs(imageArg);
   const segments = buildRawSentenceSegments(content);
   const scenes = [];
-  let chunkStart = 0;
-  let match;
+  const chunks = enumeratePresentSceneChunks(raw, segments);
 
-  const pushScene = (rawStart, rawEnd) => {
-    const text = raw.slice(rawStart, rawEnd).replace(/^\s+|\s+$/g, '');
-    if (!text) return;
-
-    const sentenceIndices = [];
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      if (seg.end > rawStart && seg.start < rawEnd) sentenceIndices.push(i);
-    }
+  for (const ch of chunks) {
+    const { start: rawStart, end: rawEnd, text, sentenceIndices } = ch;
     const primarySentenceIndex = sentenceIndices[0] ?? 0;
     const imageUrl = resolveSceneImageUrl(
       rawStart,
@@ -244,14 +273,7 @@ export function getPresentScenes(
       lineRevealStepCount: getLineRevealStepCount(text, rotateSpans, bulletSpans),
       rotateStepCount: getLineRevealStepCount(text, rotateSpans, bulletSpans),
     });
-  };
-
-  PRESENT_SCENE_BREAK.lastIndex = 0;
-  while ((match = PRESENT_SCENE_BREAK.exec(raw)) !== null) {
-    pushScene(chunkStart, match.index);
-    chunkStart = match.index + match[0].length;
   }
-  pushScene(chunkStart, raw.length);
 
   return scenes;
 }

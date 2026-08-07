@@ -208,7 +208,8 @@ export function buildUnifiedHighlightParts(sectionOrder, sectionsData) {
     const id = sectionOrder[i];
     const content = sectionsData[id]?.content ?? '';
     const images = sectionsData[id]?.sentenceImages ?? [];
-    const segments = getSentenceSegments(content, images);
+    const presentSceneImages = sectionsData[id]?.presentSceneImages ?? {};
+    const segments = getSentenceSegments(content, images, presentSceneImages);
     const spanStart = unifiedCursor;
     let localLast = 0;
 
