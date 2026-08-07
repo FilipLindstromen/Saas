@@ -2,6 +2,11 @@ import { useMemo } from 'react';
 import { getSettings } from '../utils/settings';
 import { buildPresentSceneList } from '../utils/sentences';
 import { buildLineRevealRowsSimple } from '../utils/lineReveal';
+import {
+  stripPresentImagePlaceholderLines,
+  processPresentRevealRows,
+  isPresentImageOnlyScene,
+} from '../utils/presentImagePlaceholder';
 import { normalizePresentationAnimationRules, resolveAnimationForSentence } from '../utils/textAnimations';
 import PresentSentence from './PresentSentence';
 import PresentRotateLines from './PresentRotateLines';
@@ -50,12 +55,17 @@ export default function PresentPreviewPanel({
   }
 
   const animation = resolveAnimationForSentence(scene.text, rules);
+  const displayText = stripPresentImagePlaceholderLines(scene.text);
   const useLineReveal = (scene.rotateSpans?.length ?? 0) > 0 || (scene.bulletSpans?.length ?? 0) > 0;
-  const hasBullets = (scene.bulletSpans?.length ?? 0) > 0;
-  const hasRotate = (scene.rotateSpans?.length ?? 0) > 0;
-  const rows = useLineReveal
+  const rowsRaw = useLineReveal
     ? buildLineRevealRowsSimple(scene.text, scene.rotateSpans ?? [], scene.bulletSpans ?? [], revealStep)
     : null;
+  const { rows, stepImageOnly } = processPresentRevealRows(rowsRaw);
+  const showLineReveal = useLineReveal && (rows?.length ?? 0) > 0;
+  const sceneImageOnly = isPresentImageOnlyScene(scene.text, { rows });
+  const imageOnlyPreview = Boolean(String(scene.imageUrl ?? '').trim()) && (sceneImageOnly || stepImageOnly);
+  const hasBullets = (scene.bulletSpans?.length ?? 0) > 0;
+  const hasRotate = (scene.rotateSpans?.length ?? 0) > 0;
   const layout = scene.layout ?? 'center';
   const hasDarkText = Boolean(scene.darkText);
 
@@ -68,12 +78,13 @@ export default function PresentPreviewPanel({
           hasBullets && 'present-preview-panel__stage--bullets',
           hasRotate && 'present-preview-panel__stage--text-rotate',
           hasDarkText && 'present-preview-panel__stage--dark-text',
+          imageOnlyPreview && 'present-preview-panel__stage--image-only',
         ]
           .filter(Boolean)
           .join(' ')}
         style={{ fontFamily, fontSize, lineHeight }}
       >
-        {useLineReveal ? (
+        {showLineReveal ? (
           <PresentRotateLines
             rows={rows}
             styledParts={scene.styledParts}
@@ -84,17 +95,20 @@ export default function PresentPreviewPanel({
             animation={animation}
             rules={rules}
           />
-        ) : (
+        ) : displayText.trim() ? (
           <PresentSentence
-            text={scene.text}
+            text={displayText}
             styledParts={scene.styledParts}
             animation={animation}
             phase="idle"
             rules={rules}
             style={{ fontSize, lineHeight }}
           />
-        )}
-      </div>
+        ) : imageOnlyPreview ? (
+          <p className="present-preview-panel__image-only-hint" aria-hidden="true">
+            Background image
+          </p>
+        ) : null}      </div>
     </div>
   );
 }

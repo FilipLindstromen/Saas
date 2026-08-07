@@ -20,6 +20,10 @@
   cursor: pointer;
 }
 
+.present-view--image-only .present-view__inner {
+  visibility: hidden;
+}
+
 .present-view__bg {
   position: absolute;
   inset: 0;

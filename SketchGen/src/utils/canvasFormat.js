@@ -26,18 +26,20 @@ function loadImage(dataUrl) {
   })
 }
 
-/** Resize generated output to exact sketch pixel dimensions (cover — fills frame, no letterboxing). */
-export async function fitDataUrlToSketchSize(dataUrl, width, height) {
+/** Resize API output to sketch dimensions (contain — full artwork visible, no edge crop). */
+export async function fitDataUrlToSketchSize(dataUrl, width, height, background = '#ffffff') {
   const img = await loadImage(dataUrl)
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  const scale = Math.max(width / img.width, height / img.height)
-  const sw = width / scale
-  const sh = height / scale
-  const sx = (img.width - sw) / 2
-  const sy = (img.height - sh) / 2
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height)
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, width, height)
+  const scale = Math.min(width / img.width, height / img.height)
+  const dw = img.width * scale
+  const dh = img.height * scale
+  const x = (width - dw) / 2
+  const y = (height - dh) / 2
+  ctx.drawImage(img, x, y, dw, dh)
   return canvas.toDataURL('image/png')
 }

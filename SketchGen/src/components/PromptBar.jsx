@@ -41,8 +41,8 @@ export default function PromptBar({
         className="prompt-bar-input"
         placeholder={
           improveGeneration
-            ? 'Describe what to change in the selected generation, e.g. fill the body with red…'
-            : 'e.g. make the cat orange, add a sunset background...'
+            ? 'Describe changes; ask to shrink or reflow layout if text was clipped at the edges…'
+            : 'e.g. make the cat orange… Keep titles and graphics inset from the canvas edges.'
         }
         value={value}
         onChange={(e) => onChange(e.target.value)}

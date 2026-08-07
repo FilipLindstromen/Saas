@@ -93,6 +93,12 @@ export const STYLES = [
     emoji: '🌐',
     prompt: 'a modern clean web design mockup illustration: polished UI layout with generous whitespace, subtle shadows, rounded cards, clear typography hierarchy, hero section, navigation bar, feature grids, and cohesive SaaS-style color accents — flat-to-soft-3D vector look suitable for landing pages and product marketing, crisp readable text placeholders, and balanced responsive-style composition',
   },
+  {
+    id: 'oatly-graphics',
+    name: 'Oatly Graphics',
+    emoji: '🥛',
+    prompt: 'Oatly-inspired brand graphics: flat dusty sky-blue background, solid black and white only for all artwork (no gradients). Chunky hand-drawn/stamped typography — bold uneven all-caps titles, playful scripts, and text shaped into banners or simple objects ("written illustrations"). Flat black silhouette icons with slightly rough woodcut/stamp edges (trucks, gears, cartons, hands, arrows). Thin white dotted lines connecting steps in horizontal process flows. Whimsical DIY collage feel — informal, witty, anti-corporate — generous negative space, thick irregular outlines, minimal detail, no photorealism. Suitable for infographics, how-it-works diagrams, and packaging-style callouts',
+  },
 ]
 
 export const DEFAULT_STYLE_ID = STYLES[0].id

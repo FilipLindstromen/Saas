@@ -26,6 +26,18 @@
   font-weight: 700;
 }
 
+.present-preview-panel__stage--image-only .present-rotate,
+.present-preview-panel__stage--image-only .present-view__sentence {
+  visibility: hidden;
+}
+
+.present-preview-panel__image-only-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .present-preview-panel__stage--left {
   text-align: left;
 }

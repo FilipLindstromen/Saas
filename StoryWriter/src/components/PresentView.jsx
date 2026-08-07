@@ -10,6 +10,11 @@ import {
 import { buildPresentSceneList } from '../utils/sentences';
 import { isVideoBackgroundUrl } from '../utils/stockMediaSource';
 import { buildLineRevealRowsSimple } from '../utils/lineReveal';
+import {
+  stripPresentImagePlaceholderLines,
+  processPresentRevealRows,
+  isPresentImageOnlyScene,
+} from '../utils/presentImagePlaceholder';
 import PresentSentence from './PresentSentence';
 import PresentRotateLines from './PresentRotateLines';
 import './PresentView.css';
@@ -158,18 +163,28 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
   const hasDarkTextPresent = Boolean(currentItem?.darkText);
 
   const sentence = sentences[displayIndex] ?? '';
+  const displaySentence = useMemo(() => stripPresentImagePlaceholderLines(sentence), [sentence]);
   const styledParts = currentItem?.styledParts;
   const rotateSpans = currentItem?.rotateSpans ?? [];
   const bulletSpans = currentItem?.bulletSpans ?? [];
   const useLineRevealPresent =
     rotateSpans.length > 0 || bulletSpans.length > 0;
-  const lineRevealRows = useMemo(
+  const lineRevealRowsRaw = useMemo(
     () =>
       useLineRevealPresent
         ? buildLineRevealRowsSimple(sentence, rotateSpans, bulletSpans, revealStep)
         : null,
     [useLineRevealPresent, sentence, rotateSpans, bulletSpans, revealStep]
   );
+  const { rows: lineRevealRows, stepImageOnly } = useMemo(
+    () => processPresentRevealRows(lineRevealRowsRaw),
+    [lineRevealRowsRaw]
+  );
+  const sceneImageOnly = isPresentImageOnlyScene(sentence, { rows: lineRevealRows });
+  const imageOnlyPresent =
+    Boolean(String(displayBgUrl ?? '').trim()) && (sceneImageOnly || stepImageOnly);
+  const effectiveBgOpacity = imageOnlyPresent ? 1 : bgLayerOpacity;
+  const showLineRevealPresent = useLineRevealPresent && (lineRevealRows?.length ?? 0) > 0;
   const hasBulletPresent = bulletSpans.length > 0;
   const hasRotatePresent = rotateSpans.length > 0;
 
@@ -185,8 +200,8 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
 
   useEffect(() => {
     const trimmed = String(displayBgUrl ?? '').trim();
-    setBgLayerOpacity(trimmed ? bgOpacity : 0);
-  }, [displayBgUrl, bgOpacity]);
+    setBgLayerOpacity(trimmed ? effectiveBgOpacity : 0);
+  }, [displayBgUrl, effectiveBgOpacity]);
 
   const navigateTo = useCallback(
     (newIndex, initialRevealStep = 0) => {
@@ -457,7 +472,12 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
 
   return (
     <div
-      className="present-view present-view--fullscreen present-view--advance-on-click"
+      className={[
+        'present-view present-view--fullscreen present-view--advance-on-click',
+        imageOnlyPresent && 'present-view--image-only',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{ fontFamily }}
       onClick={goNext}
       role="presentation"
@@ -468,7 +488,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           className={`present-view__bg${bgAnimation ? ' present-view__bg--animated' : ''}`}
           style={{
             backgroundImage: `url(${displayBgUrl})`,
-            opacity: bgLayerOpacity,
+            opacity: effectiveBgOpacity,
             ...(bgAnimation ? {
               ['--present-bg-duration']: `${bgAnimationDuration}s`,
               ['--present-bg-scale-max']: `${bgAnimationScale * 100}%`,
@@ -486,7 +506,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           loop
           playsInline
           style={{
-            opacity: bgLayerOpacity,
+            opacity: effectiveBgOpacity,
             ...(bgAnimation ? {
               ['--present-bg-duration']: `${bgAnimationDuration}s`,
               ['--present-bg-scale-max']: `${bgAnimationScale * 100}%`,
@@ -515,7 +535,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
             .filter(Boolean)
             .join(' ')}
         >
-          {useLineRevealPresent ? (
+          {showLineRevealPresent ? (
             <PresentRotateLines
               rows={lineRevealRows}
               styledParts={styledParts}
@@ -526,16 +546,16 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
               animation={currentAnimation}
               rules={rules}
             />
-          ) : (
+          ) : displaySentence.trim() ? (
             <PresentSentence
-              text={sentence}
+              text={displaySentence}
               styledParts={styledParts}
               animation={currentAnimation}
               phase={sentencePhase}
               rules={rules}
               style={{ fontSize, lineHeight }}
             />
-          )}
+          ) : null}
         </div>
       </div>
       </div>
