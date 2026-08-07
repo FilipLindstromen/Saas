@@ -23,12 +23,13 @@
 
 .import-panel-tabs button {
   flex: 1;
-  padding: 0.35rem 0.5rem;
+  min-width: 0;
+  padding: 0.35rem 0.35rem;
   border: none;
   border-radius: calc(var(--button-radius) - 4px);
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 500;
   cursor: pointer;
 }
@@ -113,7 +114,14 @@
 
 .import-grid-gifs {
   grid-template-columns: repeat(2, 1fr);
+  column-gap: 0.45rem;
+  row-gap: 1rem;
   max-height: 420px;
+}
+
+.import-grid-svg {
+  grid-template-columns: repeat(4, 1fr);
+  max-height: 320px;
 }
 
 .import-icon-btn {
@@ -154,14 +162,40 @@
 
 .import-gif-btn {
   padding: 0;
+  margin: 0;
   border-radius: var(--button-radius);
   border: 1px solid var(--border-default);
   overflow: hidden;
   cursor: pointer;
   background: var(--bg-tertiary);
-  /* Giphy previews are naturally tall/portrait — a square box crushed most of
-     each gif into an unrecognizable crop. Give it real vertical room instead. */
   aspect-ratio: 3 / 4;
+  min-height: 0;
+  align-self: start;
+}
+
+.import-svg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0.35rem;
+  border-radius: var(--button-radius);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+}
+
+.import-svg-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.import-svg-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .import-gif-btn img {

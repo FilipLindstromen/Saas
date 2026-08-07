@@ -256,19 +256,36 @@ function App() {
     setPersisted((prev) => {
       const section = prev.sectionsData[sectionId] ?? {};
       const content = section.content ?? '';
-      const sceneStart = getSceneStartForSentenceIndex(content, sentenceIndex);
-      if (sceneStart == null) return prev;
-
+      const arr = Array.isArray(section.sentenceImages) ? [...section.sentenceImages] : [];
       const presentSceneImages = { ...normalizePresentSceneImages(section.presentSceneImages) };
-      const key = String(sceneStart);
-      if (url) presentSceneImages[key] = url;
-      else delete presentSceneImages[key];
+
+      const scenes = getPresentScenes(content, {
+        presentSceneImages,
+        sentenceImages: arr,
+      });
+      const scene = scenes.find((s) => s.sentenceIndices.includes(sentenceIndex));
+      const sceneStart = scene?.start ?? null;
+      const indices = scene?.sentenceIndices?.length ? scene.sentenceIndices : [sentenceIndex];
+
+      if (sceneStart != null) {
+        const key = String(sceneStart);
+        if (url) presentSceneImages[key] = url;
+        else delete presentSceneImages[key];
+      } else if (url) {
+        while (arr.length <= sentenceIndex) arr.push('');
+        arr[sentenceIndex] = url;
+      }
+
+      for (const i of indices) {
+        while (arr.length <= i) arr.push('');
+        if (sceneStart != null || !url) arr[i] = '';
+      }
 
       return {
         ...prev,
         sectionsData: {
           ...prev.sectionsData,
-          [sectionId]: { ...section, presentSceneImages },
+          [sectionId]: { ...section, presentSceneImages, sentenceImages: arr },
         },
       };
     });
