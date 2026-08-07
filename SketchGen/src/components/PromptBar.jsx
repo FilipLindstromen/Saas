@@ -42,7 +42,7 @@ export default function PromptBar({
         placeholder={
           improveGeneration
             ? 'Describe changes; ask to shrink or reflow layout if text was clipped at the edges…'
-            : 'e.g. make the cat orange… Keep titles and graphics inset from the canvas edges.'
+            : 'Describe what to create (required if the canvas is empty), or sketch first and add notes…'
         }
         value={value}
         onChange={(e) => onChange(e.target.value)}

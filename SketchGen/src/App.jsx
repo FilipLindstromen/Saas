@@ -1366,6 +1366,8 @@ export default function App() {
     allStyles,
     selectedStyleId,
     instructions,
+    variations,
+    canvasFormat,
     improveGeneration,
     generatedImage,
     sketchSnapshot,
