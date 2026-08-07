@@ -11,7 +11,7 @@ import {
   FRAMEWORKS,
 } from './constants/frameworks';
 import { TARGET_OUTCOMES, DEFAULT_TARGET_OUTCOME_ID, getTargetOutcome } from './constants/targetOutcomes';
-import { getSceneStartForSentenceIndex, getPresentScenes } from './utils/sentences';
+import { getSceneStartForSentenceIndex } from './utils/sentences';
 import {
   normalizePresentSceneImages,
   normalizePresentSceneImageLocks,
@@ -264,24 +264,11 @@ function App() {
       if (url) presentSceneImages[key] = url;
       else delete presentSceneImages[key];
 
-      const arr = Array.isArray(section.sentenceImages) ? [...section.sentenceImages] : [];
-      const scenes = getPresentScenes(content, {
-        presentSceneImages,
-        sentenceImages: arr,
-      });
-      const scene = scenes.find((s) => s.start === sceneStart);
-      if (scene) {
-        for (const i of scene.sentenceIndices) {
-          while (arr.length <= i) arr.push('');
-          arr[i] = '';
-        }
-      }
-
       return {
         ...prev,
         sectionsData: {
           ...prev.sectionsData,
-          [sectionId]: { ...section, presentSceneImages, sentenceImages: arr },
+          [sectionId]: { ...section, presentSceneImages },
         },
       };
     });

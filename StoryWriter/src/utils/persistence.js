@@ -5,6 +5,8 @@ import { normalizePresentStyleSpans } from './presentStyles';
 import {
   normalizePresentSceneImages,
   normalizePresentSceneImageLocks,
+  migratePresentSceneImagesFromLegacy,
+  migratePresentSceneImageLocksFromLegacy,
 } from './presentSceneImages';
 
 function persistHeadlineSpans(spans, contentLength) {
@@ -92,6 +94,18 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
           ? sentenceImages.map((x) => (typeof x === 'string' ? x : ''))
           : [];
         const content = sectionsData[id].content ?? empty[id].content;
+        const presentSceneImages = migratePresentSceneImagesFromLegacy(
+          content,
+          sectionsData[id].presentSceneImages,
+          arr
+        );
+        const presentSceneImageLocks = migratePresentSceneImageLocksFromLegacy(
+          content,
+          sectionsData[id].presentSceneImageLocks,
+          sectionsData[id].sentenceImageLocks,
+          presentSceneImages,
+          arr
+        );
         data[id] = {
           input: sectionsData[id].input ?? empty[id].input,
           content,
@@ -99,8 +113,8 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
           backgroundImageCredit: typeof sectionsData[id].backgroundImageCredit === 'string' ? sectionsData[id].backgroundImageCredit : undefined,
           sentenceImages: arr,
           sentenceImageLocks: persistSentenceImageLocks(sectionsData[id].sentenceImageLocks),
-          presentSceneImages: normalizePresentSceneImages(sectionsData[id].presentSceneImages),
-          presentSceneImageLocks: normalizePresentSceneImageLocks(sectionsData[id].presentSceneImageLocks),
+          presentSceneImages,
+          presentSceneImageLocks,
           headlineSpans: persistHeadlineSpans(sectionsData[id].headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(sectionsData[id].rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(sectionsData[id].bulletLineSpans, String(content).length),
@@ -142,6 +156,18 @@ export function saveContent(payload) {
           ? sentenceImages.map((x) => (typeof x === 'string' ? x : ''))
           : [];
         const content = section.content ?? '';
+        const presentSceneImages = migratePresentSceneImagesFromLegacy(
+          content,
+          section.presentSceneImages,
+          arr
+        );
+        const presentSceneImageLocks = migratePresentSceneImageLocksFromLegacy(
+          content,
+          section.presentSceneImageLocks,
+          section.sentenceImageLocks,
+          presentSceneImages,
+          arr
+        );
         sectionsData[id] = {
           input: section.input ?? '',
           content,
@@ -149,8 +175,8 @@ export function saveContent(payload) {
           backgroundImageCredit: typeof section.backgroundImageCredit === 'string' ? section.backgroundImageCredit : undefined,
           sentenceImages: arr,
           sentenceImageLocks: persistSentenceImageLocks(section.sentenceImageLocks),
-          presentSceneImages: normalizePresentSceneImages(section.presentSceneImages),
-          presentSceneImageLocks: normalizePresentSceneImageLocks(section.presentSceneImageLocks),
+          presentSceneImages,
+          presentSceneImageLocks,
           headlineSpans: persistHeadlineSpans(section.headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(section.rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(section.bulletLineSpans, String(content).length),

@@ -125,18 +125,11 @@ export function getSceneStartForSentenceIndex(content, sentenceIndex) {
   return hit != null ? hit.start : null;
 }
 
-/** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
-export function getSentenceSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
+/** Raw sentence spans in editor text (no image flags — safe to call from getPresentScenes). */
+function buildRawSentenceSegments(content) {
   const raw = String(content ?? '');
   const { sentences, starts } = getSentenceStarts(content);
   if (!sentences.length) return [];
-
-  const scenes = getPresentScenes(content, { presentSceneImages, sentenceImages: legacySentenceImages });
-  const sentenceHasSceneImage = new Set();
-  for (const sc of scenes) {
-    if (!sc.imageUrl) continue;
-    for (const i of sc.sentenceIndices) sentenceHasSceneImage.add(i);
-  }
 
   const segments = [];
   let cursor = 0;
@@ -152,7 +145,6 @@ export function getSentenceSegments(content, legacySentenceImages = [], presentS
         start: rawStart,
         end: rawEnd,
         text: raw.slice(rawStart, rawEnd),
-        hasImage: sentenceHasSceneImage.has(i),
       });
       cursor = rawEnd;
       continue;
@@ -161,13 +153,30 @@ export function getSentenceSegments(content, legacySentenceImages = [], presentS
       start: span.start,
       end: span.end,
       text: span.text,
-      hasImage: sentenceHasSceneImage.has(i),
     });
     cursor = span.end;
     while (cursor < raw.length && /[\s\n]/.test(raw[cursor])) cursor += 1;
   }
 
   return segments;
+}
+
+/** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
+export function getSentenceSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
+  const base = buildRawSentenceSegments(content);
+  if (!base.length) return [];
+
+  const scenes = getPresentScenes(content, { presentSceneImages, sentenceImages: legacySentenceImages });
+  const sentenceHasSceneImage = new Set();
+  for (const sc of scenes) {
+    if (!sc.imageUrl) continue;
+    for (const i of sc.sentenceIndices) sentenceHasSceneImage.add(i);
+  }
+
+  return base.map((seg, i) => ({
+    ...seg,
+    hasImage: sentenceHasSceneImage.has(i),
+  }));
 }
 
 /** Segments for edit highlight — same boundaries as present mode. */
@@ -195,7 +204,7 @@ export function getPresentScenes(
   if (!raw.trim()) return [];
 
   const { presentSceneImages, sentenceImages } = parseImageArgs(imageArg);
-  const segments = getSentenceSegments(content);
+  const segments = buildRawSentenceSegments(content);
   const scenes = [];
   let chunkStart = 0;
   let match;

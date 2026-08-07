@@ -1,4 +1,4 @@
-import { getPresentScenes } from './sentences';
+import { getPresentScenes, resolveSceneImageUrl } from './sentences';
 import { mapOldIndexToNew } from './textEditMap';
 
 export function normalizePresentSceneImages(map) {
@@ -65,4 +65,50 @@ export function remapPresentSceneImageLocks(oldContent, newContent, oldLocks, ol
   return result;
 }
 
-export { getSceneStartForSentenceIndex, resolveSceneImageUrl } from './sentences';
+export { getSceneStartForSentenceIndex } from './sentences';
+
+/** Copy legacy per-sentence URLs into per-screen keys when upgrading older projects. */
+export function migratePresentSceneImagesFromLegacy(content, presentSceneImages, sentenceImages) {
+  const existing = normalizePresentSceneImages(presentSceneImages);
+  if (Object.keys(existing).length) return existing;
+  const legacy = Array.isArray(sentenceImages) ? sentenceImages : [];
+  if (!legacy.some((u) => String(u ?? '').trim())) return existing;
+
+  const scenes = getPresentScenes(String(content ?? ''), { presentSceneImages: {}, sentenceImages: legacy });
+  const migrated = { ...existing };
+  for (const sc of scenes) {
+    const key = String(sc.start);
+    if (migrated[key]) continue;
+    const url = resolveSceneImageUrl(sc.start, {}, legacy, sc.sentenceIndices);
+    if (url) migrated[key] = url;
+  }
+  return migrated;
+}
+
+/** Map legacy per-sentence lock flags to per-screen locks. */
+export function migratePresentSceneImageLocksFromLegacy(
+  content,
+  presentSceneImageLocks,
+  sentenceImageLocks,
+  presentSceneImages,
+  sentenceImages
+) {
+  const existing = normalizePresentSceneImageLocks(presentSceneImageLocks);
+  if (Object.keys(existing).length) return existing;
+  const legacyLocks = Array.isArray(sentenceImageLocks) ? sentenceImageLocks : [];
+  if (!legacyLocks.some(Boolean)) return existing;
+
+  const scenes = getPresentScenes(String(content ?? ''), {
+    presentSceneImages: presentSceneImages ?? {},
+    sentenceImages: sentenceImages ?? [],
+  });
+  const migrated = { ...existing };
+  for (const sc of scenes) {
+    const key = String(sc.start);
+    if (migrated[key]) continue;
+    if (sc.sentenceIndices.some((i) => Boolean(legacyLocks[i]))) {
+      migrated[key] = true;
+    }
+  }
+  return migrated;
+}
