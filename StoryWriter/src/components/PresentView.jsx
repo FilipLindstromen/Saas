@@ -14,6 +14,7 @@ import {
   stripPresentImagePlaceholderLines,
   processPresentRevealRows,
   isPresentImageOnlyScene,
+  sceneUsesPresentImagePlaceholder,
 } from '../utils/presentImagePlaceholder';
 import PresentSentence from './PresentSentence';
 import PresentRotateLines from './PresentRotateLines';
@@ -181,9 +182,17 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
     [lineRevealRowsRaw]
   );
   const sceneImageOnly = isPresentImageOnlyScene(sentence, { rows: lineRevealRows });
+  const usesImagePlaceholder = sceneUsesPresentImagePlaceholder(sentence);
   const imageOnlyPresent =
     Boolean(String(displayBgUrl ?? '').trim()) && (sceneImageOnly || stepImageOnly);
-  const effectiveBgOpacity = imageOnlyPresent ? 1 : bgLayerOpacity;
+  const effectiveBgOpacity = useMemo(() => {
+    const hasBg = Boolean(String(displayBgUrl ?? '').trim());
+    if (!hasBg) return 0;
+    if (usesImagePlaceholder) {
+      return imageOnlyPresent ? 1 : 0;
+    }
+    return imageOnlyPresent ? 1 : bgOpacity;
+  }, [displayBgUrl, usesImagePlaceholder, imageOnlyPresent, bgOpacity]);
   const showLineRevealPresent = useLineRevealPresent && (lineRevealRows?.length ?? 0) > 0;
   const hasBulletPresent = bulletSpans.length > 0;
   const hasRotatePresent = rotateSpans.length > 0;
@@ -488,7 +497,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           className={`present-view__bg${bgAnimation ? ' present-view__bg--animated' : ''}`}
           style={{
             backgroundImage: `url(${displayBgUrl})`,
-            opacity: effectiveBgOpacity,
+            opacity: bgLayerOpacity,
             ...(bgAnimation ? {
               ['--present-bg-duration']: `${bgAnimationDuration}s`,
               ['--present-bg-scale-max']: `${bgAnimationScale * 100}%`,
@@ -506,7 +515,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           loop
           playsInline
           style={{
-            opacity: effectiveBgOpacity,
+            opacity: bgLayerOpacity,
             ...(bgAnimation ? {
               ['--present-bg-duration']: `${bgAnimationDuration}s`,
               ['--present-bg-scale-max']: `${bgAnimationScale * 100}%`,
@@ -520,16 +529,17 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           'present-view__inner',
           sceneLayout === 'left' && 'present-view__inner--layout-left',
           hasBulletPresent && 'present-view__inner--bullets',
-          hasRotatePresent && 'present-view__inner--text-rotate',
-          hasDarkTextPresent && 'present-view__inner--dark-text',
-        ]
-          .filter(Boolean)
-          .join(' ')}
+            hasRotatePresent && 'present-view__inner--text-rotate',
+            hasDarkTextPresent && 'present-view__inner--dark-text',
+          ]
+            .filter(Boolean)
+            .join(' ')}
       >
         <div
           className={[
             'present-view__sentence-stage',
             hasBulletPresent && 'present-view__sentence-stage--bullets',
+            hasRotatePresent && 'present-view__sentence-stage--text-rotate',
             sceneLayout === 'left' && 'present-view__sentence-stage--layout-left',
           ]
             .filter(Boolean)

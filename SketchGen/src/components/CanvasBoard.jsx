@@ -32,8 +32,8 @@ import { blendModeToCompositeOperation, normalizeBlendMode } from '../utils/laye
 import './CanvasBoard.css'
 
 /** @deprecated use getSketchFormat — kept for any external imports */
-export const CANVAS_WIDTH = getSketchFormat('16:9').width
-export const CANVAS_HEIGHT = getSketchFormat('16:9').height
+export const CANVAS_WIDTH = getSketchFormat(DEFAULT_SKETCH_FORMAT_ID).width
+export const CANVAS_HEIGHT = getSketchFormat(DEFAULT_SKETCH_FORMAT_ID).height
 export const BACKGROUND_COLOR = '#ffffff'
 const MAX_HISTORY = 40
 const FILL_TOLERANCE = 40

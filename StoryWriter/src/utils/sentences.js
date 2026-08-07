@@ -6,6 +6,7 @@ import {
   resolveSceneDarkText,
 } from './presentStyles';
 import { rotateSpansForScene, bulletSpansForScene, getLineRevealStepCount } from './lineReveal';
+import { getPresentImagePlaceholderRanges } from './presentImagePlaceholder';
 
 /** Split text into sentences (by . ! ? followed by space or end). */
 export function getSentences(text) {
@@ -192,13 +193,32 @@ function enumeratePresentSceneChunks(content, segments) {
   return chunks;
 }
 
-/** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
-export function getSentenceSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
-  const base = buildRawSentenceSegments(content);
-  if (!base.length) return [];
+/** Local character ranges that should show the present-image highlight in the editor. */
+export function getSectionImageHighlightRanges(content, legacySentenceImages = [], presentSceneImages = {}) {
+  const raw = String(content ?? '');
+  if (!raw.trim()) return [];
 
-  const chunks = enumeratePresentSceneChunks(content, base);
-  const sentenceHasSceneImage = new Set();
+  const base = buildRawSentenceSegments(raw);
+  const chunks = enumeratePresentSceneChunks(raw, base);
+  const placeholderLines = getPresentImagePlaceholderRanges(raw);
+
+  if (placeholderLines.length > 0) {
+    const out = [];
+    for (const pr of placeholderLines) {
+      const ch = chunks.find((c) => pr.start >= c.start && pr.end <= c.end);
+      if (!ch) continue;
+      const url = resolveSceneImageUrl(
+        ch.start,
+        presentSceneImages,
+        legacySentenceImages,
+        ch.sentenceIndices
+      );
+      if (url) out.push({ start: pr.start, end: pr.end });
+    }
+    return out;
+  }
+
+  const out = [];
   for (const ch of chunks) {
     const url = resolveSceneImageUrl(
       ch.start,
@@ -207,12 +227,24 @@ export function getSentenceSegments(content, legacySentenceImages = [], presentS
       ch.sentenceIndices
     );
     if (!url) continue;
-    for (const i of ch.sentenceIndices) sentenceHasSceneImage.add(i);
+    for (const i of ch.sentenceIndices) {
+      const seg = base[i];
+      if (seg) out.push({ start: seg.start, end: seg.end });
+    }
   }
+  return out;
+}
 
-  return base.map((seg, i) => ({
+/** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
+export function getSentenceSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
+  const base = buildRawSentenceSegments(content);
+  if (!base.length) return [];
+
+  const highlightRanges = getSectionImageHighlightRanges(content, legacySentenceImages, presentSceneImages);
+
+  return base.map((seg) => ({
     ...seg,
-    hasImage: sentenceHasSceneImage.has(i),
+    hasImage: highlightRanges.some((r) => r.start < seg.end && r.end > seg.start),
   }));
 }
 

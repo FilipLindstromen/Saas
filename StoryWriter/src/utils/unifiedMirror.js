@@ -1,5 +1,5 @@
 import { getUnifiedSectionSpans, joinSectionContents } from './storyDocument';
-import { getSentenceSegments } from './sentences';
+import { getSectionImageHighlightRanges } from './sentences';
 import { normalizeHeadlineSpans } from './headlines';
 import { normalizePresentStyleSpans } from './presentStyles';
 
@@ -35,10 +35,9 @@ export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
     const bullets = sectionsData[span.sectionId]?.bulletLineSpans ?? [];
     const presentStyles = sectionsData[span.sectionId]?.presentStyleSpans ?? [];
 
-    for (const seg of getSentenceSegments(content, images, presentSceneImages)) {
-      if (!seg.hasImage) continue;
-      const start = span.start + seg.start;
-      const end = span.start + seg.end;
+    for (const r of getSectionImageHighlightRanges(content, images, presentSceneImages)) {
+      const start = span.start + r.start;
+      const end = span.start + r.end;
       imageRanges.push({ start, end });
       boundaries.add(start);
       boundaries.add(end);
@@ -127,9 +126,8 @@ export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
     const bullets = sectionsData[span.sectionId]?.bulletLineSpans ?? [];
     const presentStyles = sectionsData[span.sectionId]?.presentStyleSpans ?? [];
 
-    for (const seg of getSentenceSegments(content, images, presentSceneImages)) {
-      if (!seg.hasImage) continue;
-      imageRanges.push({ start: span.start + seg.start, end: span.start + seg.end });
+    for (const r of getSectionImageHighlightRanges(content, images, presentSceneImages)) {
+      imageRanges.push({ start: span.start + r.start, end: span.start + r.end });
     }
     for (const h of normalizeHeadlineSpans(headlines, content.length)) {
       headlineRanges.push({ start: span.start + h.start, end: span.start + h.end });

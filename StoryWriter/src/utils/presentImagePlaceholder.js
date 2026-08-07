@@ -5,6 +5,28 @@ export function isPresentImagePlaceholderLine(line) {
   return String(line ?? '').trim() === PRESENT_IMAGE_PLACEHOLDER;
 }
 
+/** Character ranges in raw editor text for lines that are exactly `[IMAGE]`. */
+export function getPresentImagePlaceholderRanges(content) {
+  const raw = String(content ?? '');
+  const ranges = [];
+  let offset = 0;
+  const lines = raw.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineStart = offset;
+    const lineEnd = offset + line.length;
+    if (isPresentImagePlaceholderLine(line)) {
+      ranges.push({ start: lineStart, end: lineEnd });
+    }
+    offset = lineEnd + (i < lines.length - 1 ? 1 : 0);
+  }
+  return ranges;
+}
+
+export function sceneUsesPresentImagePlaceholder(text) {
+  return getPresentImagePlaceholderRanges(text).length > 0;
+}
+
 /** Remove lines that contain only [IMAGE] (present display text). */
 export function stripPresentImagePlaceholderLines(text) {
   const lines = String(text ?? '').split('\n');

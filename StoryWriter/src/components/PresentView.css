@@ -33,7 +33,7 @@
   background-position: center;
   background-repeat: no-repeat;
   z-index: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .present-view__bg--animated {
@@ -132,6 +132,15 @@
   align-items: stretch;
   justify-content: center;
   width: 100%;
+}
+
+.present-view__sentence-stage--text-rotate {
+  align-items: center;
+  justify-content: center;
+}
+
+.present-view__sentence-stage--text-rotate .present-rotate--text-rotate {
+  justify-content: center;
 }
 
 .present-view__sentence-stage--bullets .present-rotate--bullets {
@@ -332,6 +341,7 @@
   width: 100%;
   max-width: 100%;
   align-self: stretch;
+  justify-content: center;
 }
 
 .present-rotate__slot {

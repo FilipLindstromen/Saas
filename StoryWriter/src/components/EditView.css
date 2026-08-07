@@ -505,7 +505,7 @@
   left: 0;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-end;
   gap: 1px;
   flex-wrap: nowrap;

@@ -1,12 +1,12 @@
 export const SKETCH_FORMATS = [
   { id: '1:1', label: '1:1', width: 1080, height: 1080, apiSize: '1024x1024' },
-  { id: '4:3', label: '4:3', width: 1024, height: 768, apiSize: '1536x1024' },
+  { id: '4:3', label: '4:3', width: 1080, height: 810, apiSize: '1536x1024' },
   { id: '16:9', label: '16:9', width: 1920, height: 1080, apiSize: '1536x1024' },
   { id: '9:16', label: '9:16', width: 1080, height: 1920, apiSize: '1024x1536' },
   { id: '1080x1440', label: '1080×1440', width: 1080, height: 1440, apiSize: '1024x1536' },
 ]
 
-export const DEFAULT_SKETCH_FORMAT_ID = '16:9'
+export const DEFAULT_SKETCH_FORMAT_ID = '4:3'
 
 /** Inset fraction used in generation prompts and the sketch safe-zone overlay. */
 export const GENERATION_SAFE_ZONE_INSET = 0.06

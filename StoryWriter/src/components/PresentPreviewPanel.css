@@ -57,6 +57,9 @@
 
 .present-preview-panel__stage--text-rotate {
   max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .present-preview-panel__stage--text-rotate .present-rotate__slot {

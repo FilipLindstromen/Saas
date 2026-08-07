@@ -122,7 +122,7 @@ export async function generateStyledImage({
   sketchDataUrl,
   style,
   instructions,
-  formatId = '16:9',
+  formatId = DEFAULT_SKETCH_FORMAT_ID,
   referenceImageDataUrl = null,
   brand = null,
   useBrandColors = false,

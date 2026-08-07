@@ -27,7 +27,7 @@ const DEFAULTS = {
   smoothing: 0.22,
   wobble: 0,
   zoom: 1,
-  canvasFormat: '16:9',
+  canvasFormat: '4:3',
   selectedStyleId: null,
   instructions: '',
   variations: 1,

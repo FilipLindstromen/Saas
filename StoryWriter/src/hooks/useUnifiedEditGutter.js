@@ -8,12 +8,23 @@ function fallbackTops(lineCount) {
   return Array.from({ length: n }, (_, i) => i * FALLBACK_LINE_HEIGHT);
 }
 
+function topsToLineHeights(tops, containerHeight) {
+  if (!tops.length) return [];
+  return tops.map((top, i) => {
+    if (i < tops.length - 1) return Math.max(1, tops[i + 1] - top);
+    return Math.max(FALLBACK_LINE_HEIGHT, (containerHeight || 0) - top);
+  });
+}
+
 /**
  * Gutter line alignment for the unified Edit textarea.
  * Keeps measure callbacks declared before effects that use them (avoids TDZ crashes).
  */
 export function useUnifiedEditGutter({ content, gutterLineCount, measureRef, wrapRef, textareaRef, bodyRef }) {
   const [gutterTops, setGutterTops] = useState(() => fallbackTops(gutterLineCount));
+  const [gutterHeights, setGutterHeights] = useState(() =>
+    Array.from({ length: Math.max(1, gutterLineCount) }, () => FALLBACK_LINE_HEIGHT)
+  );
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -29,20 +40,32 @@ export function useUnifiedEditGutter({ content, gutterLineCount, measureRef, wra
     const measureEl = measureRef.current;
     if (!measureEl) {
       setGutterTops(fallbackTops(gutterLineCount));
+      setGutterHeights(Array.from({ length: Math.max(1, gutterLineCount) }, () => FALLBACK_LINE_HEIGHT));
       return;
     }
     try {
       const tops = measureLineTops(measureEl, content);
       if (!tops.length) {
         setGutterTops(fallbackTops(gutterLineCount));
+        setGutterHeights(Array.from({ length: gutterLineCount }, () => FALLBACK_LINE_HEIGHT));
         return;
       }
       setGutterTops(tops);
+      setGutterHeights(topsToLineHeights(tops, measureEl.offsetHeight));
     } catch (err) {
       console.warn('[Edit] Gutter measurement failed:', err);
       setGutterTops(fallbackTops(gutterLineCount));
+      setGutterHeights(Array.from({ length: Math.max(1, gutterLineCount) }, () => FALLBACK_LINE_HEIGHT));
     }
   }, [content, gutterLineCount, measureRef]);
+
+  useEffect(() => {
+    const n = Math.max(1, gutterLineCount);
+    setGutterHeights((prev) => {
+      if (prev.length === n) return prev;
+      return Array.from({ length: n }, (_, i) => prev[i] ?? FALLBACK_LINE_HEIGHT);
+    });
+  }, [gutterLineCount]);
 
   useEffect(() => {
     adjustHeight();
@@ -66,5 +89,5 @@ export function useUnifiedEditGutter({ content, gutterLineCount, measureRef, wra
     };
   }, [bodyRef, remeasureGutter]);
 
-  return { gutterTops, adjustHeight, remeasureGutter };
+  return { gutterTops, gutterHeights, adjustHeight, remeasureGutter };
 }

@@ -3,7 +3,7 @@ import { remapPresentStyleSpans } from './presentStyles';
 import { remapRotateSpans, remapBulletSpans } from './lineReveal';
 import {
   getSentenceStarts,
-  getSentenceSegments,
+  getSectionImageHighlightRanges,
   normalizedOffsetToSentenceIndex,
   contentOffsetToNormalized,
   normalizedOffsetToRawOffset,
@@ -209,23 +209,22 @@ export function buildUnifiedHighlightParts(sectionOrder, sectionsData) {
     const content = sectionsData[id]?.content ?? '';
     const images = sectionsData[id]?.sentenceImages ?? [];
     const presentSceneImages = sectionsData[id]?.presentSceneImages ?? {};
-    const segments = getSentenceSegments(content, images, presentSceneImages);
+    const imageRanges = getSectionImageHighlightRanges(content, images, presentSceneImages);
     const spanStart = unifiedCursor;
-    let localLast = 0;
-
-    for (const seg of segments) {
-      const absStart = spanStart + seg.start;
-      const absEnd = spanStart + seg.end;
-      if (seg.start > localLast) {
-        parts.push({ text: unified.slice(spanStart + localLast, absStart), highlight: false });
-      }
-      parts.push({ text: unified.slice(absStart, absEnd), highlight: seg.hasImage });
-      localLast = seg.end;
+    const boundaries = new Set([0, content.length]);
+    for (const r of imageRanges) {
+      boundaries.add(r.start);
+      boundaries.add(r.end);
     }
-    if (localLast < content.length) {
+    const points = [...boundaries].sort((a, b) => a - b);
+    for (let p = 0; p < points.length - 1; p++) {
+      const ls = points[p];
+      const le = points[p + 1];
+      if (le <= ls) continue;
+      const highlight = imageRanges.some((r) => r.start <= ls && r.end >= le);
       parts.push({
-        text: unified.slice(spanStart + localLast, spanStart + content.length),
-        highlight: false,
+        text: unified.slice(spanStart + ls, spanStart + le),
+        highlight,
       });
     }
     unifiedCursor = spanStart + content.length;

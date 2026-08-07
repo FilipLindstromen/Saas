@@ -90,7 +90,7 @@ function UnifiedEditEditor({
     [sectionOrder, sectionsData]
   );
 
-  const { gutterTops, adjustHeight, remeasureGutter } = useUnifiedEditGutter({
+  const { gutterTops, gutterHeights, adjustHeight, remeasureGutter } = useUnifiedEditGutter({
     content,
     gutterLineCount: gutterLines.length,
     measureRef,
@@ -409,7 +409,7 @@ function UnifiedEditEditor({
           <div
             key={i}
             className="edit-step__gutter-line"
-            style={{ top: gutterTops[i] ?? 0 }}
+            style={{ top: gutterTops[i] ?? 0, height: gutterHeights[i] ?? 28 }}
           >
             {line.headline && (
               <span className="edit-step__gutter-mark edit-step__gutter-mark--headline" title="Headline">
