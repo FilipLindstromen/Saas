@@ -31,6 +31,7 @@ export default function OptionsBar({
   penSnapHV,
   onPenSnapHVChange,
   onCleanUpSketch,
+  onRemoveLayerBackground,
   onSeparateParts,
   defringeMode,
   onDefringeModeChange,
@@ -420,6 +421,16 @@ export default function OptionsBar({
 
       {onCanvasBackgroundColorChange && (
         <div className="options-bar-group options-bar-bg-group" onPointerDown={(e) => e.stopPropagation()}>
+          {onRemoveLayerBackground && (
+            <button
+              type="button"
+              className="options-bar-remove-bg-btn"
+              onClick={onRemoveLayerBackground}
+              title="Remove edge-connected background on the active layer so the document background shows through"
+            >
+              Remove background
+            </button>
+          )}
           <CanvasBackgroundPicker
             value={canvasBackgroundColor}
             brandColors={brandColors}

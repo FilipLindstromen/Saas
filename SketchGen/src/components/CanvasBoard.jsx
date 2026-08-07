@@ -4,6 +4,7 @@ import { ensureGoogleFontLoaded } from '../constants/brand'
 import { drawArrowShape } from '../constants/arrowStyles'
 import { cleanUpSketchImageData, snapPointToHorizontalVertical } from '../utils/sketchAssist'
 import { defringeImageData, defringeRegion } from '../utils/defringe'
+import { removeEdgeConnectedBackground } from '../utils/imageBackground'
 import { separateIntoParts, hitTestPartAt } from '../utils/separateIllustration'
 import {
   maskFromPolygon,
@@ -1383,6 +1384,28 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       pushHistory()
       onCommit?.()
       return true
+    },
+    removeActiveLayerBackground: () => {
+      const layer = getActiveLayer()
+      if (layer?.parts?.length) flattenLayerParts(layer)
+      const ctx = getActiveCtx()
+      if (!ctx) return { ok: false, reason: 'no-layer' }
+      const w = W()
+      const h = H()
+      const before = ctx.getImageData(0, 0, w, h)
+      const imageData = ctx.getImageData(0, 0, w, h)
+      removeEdgeConnectedBackground(imageData, w, h)
+      let removed = 0
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (before.data[i] > 12 && imageData.data[i] < 12) removed += 1
+      }
+      if (removed === 0) return { ok: false, reason: 'nothing-removed' }
+      ctx.putImageData(imageData, 0, 0)
+      hasContentRef.current = true
+      renderComposite()
+      pushHistory()
+      onCommit?.()
+      return { ok: true, removed }
     },
     /** Split the active layer into connected parts (icons, labels, arrows) for individual move. */
     separateActiveLayerIntoParts: () => {

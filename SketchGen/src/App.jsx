@@ -1696,6 +1696,7 @@ export default function App() {
           penSnapHV={penSnapHV}
           onPenSnapHVChange={setPenSnapHV}
           onCleanUpSketch={handleCleanUpSketch}
+          onRemoveLayerBackground={handleRemoveLayerBackground}
           onSeparateParts={handleSeparateParts}
           defringeMode={defringeMode}
           onDefringeModeChange={setDefringeMode}
