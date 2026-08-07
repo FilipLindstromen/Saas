@@ -3,7 +3,7 @@ import TopBar from './components/TopBar'
 import CanvasBoard from './components/CanvasBoard'
 import ToolRail from './components/ToolRail'
 import OptionsBar from './components/OptionsBar'
-import StyleGrid from './components/StyleGrid'
+import StylePickerOverlay from './components/StylePickerOverlay'
 import PromptBar from './components/PromptBar'
 import GenerationProgress from './components/GenerationProgress'
 import GenerationQueue from './components/GenerationQueue'
@@ -110,9 +110,11 @@ export default function App() {
   const [imageStyles, setImageStyles] = useState([])
   const allStyles = useMemo(() => [...STYLES, ...customStyles, ...imageStyles], [customStyles, imageStyles])
   const [selectedStyleId, setSelectedStyleId] = useState(savedSettings.selectedStyleId || DEFAULT_STYLE_ID)
-  const [instructions, setInstructions] = useState(savedSettings.instructions)
+  const [instructions, setInstructions] = useState('')
   const [variations, setVariations] = useState(savedSettings.variations)
   const [styleSectionCollapsed, setStyleSectionCollapsed] = useState(savedSettings.styleSectionCollapsed)
+  const [stylePickerOpen, setStylePickerOpen] = useState(false)
+  const [selectedTextItem, setSelectedTextItem] = useState(null)
   const [improveGeneration, setImproveGeneration] = useState(savedSettings.improveGeneration)
   const [brandColors, setBrandColors] = useState(() => normalizeBrandColors(savedSettings.brandColors))
   const [brandFonts, setBrandFonts] = useState(() => normalizeBrandFonts(savedSettings.brandFonts))
@@ -139,7 +141,9 @@ export default function App() {
   const [genQueue, setGenQueue] = useState([])
   const [generationErrorDetail, setGenerationErrorDetail] = useState(null)
   const genAbortRef = useRef(new Map())
-  const lastGenBatchRef = useRef(null)
+  const genBatchesRef = useRef(new Map())
+  const genQueueRef = useRef([])
+  const queuePumpActiveRef = useRef(false)
   const canceledJobsRef = useRef(new Set())
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -159,6 +163,9 @@ export default function App() {
   const [currentTabId, setCurrentTabId] = useState(null)
   const [hasHydrated, setHasHydrated] = useState(false)
 
+  const instructionsRef = useRef('')
+  instructionsRef.current = instructions
+
   const persistedSettingsRef = useRef(null)
   persistedSettingsRef.current = {
     tool,
@@ -170,7 +177,6 @@ export default function App() {
     zoom,
     canvasFormat,
     selectedStyleId,
-    instructions,
     variations,
     styleSectionCollapsed,
     improveGeneration,
@@ -223,6 +229,18 @@ export default function App() {
     } catch {
       setGenerationHistory([])
     }
+    try {
+      const stored = await kvGet(`instructions:${key}`)
+      if (stored !== undefined && stored !== null) {
+        setInstructions(typeof stored === 'string' ? stored : String(stored))
+      } else {
+        const legacy = settingsFallback.instructions || ''
+        setInstructions(legacy)
+        if (legacy) await kvSet(`instructions:${key}`, legacy)
+      }
+    } catch {
+      setInstructions('')
+    }
     setGeneratedImage(null)
     setSketchSnapshot(null)
     setActiveGenerationId(null)
@@ -244,6 +262,20 @@ export default function App() {
       // ignore — best-effort flush
     }
   }, [])
+
+  const flushInstructions = useCallback(async (key = drawingKeyRef.current) => {
+    if (!key) return
+    try {
+      await kvSet(`instructions:${key}`, instructionsRef.current ?? '')
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const flushDrawingState = useCallback(async () => {
+    await flushAutosave()
+    await flushInstructions()
+  }, [flushAutosave, flushInstructions])
 
   // Hydrate projects/tabs, then this drawing's canvas + generation history, on mount.
   useEffect(() => {
@@ -300,17 +332,34 @@ export default function App() {
       clearTimeout(timer)
       flushAppSettings()
     }
-  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, instructions, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, penSnapHV, generationQuality, addGenerationsAsLayers, canvasBackgroundColor, flushAppSettings])
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, penSnapHV, generationQuality, addGenerationsAsLayers, canvasBackgroundColor, flushAppSettings])
+
+  // Per-drawing instructions (IndexedDB), debounced while typing.
+  useEffect(() => {
+    if (!hasHydrated) return
+    const key = drawingKeyRef.current
+    if (!key) return
+    const timer = setTimeout(() => {
+      kvSet(`instructions:${key}`, instructions).catch(() => {})
+    }, 300)
+    return () => {
+      clearTimeout(timer)
+      kvSet(`instructions:${key}`, instructions).catch(() => {})
+    }
+  }, [instructions, hasHydrated, currentProjectId, currentTabId])
 
   useEffect(() => {
-    const onPageHide = () => flushAppSettings()
+    const onPageHide = () => {
+      flushAppSettings()
+      flushInstructions()
+    }
     window.addEventListener('pagehide', onPageHide)
     window.addEventListener('beforeunload', onPageHide)
     return () => {
       window.removeEventListener('pagehide', onPageHide)
       window.removeEventListener('beforeunload', onPageHide)
     }
-  }, [flushAppSettings])
+  }, [flushAppSettings, flushInstructions])
 
   // A persisted selectedStyleId might reference a custom/image style that was
   // deleted in a previous session — fall back once the real style list loads.
@@ -676,6 +725,21 @@ export default function App() {
     canvasRef.current?.reorderLayers(orderedIdsBottomToTop)
   }, [])
 
+  const handleTextSelectionChange = useCallback((item) => {
+    setSelectedTextItem(item)
+  }, [])
+
+  const handleUpdateSelectedText = useCallback((patch) => {
+    if (!selectedTextItem?.id) return
+    canvasRef.current?.updateTextItem?.(selectedTextItem.id, patch)
+    setSelectedTextItem((prev) => (prev ? { ...prev, ...patch } : null))
+  }, [selectedTextItem?.id])
+
+  const selectedStyle = useMemo(
+    () => allStyles.find((s) => s.id === selectedStyleId) || allStyles[0],
+    [allStyles, selectedStyleId]
+  )
+
   const handleAddCustomStyle = useCallback(({ name, prompt }) => {
     const next = addCustomStyle({ name, prompt })
     setCustomStyles(next)
@@ -725,6 +789,21 @@ export default function App() {
     setView((v) => (v === 'sketch' ? 'generated' : v))
   }, [])
 
+  const handleViewChange = useCallback(
+    (nextView) => {
+      if (nextView === 'generated' || nextView === 'compare') {
+        if (!generatedImage && generationHistory.length > 0) {
+          const latest = generationHistory[0]
+          setSketchSnapshot(latest.sketchDataUrl)
+          setGeneratedImage(latest.dataUrl)
+          setActiveGenerationId(latest.id)
+        }
+      }
+      setView(nextView)
+    },
+    [generatedImage, generationHistory]
+  )
+
   const handleDeleteHistoryEntry = useCallback(async (id) => {
     await deleteGeneration(id)
     const key = drawingKeyRef.current
@@ -743,11 +822,13 @@ export default function App() {
     }
   }, [activeGenerationId])
 
+  useEffect(() => {
+    genQueueRef.current = genQueue
+  }, [genQueue])
+
   const runGenerationJob = useCallback(async (jobId, { qualityOverride } = {}) => {
-    const batch = lastGenBatchRef.current
+    const batch = genBatchesRef.current.get(jobId)
     if (!batch) return { ok: false }
-    const jobMeta = batch.jobs.find((j) => j.id === jobId)
-    if (!jobMeta) return { ok: false }
 
     if (canceledJobsRef.current.has(jobId)) {
       return { ok: false, canceled: true }
@@ -785,7 +866,7 @@ export default function App() {
         id: jobId,
         batchId: batch.batchId,
         drawingKey: batch.key,
-        createdAt: batch.createdAtBase + jobMeta.index,
+        createdAt: batch.createdAtBase + batch.jobIndex,
         dataUrl,
         sketchDataUrl: batch.sketchDataUrl,
         styleId: batch.style.id,
@@ -793,14 +874,18 @@ export default function App() {
         instructions: batch.instructions,
       }
       await addGeneration(entry)
-      if (batch.addGenerationsAsLayers) {
-        await canvasRef.current?.addLayerFromImage?.(dataUrl, `Generation ${jobMeta.index + 1}`)
+      if (batch.addGenerationsAsLayers && batch.key === drawingKeyRef.current) {
+        await canvasRef.current?.addLayerFromImage?.(dataUrl, `Generation ${batch.jobIndex + 1}`)
       }
-      setGenQueue((prev) =>
-        prev.map((j) =>
-          j.id === jobId ? { ...j, status: 'done', dataUrl, historyId: jobId } : j
+      setGenQueue((prev) => {
+        const next = prev.map((j) =>
+          j.id === jobId
+            ? { ...j, status: 'done', dataUrl, historyId: jobId, sketchDataUrl: batch.sketchDataUrl }
+            : j
         )
-      )
+        genQueueRef.current = next
+        return next
+      })
       return { ok: true, dataUrl, jobId }
     } catch (err) {
       if (err?.name === 'AbortError' || canceledJobsRef.current.has(jobId)) {
@@ -831,84 +916,124 @@ export default function App() {
     )
   }, [])
 
+  const processGenerationQueue = useCallback(async () => {
+    if (queuePumpActiveRef.current) return
+    queuePumpActiveRef.current = true
+    setIsGenerating(true)
+
+    let softTimer = null
+
+    try {
+      while (true) {
+        const job = genQueueRef.current.find((j) => j.status === 'queued')
+        if (!job) break
+
+        const batch = genBatchesRef.current.get(job.id)
+        const verb = batch?.referenceImageDataUrl ? 'Improving' : 'Generating'
+        const labelPrefix = job.drawingLabel ? `${job.drawingLabel} — ` : ''
+
+        setGenerationProgress({
+          message: `${labelPrefix}${verb} variation ${job.index + 1}…`,
+          completed: genQueueRef.current.filter((j) => j.status === 'done' && j.batchId === job.batchId).length,
+          total: genQueueRef.current.filter((j) => j.batchId === job.batchId).length,
+          percent: 12,
+        })
+
+        softTimer = setInterval(() => {
+          setGenerationProgress((prev) => {
+            if (!prev || prev.percent >= 92) return prev
+            return { ...prev, percent: Math.min(92, prev.percent + 1) }
+          })
+        }, 700)
+
+        const result = await runGenerationJob(job.id)
+        clearInterval(softTimer)
+        softTimer = null
+
+        if (result.ok && job.drawingKey === drawingKeyRef.current) {
+          await pruneGenerations(job.drawingKey)
+          await refreshHistory()
+          setSketchSnapshot(batch?.sketchDataUrl ?? sketchSnapshot)
+          setGeneratedImage(result.dataUrl)
+          setActiveGenerationId(result.jobId)
+          setView('generated')
+        } else if (result.error && job.drawingKey === drawingKeyRef.current) {
+          const classified = classifyGenerationError(result.error)
+          setGenerationErrorDetail(classified)
+          setError(classified.message)
+        }
+      }
+    } finally {
+      if (softTimer) clearInterval(softTimer)
+      queuePumpActiveRef.current = false
+      const stillActive = genQueueRef.current.some((j) => j.status === 'queued' || j.status === 'running')
+      setIsGenerating(stillActive)
+      if (!stillActive) setGenerationProgress(null)
+    }
+  }, [runGenerationJob, refreshHistory, sketchSnapshot])
+
   const handleRetryGenerationJob = useCallback(
-    async (jobId) => {
+    (jobId) => {
       canceledJobsRef.current.delete(jobId)
       setError('')
       setGenerationErrorDetail(null)
-      setIsGenerating(true)
-      const result = await runGenerationJob(jobId)
-      await pruneGenerations(drawingKeyRef.current)
-      await refreshHistory()
-      if (result.ok) {
-        setSketchSnapshot(lastGenBatchRef.current?.sketchDataUrl ?? sketchSnapshot)
-        setGeneratedImage(result.dataUrl)
-        setActiveGenerationId(result.jobId)
-        setView('generated')
-      } else if (result.error) {
-        const classified = classifyGenerationError(result.error)
-        setGenerationErrorDetail(classified)
-        setError(classified.message)
-      }
-      setIsGenerating(false)
+      setGenQueue((prev) => {
+        const next = prev.map((j) =>
+          j.id === jobId ? { ...j, status: 'queued', error: null } : j
+        )
+        genQueueRef.current = next
+        return next
+      })
+      void processGenerationQueue()
     },
-    [runGenerationJob, refreshHistory, sketchSnapshot]
+    [processGenerationQueue]
   )
 
   const handleUseQueueResult = useCallback((job) => {
     if (!job?.dataUrl) return
     setGeneratedImage(job.dataUrl)
     setActiveGenerationId(job.historyId || job.id)
-    const batchSketch = lastGenBatchRef.current?.sketchDataUrl
+    const batchSketch = job.sketchDataUrl ?? genBatchesRef.current.get(job.id)?.sketchDataUrl
     if (batchSketch) setSketchSnapshot(batchSketch)
     setView('generated')
   }, [])
 
   const handleDismissGenerationQueue = useCallback(() => {
     setGenQueue([])
+    genQueueRef.current = []
   }, [])
 
   const handleRetryFailedGenerations = useCallback(
-    async (asDraft = false) => {
+    (asDraft = false) => {
       const failedIds = genQueue.filter((j) => j.status === 'error').map((j) => j.id)
       if (!failedIds.length) return
       setError('')
       setGenerationErrorDetail(null)
-      setIsGenerating(true)
-      const qualityOverride = asDraft ? 'low' : undefined
-      const results = await Promise.all(
-        failedIds.map((id) => {
-          canceledJobsRef.current.delete(id)
-          return runGenerationJob(id, { qualityOverride })
-        })
-      )
-      await pruneGenerations(drawingKeyRef.current)
-      await refreshHistory()
-      const firstSuccess = results.find((r) => r.ok)
-      if (firstSuccess) {
-        setSketchSnapshot(lastGenBatchRef.current?.sketchDataUrl ?? sketchSnapshot)
-        setGeneratedImage(firstSuccess.dataUrl)
-        setActiveGenerationId(firstSuccess.jobId)
-        setView('generated')
-      } else {
-        const failed = results.find((r) => r.error)
-        if (failed) {
-          const classified = classifyGenerationError(failed.error)
-          setGenerationErrorDetail(classified)
-          setError(classified.message)
-        }
+      for (const id of failedIds) {
+        canceledJobsRef.current.delete(id)
+        const batch = genBatchesRef.current.get(id)
+        if (batch && asDraft) genBatchesRef.current.set(id, { ...batch, quality: 'low' })
       }
-      setIsGenerating(false)
+      setGenQueue((prev) => {
+        const next = prev.map((j) =>
+          failedIds.includes(j.id) ? { ...j, status: 'queued', error: null } : j
+        )
+        genQueueRef.current = next
+        return next
+      })
+      void processGenerationQueue()
     },
-    [genQueue, runGenerationJob, refreshHistory, sketchSnapshot]
+    [genQueue, processGenerationQueue]
   )
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(() => {
     setError('')
     setGenerationErrorDetail(null)
     const board = canvasRef.current
     const key = drawingKeyRef.current
+    if (!key) return
     const style = allStyles.find((s) => s.id === selectedStyleId) || allStyles[0]
+    const drawingLabel = tabs.find((t) => t.id === currentTabId)?.name ?? 'Drawing'
 
     if (improveGeneration) {
       if (!generatedImage) {
@@ -929,128 +1054,50 @@ export default function App() {
       : board.exportPNG()
     const referenceImageDataUrl = improveGeneration ? generatedImage : null
     const total = variations
-    const verb = improveGeneration ? 'Improving' : 'Generating'
 
-    canceledJobsRef.current = new Set()
     const batchId = `batch-${Date.now()}`
     const createdAtBase = Date.now()
-    const jobs = Array.from({ length: total }, (_, i) => ({
-      id: `${batchId}-${i}`,
-      index: i,
-      status: 'queued',
-      dataUrl: null,
-      error: null,
-      historyId: null,
-    }))
-    setGenQueue(jobs)
-
-    lastGenBatchRef.current = {
-      batchId,
-      createdAtBase,
-      jobs,
-      sketchDataUrl,
-      referenceImageDataUrl,
-      style,
-      instructions,
-      formatId: canvasFormat,
-      brand: { colors: brandColors, fonts: brandFonts },
-      useBrandColors: useBrandColorsInGeneration,
-      key,
-      quality: generationQuality,
-      addGenerationsAsLayers,
-    }
-
-    setIsGenerating(true)
-    setGenerationProgress({
-      message: improveGeneration ? 'Preparing reference image…' : 'Preparing sketch…',
-      completed: 0,
-      total,
-      percent: 5,
+    const jobs = Array.from({ length: total }, (_, i) => {
+      const id = `${batchId}-${i}`
+      genBatchesRef.current.set(id, {
+        batchId,
+        createdAtBase,
+        jobIndex: i,
+        sketchDataUrl,
+        referenceImageDataUrl,
+        style,
+        instructions,
+        formatId: canvasFormat,
+        brand: { colors: brandColors, fonts: brandFonts },
+        useBrandColors: useBrandColorsInGeneration,
+        key,
+        quality: generationQuality,
+        addGenerationsAsLayers,
+      })
+      return {
+        id,
+        batchId,
+        index: i,
+        status: 'queued',
+        dataUrl: null,
+        error: null,
+        historyId: null,
+        drawingKey: key,
+        drawingLabel,
+      }
     })
 
-    let softTimer = setInterval(() => {
-      setGenerationProgress((prev) => {
-        if (!prev || prev.completed >= prev.total) return prev
-        const maxBeforeDone = 8 + (prev.completed / prev.total) * 82 + (prev.total > 1 ? 8 : 18)
-        if (prev.percent >= maxBeforeDone) return prev
-        return { ...prev, percent: Math.min(maxBeforeDone, prev.percent + 1) }
-      })
-    }, 700)
-
-    let completed = 0
-
-    try {
-      setGenerationProgress({
-        message:
-          total > 1
-            ? `${verb} ${total} variation${total > 1 ? 's' : ''} with the model…`
-            : `${verb} illustration with the model…`,
-        completed: 0,
-        total,
-        percent: 10,
-      })
-
-      const results = await Promise.all(
-        jobs.map(async (job) => {
-          if (canceledJobsRef.current.has(job.id)) {
-            return { ok: false, canceled: true }
-          }
-          const result = await runGenerationJob(job.id)
-          if (result.ok) {
-            completed += 1
-            const pct = Math.round(10 + (completed / total) * 85)
-            setGenerationProgress({
-              message:
-                total > 1
-                  ? `${verb} variation ${completed} of ${total}…`
-                  : `${verb} illustration…`,
-              completed,
-              total,
-              percent: pct,
-            })
-          }
-          return result
-        })
-      )
-
-      setGenerationProgress({
-        message: 'Saving to history…',
-        completed: results.filter((r) => r.ok).length,
-        total,
-        percent: 98,
-      })
-      await pruneGenerations(key)
-      await refreshHistory()
-
-      const firstSuccess = results.find((r) => r.ok)
-      if (firstSuccess) {
-        setSketchSnapshot(sketchDataUrl)
-        setGeneratedImage(firstSuccess.dataUrl)
-        setActiveGenerationId(firstSuccess.jobId)
-        setView('generated')
-      } else {
-        const failed = results.find((r) => r.error && !r.canceled)
-        if (failed) {
-          const classified = classifyGenerationError(failed.error)
-          setGenerationErrorDetail(classified)
-          setError(classified.message)
-        }
-      }
-    } catch (err) {
-      const classified = classifyGenerationError(err)
-      setGenerationErrorDetail(classified)
-      setError(classified.message)
-    } finally {
-      clearInterval(softTimer)
-      setGenerationProgress(null)
-      setIsGenerating(false)
-    }
+    setGenQueue((prev) => {
+      const next = [...prev.filter((j) => j.status !== 'canceled'), ...jobs]
+      genQueueRef.current = next
+      return next
+    })
+    void processGenerationQueue()
   }, [
     allStyles,
     selectedStyleId,
     instructions,
     variations,
-    refreshHistory,
     canvasFormat,
     improveGeneration,
     generatedImage,
@@ -1060,7 +1107,9 @@ export default function App() {
     useBrandColorsInGeneration,
     generationQuality,
     addGenerationsAsLayers,
-    runGenerationJob,
+    processGenerationQueue,
+    tabs,
+    currentTabId,
   ])
 
   const handleExport = useCallback(
@@ -1075,17 +1124,17 @@ export default function App() {
 
   const switchProject = useCallback(async (projectId) => {
     if (projectId === currentProjectId) return
-    await flushAutosave()
+    await flushDrawingState()
     saveCurrentProjectId(projectId)
     const { tabs: nextTabs, tabId } = ensureProjectTabs(projectId)
     setCurrentProjectId(projectId)
     setTabs(nextTabs)
     setCurrentTabId(tabId)
     await loadDrawing(projectId, tabId)
-  }, [currentProjectId, flushAutosave, loadDrawing])
+  }, [currentProjectId, flushDrawingState, loadDrawing])
 
   const createProject = useCallback(async () => {
-    await flushAutosave()
+    await flushDrawingState()
     const id = generateProjectId()
     const nextProjects = [...projects, { id, name: 'Untitled', updatedAt: Date.now() }]
     saveProjects(nextProjects)
@@ -1097,7 +1146,7 @@ export default function App() {
     setTabs(getProjectTabs(id))
     setCurrentTabId(tabId)
     await loadDrawing(id, tabId)
-  }, [projects, flushAutosave, loadDrawing])
+  }, [projects, flushDrawingState, loadDrawing])
 
   const renameProject = useCallback((id, name) => {
     const next = projects.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p))
@@ -1114,6 +1163,7 @@ export default function App() {
       const key = drawingKeyFor(id, t.id)
       // eslint-disable-next-line no-await-in-loop
       await kvDelete(`canvas:${key}`).catch(() => {})
+      await kvDelete(`instructions:${key}`).catch(() => {})
       // eslint-disable-next-line no-await-in-loop
       await deleteGenerationsForDrawing(key).catch(() => {})
     }
@@ -1139,14 +1189,14 @@ export default function App() {
 
   const switchTab = useCallback(async (tabId) => {
     if (tabId === currentTabId) return
-    await flushAutosave()
+    await flushDrawingState()
     saveCurrentTabId(currentProjectId, tabId)
     setCurrentTabId(tabId)
     await loadDrawing(currentProjectId, tabId)
-  }, [currentTabId, currentProjectId, flushAutosave, loadDrawing])
+  }, [currentTabId, currentProjectId, flushDrawingState, loadDrawing])
 
   const addTab = useCallback(async () => {
-    await flushAutosave()
+    await flushDrawingState()
     const name = `Drawing ${tabs.length + 1}`
     const tabId = addProjectTab(currentProjectId, name)
     const nextTabs = getProjectTabs(currentProjectId)
@@ -1154,7 +1204,7 @@ export default function App() {
     setTabs(nextTabs)
     setCurrentTabId(tabId)
     await loadDrawing(currentProjectId, tabId)
-  }, [currentProjectId, tabs.length, flushAutosave, loadDrawing])
+  }, [currentProjectId, tabs.length, flushDrawingState, loadDrawing])
 
   const renameTab = useCallback((tabId, name) => {
     renameProjectTab(currentProjectId, tabId, name)
@@ -1166,6 +1216,7 @@ export default function App() {
     const wasCurrentTab = tabId === currentTabId
     const key = drawingKeyFor(currentProjectId, tabId)
     await kvDelete(`canvas:${key}`).catch(() => {})
+    await kvDelete(`instructions:${key}`).catch(() => {})
     await deleteGenerationsForDrawing(key).catch(() => {})
 
     const fallbackTabId = removeProjectTab(currentProjectId, tabId)
@@ -1184,8 +1235,8 @@ export default function App() {
     <div className="app">
       <TopBar
         view={view}
-        onViewChange={setView}
-        hasGenerated={Boolean(generatedImage)}
+        onViewChange={handleViewChange}
+        hasGenerated={generationHistory.length > 0 || Boolean(generatedImage)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onOpenSettings={handleOpenSettings}
@@ -1296,6 +1347,13 @@ export default function App() {
             setCanvasFormat(id)
             scheduleAutosave()
           }}
+          canvasBackgroundColor={canvasBackgroundColor}
+          onCanvasBackgroundColorChange={(hex) => {
+            setCanvasBackgroundColor(hex)
+            scheduleAutosave()
+          }}
+          selectedTextItem={selectedTextItem}
+          onUpdateSelectedText={handleUpdateSelectedText}
         />
       )}
 
@@ -1323,7 +1381,6 @@ export default function App() {
               penSnapHV={penSnapHV}
               backgroundColor={canvasBackgroundColor}
               brandColors={brandColors}
-              onBackgroundColorChange={setCanvasBackgroundColor}
               zoom={zoom}
               formatId={canvasFormat}
               placing={placing}
@@ -1340,6 +1397,7 @@ export default function App() {
                 syncSketchContent()
               }}
               onSelectionChange={handleSelectionChange}
+              onTextSelectionChange={handleTextSelectionChange}
             />
           </div>
 
@@ -1376,20 +1434,9 @@ export default function App() {
             />
           )}
           {tool !== 'stamp' && (
-            <StyleGrid
-              styles={allStyles}
-              selectedId={selectedStyleId}
-              onSelect={setSelectedStyleId}
-              onAddCustomStyle={handleAddCustomStyle}
-              onDeleteCustomStyle={handleDeleteCustomStyle}
-              onUploadImageStyle={handleUploadImageStyle}
-              onDeleteImageStyle={handleDeleteImageStyle}
-              collapsed={styleSectionCollapsed}
-              onCollapsedChange={setStyleSectionCollapsed}
-            />
-          )}
-          {tool !== 'stamp' && (
             <PromptBar
+              selectedStyle={selectedStyle}
+              onOpenStylePicker={() => setStylePickerOpen(true)}
               value={instructions}
               onChange={setInstructions}
               onGenerate={handleGenerate}
@@ -1448,6 +1495,18 @@ export default function App() {
           onClose={() => setImageContextMenu(null)}
         />
       )}
+
+      <StylePickerOverlay
+        isOpen={stylePickerOpen}
+        onClose={() => setStylePickerOpen(false)}
+        styles={allStyles}
+        selectedId={selectedStyleId}
+        onSelect={setSelectedStyleId}
+        onAddCustomStyle={handleAddCustomStyle}
+        onDeleteCustomStyle={handleDeleteCustomStyle}
+        onUploadImageStyle={handleUploadImageStyle}
+        onDeleteImageStyle={handleDeleteImageStyle}
+      />
     </div>
   )
 }

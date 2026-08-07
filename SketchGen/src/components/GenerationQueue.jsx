@@ -38,7 +38,10 @@ export default function GenerationQueue({
                 <div className="generation-queue-thumb generation-queue-thumb-empty" />
               )}
               <div className="generation-queue-meta">
-                <span className="generation-queue-title">Variation {job.index + 1}</span>
+                <span className="generation-queue-title">
+                  {job.drawingLabel ? `${job.drawingLabel} · ` : ''}
+                  Variation {job.index + 1}
+                </span>
                 <span className="generation-queue-status">{STATUS_LABEL[job.status] || job.status}</span>
                 {job.error && <span className="generation-queue-error">{job.error}</span>}
               </div>

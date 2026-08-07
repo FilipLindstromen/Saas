@@ -18,7 +18,13 @@ import {
   constrainImageDataToMask,
   deletePixelsInMask,
 } from '../utils/selectionMask'
-import CanvasBackgroundPicker from './CanvasBackgroundPicker'
+import {
+  createTextItem,
+  drawTextItemsSync,
+  hitTestTextItem,
+  serializeTextItems,
+  measureTextItem,
+} from '../utils/textLayerItems'
 import './CanvasBoard.css'
 
 /** @deprecated use getSketchFormat — kept for any external imports */
@@ -244,6 +250,17 @@ function flattenLayerParts(layer) {
   layer.parts = null
 }
 
+function flattenLayerTextItems(layer) {
+  if (!layer?.textItems?.length) return
+  drawTextItemsSync(layer.ctx, layer.textItems)
+  layer.textItems = []
+}
+
+function cloneTextItems(items) {
+  if (!items?.length) return undefined
+  return items.map((t) => ({ ...t }))
+}
+
 function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH) {
   const { canvas, ctx } = createLayerCanvas(newW, newH)
   const scale = Math.min(newW / oldW, newH / oldH)
@@ -268,8 +285,6 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     arrowStyleId = 'straight',
     penSnapHV = false,
     backgroundColor = BACKGROUND_COLOR,
-    brandColors,
-    onBackgroundColorChange,
     placing,
     onPlaced,
     onHistoryChange,
@@ -277,6 +292,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onCommit,
     onDropFile,
     onSelectionChange,
+    onTextSelectionChange,
   },
   ref
 ) {
@@ -331,6 +347,10 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const selectionDragRef = useRef(null)
   const [selectedPartId, setSelectedPartId] = useState(null)
   const [partSelectionRect, setPartSelectionRect] = useState(null)
+  const selectedTextIdRef = useRef(null)
+  const [textSelectionRect, setTextSelectionRect] = useState(null)
+  const textDragRef = useRef(null)
+  const moveTextOriginsRef = useRef(null)
   const [lassoPreview, setLassoPreview] = useState(null)
   const [selectionOutline, setSelectionOutline] = useState(null)
   const [pixelSelectionOverlayUrl, setPixelSelectionOverlayUrl] = useState(null)
@@ -393,6 +413,39 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       setSelectedPartId(null)
       setPartSelectionRect(null)
     }
+    if (layer?.textItems?.length) {
+      flattenLayerTextItems(layer)
+      clearTextSelection()
+    }
+  }
+
+  const syncTextSelectionRect = (textId) => {
+    const layer = getActiveLayer()
+    const ctx = ctxRef.current
+    if (!textId || !layer?.textItems?.length || !ctx) {
+      setTextSelectionRect(null)
+      return
+    }
+    const item = layer.textItems.find((t) => t.id === textId)
+    if (!item) {
+      setTextSelectionRect(null)
+      return
+    }
+    const pad = 4
+    const { w, h } = measureTextItem(ctx, item)
+    setTextSelectionRect({ x: item.x - pad, y: item.y - pad, w: w + pad * 2, h: h + pad * 2 })
+  }
+
+  function clearTextSelection() {
+    selectedTextIdRef.current = null
+    setTextSelectionRect(null)
+    onTextSelectionChange?.(null)
+  }
+
+  function selectTextItem(item) {
+    selectedTextIdRef.current = item?.id ?? null
+    syncTextSelectionRect(item?.id)
+    onTextSelectionChange?.(item ? { ...item } : null)
   }
 
   const syncSelectionRectForPart = (partId) => {
@@ -433,7 +486,10 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       targetCtx.clearRect(0, 0, W(), H())
     }
     for (const layer of layersRef.current) {
-      if (layer.visible) targetCtx.drawImage(layer.canvas, 0, 0)
+      if (layer.visible) {
+        targetCtx.drawImage(layer.canvas, 0, 0)
+        drawTextItemsSync(targetCtx, layer.textItems)
+      }
     }
     const sel = floatingSelectionRef.current
     if (sel) {
@@ -666,7 +722,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
             })),
           }
         }
-        return { ...base, imageData: l.ctx.getImageData(0, 0, w, h) }
+        return { ...base, imageData: l.ctx.getImageData(0, 0, w, h), textItems: cloneTextItems(l.textItems) }
       }),
       activeLayerId: activeLayerIdRef.current,
       floatingSelection: serializeFloatingSelection(floatingSelectionRef.current),
@@ -689,7 +745,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         return layer
       }
       ctx.putImageData(saved.imageData, 0, 0)
-      return { id: saved.id, name: saved.name, visible: saved.visible, kind: saved.kind, canvas, ctx }
+      return {
+        id: saved.id,
+        name: saved.name,
+        visible: saved.visible,
+        kind: saved.kind,
+        canvas,
+        ctx,
+        textItems: cloneTextItems(saved.textItems),
+      }
     })
     activeLayerIdRef.current = entry.activeLayerId
     floatingSelectionRef.current = deserializeFloatingSelection(entry.floatingSelection)
@@ -801,12 +865,25 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     },
     hasContent: () => hasContentRef.current,
     clear: () => {
-      const ctx = getActiveCtx()
+      const layer = getActiveLayer()
+      const ctx = layer?.ctx
       if (!ctx) return
       ctx.clearRect(0, 0, W(), H())
+      if (layer) layer.textItems = []
+      clearTextSelection()
       renderComposite()
       pushHistory()
     },
+    updateTextItem: (id, patch) => {
+      const layer = getActiveLayer()
+      const item = layer?.textItems?.find((t) => t.id === id)
+      if (!item) return
+      Object.assign(item, patch)
+      selectTextItem(item)
+      renderComposite()
+      pushHistory()
+    },
+    clearTextSelection: () => clearTextSelection(),
     undo: () => {
       if (historyIndexRef.current <= 0) return
       historyIndexRef.current -= 1
@@ -872,7 +949,14 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         const dw = img.width * scale
         const dh = img.height * scale
         ctx.drawImage(img, (W() - dw) / 2, (H() - dh) / 2, dw, dh)
-        rebuilt.push({ id: saved.id, name: saved.name, visible: saved.visible, canvas, ctx })
+        rebuilt.push({
+          id: saved.id,
+          name: saved.name,
+          visible: saved.visible,
+          canvas,
+          ctx,
+          textItems: cloneTextItems(saved.textItems),
+        })
         const num = parseInt(String(saved.id).replace('layer-', ''), 10)
         if (!Number.isNaN(num)) maxCounter = Math.max(maxCounter, num)
       }
@@ -883,7 +967,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       renderComposite()
       notifyLayers()
       historyRef.current = [{
-        layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, imageData: l.ctx.getImageData(0, 0, W(), H()) })),
+        layers: layersRef.current.map((l) => ({
+          id: l.id,
+          name: l.name,
+          visible: l.visible,
+          imageData: l.ctx.getImageData(0, 0, W(), H()),
+          textItems: cloneTextItems(l.textItems),
+        })),
         activeLayerId: activeLayerIdRef.current,
       }]
       historyIndexRef.current = 0
@@ -923,7 +1013,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       }
       return {
         formatId: formatRef.current,
-        layers: layersRef.current.map((l) => ({ id: l.id, name: l.name, visible: l.visible, dataUrl: l.canvas.toDataURL('image/png') })),
+        layers: layersRef.current.map((l) => ({
+          id: l.id,
+          name: l.name,
+          visible: l.visible,
+          dataUrl: l.canvas.toDataURL('image/png'),
+          textItems: serializeTextItems(l.textItems),
+        })),
         activeLayerId: activeLayerIdRef.current,
       }
     },
@@ -1206,23 +1302,25 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       setTextEditor(null)
       return
     }
-    const ctx = getActiveCtx()
-    if (!ctx) {
+    const layer = getActiveLayer()
+    if (!layer) {
       setTextEditor(null)
       return
     }
     const family = textFontFamilyRef.current
     const fontSize = textFontSizeRef.current
-    const weight = textFontBoldRef.current ? 'bold' : 'normal'
-    await ensureGoogleFontLoaded(family)
-    ctx.font = `${weight} ${fontSize}px "${family}", sans-serif`
-    ctx.fillStyle = colorRef.current
-    ctx.textBaseline = 'top'
-    const lines = editor.value.replace(/\r\n/g, '\n').split('\n')
-    const lineHeight = fontSize * 1.25
-    lines.forEach((line, i) => {
-      ctx.fillText(line, editor.x, editor.y + i * lineHeight)
+    const item = createTextItem({
+      x: editor.x,
+      y: editor.y,
+      text: editor.value,
+      fontFamily: family,
+      fontSize,
+      fontBold: textFontBoldRef.current,
+      color: colorRef.current,
     })
+    if (!layer.textItems) layer.textItems = []
+    layer.textItems.push(item)
+    await ensureGoogleFontLoaded(family)
     hasContentRef.current = true
     renderComposite()
     pushHistory()
@@ -1301,6 +1399,24 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     if (currentTool === 'move') {
       const layer = getActiveLayer()
+      const compositeCtx = ctxRef.current
+      if (layer?.textItems?.length && compositeCtx) {
+        for (let i = layer.textItems.length - 1; i >= 0; i -= 1) {
+          const t = layer.textItems[i]
+          if (hitTestTextItem(compositeCtx, t, pos.x, pos.y)) {
+            selectTextItem(t)
+            textDragRef.current = {
+              textId: t.id,
+              startX: pos.x,
+              startY: pos.y,
+              origX: t.x,
+              origY: t.y,
+            }
+            drawingRef.current = true
+            return
+          }
+        }
+      }
       if (layer?.parts?.length) {
         const hit = hitTestPartAt(layer.parts, pos.x, pos.y)
         if (hit) {
@@ -1319,9 +1435,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         }
         setSelectedPartId(null)
         setPartSelectionRect(null)
+        clearTextSelection()
         return
       }
+      clearTextSelection()
       moveSnapshotRef.current = ctx.getImageData(0, 0, W(), H())
+      moveTextOriginsRef.current = layer?.textItems?.map((t) => ({ id: t.id, x: t.x, y: t.y })) ?? null
       moveStartRef.current = pos
       drawingRef.current = true
       return
@@ -1426,6 +1545,18 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     if (currentTool === 'move') {
       const layer = getActiveLayer()
+      if (textDragRef.current && layer?.textItems) {
+        const drag = textDragRef.current
+        const item = layer.textItems.find((t) => t.id === drag.textId)
+        if (item) {
+          item.x = Math.round(drag.origX + pos.x - drag.startX)
+          item.y = Math.round(drag.origY + pos.y - drag.startY)
+          syncTextSelectionRect(item.id)
+          onTextSelectionChange?.({ ...item })
+          renderComposite()
+        }
+        return
+      }
       if (partDragRef.current && layer?.parts?.length) {
         const drag = partDragRef.current
         const part = layer.parts.find((p) => p.id === drag.partId)
@@ -1442,6 +1573,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       const dy = Math.round(pos.y - moveStartRef.current.y)
       ctx.clearRect(0, 0, W(), H())
       ctx.putImageData(moveSnapshotRef.current, dx, dy)
+      const origins = moveTextOriginsRef.current
+      if (origins?.length && layer?.textItems) {
+        for (const o of origins) {
+          const item = layer.textItems.find((t) => t.id === o.id)
+          if (item) {
+            item.x = Math.round(o.x + dx)
+            item.y = Math.round(o.y + dy)
+          }
+        }
+      }
       renderComposite()
       return
     }
@@ -1520,12 +1661,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     if (drawingRef.current && toolRef.current === 'move') {
       drawingRef.current = false
-      if (partDragRef.current) {
+      if (textDragRef.current) {
+        textDragRef.current = null
+        pushHistory()
+      } else if (partDragRef.current) {
         partDragRef.current = null
         pushHistory()
       } else {
         moveSnapshotRef.current = null
         moveStartRef.current = null
+        moveTextOriginsRef.current = null
         pushHistory()
       }
       return
@@ -1579,6 +1724,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onDropFile?.(file)
   }
 
+  useEffect(() => {
+    if (tool !== 'move') clearTextSelection()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool])
+
   const aspect = getSketchFormat(formatId)
   const canvasW = W()
   const canvasH = H()
@@ -1587,15 +1737,6 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   return (
     <div className="sketch-canvas-viewport" onDragOver={handleDragOver} onDrop={handleDrop}>
       <div className="sketch-canvas-wrap">
-        {onBackgroundColorChange && (
-          <div onPointerDown={(e) => e.stopPropagation()}>
-            <CanvasBackgroundPicker
-              value={backgroundColor}
-              brandColors={brandColors}
-              onChange={onBackgroundColorChange}
-            />
-          </div>
-        )}
         <div
           className="sketch-canvas-stage"
           style={{ aspectRatio: `${aspect.width} / ${aspect.height}`, backgroundColor }}
@@ -1618,6 +1759,18 @@ const CanvasBoard = forwardRef(function CanvasBoard(
                 top: `${(partSelectionRect.y / canvasH) * 100}%`,
                 width: `${(partSelectionRect.w / canvasW) * 100}%`,
                 height: `${(partSelectionRect.h / canvasH) * 100}%`,
+              }}
+              aria-hidden
+            />
+          )}
+          {textSelectionRect && canvasW > 0 && canvasH > 0 && (
+            <div
+              className="canvas-text-selection"
+              style={{
+                left: `${(textSelectionRect.x / canvasW) * 100}%`,
+                top: `${(textSelectionRect.y / canvasH) * 100}%`,
+                width: `${(textSelectionRect.w / canvasW) * 100}%`,
+                height: `${(textSelectionRect.h / canvasH) * 100}%`,
               }}
               aria-hidden
             />

@@ -1,5 +1,6 @@
 .sketchgen-top-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
@@ -10,6 +11,26 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.sketchgen-top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-self: start;
+  min-width: 0;
+}
+
+.sketchgen-top-bar-center {
+  justify-self: center;
+}
+
+.sketchgen-top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-self: end;
+  flex-shrink: 0;
 }
 
 .sketchgen-logo {
@@ -52,10 +73,6 @@
 .sketchgen-view-switch button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.sketchgen-top-bar-spacer {
-  flex: 1;
 }
 
 .sketchgen-icon-btn {

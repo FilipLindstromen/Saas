@@ -139,3 +139,10 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.prompt-bar-queue-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}

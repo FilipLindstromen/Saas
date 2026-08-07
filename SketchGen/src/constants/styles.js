@@ -87,6 +87,12 @@ export const STYLES = [
     emoji: '🗒️',
     prompt: 'a clean black-marker sketchnote / visual-note-taking illustration on a plain white background: bold confident black outline linework, simple stick-figure people with circle heads, minimalist doodle icons, hand-drawn boxes, arrows and connectors linking ideas, circled numbered step markers, and neat hand-lettered text labels integrated directly into the diagram — in the style of graphic recording / visual thinking notes, mostly monochrome with at most one small color accent',
   },
+  {
+    id: 'web-design',
+    name: 'Web Design',
+    emoji: '🌐',
+    prompt: 'a modern clean web design mockup illustration: polished UI layout with generous whitespace, subtle shadows, rounded cards, clear typography hierarchy, hero section, navigation bar, feature grids, and cohesive SaaS-style color accents — flat-to-soft-3D vector look suitable for landing pages and product marketing, crisp readable text placeholders, and balanced responsive-style composition',
+  },
 ]
 
 export const DEFAULT_STYLE_ID = STYLES[0].id

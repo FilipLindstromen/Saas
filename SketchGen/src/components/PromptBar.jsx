@@ -1,8 +1,11 @@
 import './PromptBar.css'
+import './StylePickerOverlay.css'
 import GenerationProgress from './GenerationProgress'
 import { estimateGenerationCost } from '../utils/generationCost'
 
 export default function PromptBar({
+  selectedStyle,
+  onOpenStylePicker,
   value,
   onChange,
   onGenerate,
@@ -27,6 +30,13 @@ export default function PromptBar({
     <div className="prompt-bar-section side-panel">
       <div className="side-panel-header">Instructions (optional)</div>
       <div className="side-panel-body">
+      <div className="prompt-bar-style-row">
+        <button type="button" className="prompt-bar-style-btn" onClick={onOpenStylePicker}>
+          <span className="prompt-bar-style-btn-emoji" aria-hidden>{selectedStyle?.emoji ?? '✨'}</span>
+          <span className="prompt-bar-style-btn-label">{selectedStyle?.name ?? 'Choose style'}</span>
+          <span className="prompt-bar-style-btn-chevron" aria-hidden>›</span>
+        </button>
+      </div>
       <textarea
         className="prompt-bar-input"
         placeholder={
@@ -129,10 +139,9 @@ export default function PromptBar({
         type="button"
         className="prompt-bar-generate"
         onClick={onGenerate}
-        disabled={isGenerating}
       >
         {isGenerating
-          ? (generationProgress ? `${Math.round(generationProgress.percent)}%` : 'Working…')
+          ? (generationProgress ? `${Math.round(generationProgress.percent)}%` : 'Add to queue')
           : improveGeneration
             ? variations > 1
               ? `Improve ${variations} variations`
@@ -141,6 +150,9 @@ export default function PromptBar({
               ? `Generate ${variations} variations`
               : 'Generate'}
       </button>
+      {isGenerating && (
+        <p className="prompt-bar-queue-hint">You can switch drawings or queue more while jobs run.</p>
+      )}
       </div>
     </div>
   )

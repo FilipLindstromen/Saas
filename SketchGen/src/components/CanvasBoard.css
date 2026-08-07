@@ -51,6 +51,15 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-primary) 40%, transparent);
 }
 
+.canvas-text-selection {
+  position: absolute;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 2px solid var(--accent, #ff6b35);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-primary) 40%, transparent);
+}
+
 .canvas-pixel-selection-overlay {
   position: absolute;
   inset: 0;

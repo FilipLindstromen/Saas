@@ -242,3 +242,20 @@
 .options-bar-selection-rotation input:disabled {
   opacity: 0.45;
 }
+
+.options-bar-bg-group {
+  position: relative;
+}
+
+.options-bar-bg-group .canvas-bg-picker {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: auto;
+}
+
+.options-bar-bg-group .canvas-bg-picker-trigger {
+  backdrop-filter: none;
+  box-shadow: none;
+  height: 34px;
+}

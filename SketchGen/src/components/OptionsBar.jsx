@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { SKETCH_FORMATS } from '../utils/canvasFormat'
 import { BRAND_FONT_ROLES, GOOGLE_FONT_OPTIONS } from '../constants/brand'
 import { ARROW_STYLES } from '../constants/arrowStyles'
+import CanvasBackgroundPicker from './CanvasBackgroundPicker'
 import './OptionsBar.css'
 
 const PRESET_COLORS = ['#1a1a1a', '#e03131', '#f08c00', '#2f9e44', '#1971c2', '#9c36b5', '#ffffff']
@@ -49,10 +50,18 @@ export default function OptionsBar({
   onImportFile,
   canvasFormat,
   onCanvasFormatChange,
+  canvasBackgroundColor,
+  onCanvasBackgroundColorChange,
+  selectedTextItem,
+  onUpdateSelectedText,
 }) {
   const fileInputRef = useRef(null)
   const showDrawColor = tool === 'pen' || tool === 'fill' || tool === 'line' || tool === 'rect' || tool === 'circle' || tool === 'arrow'
-  const showTextSettings = tool === 'text'
+  const showTextSettings = tool === 'text' || Boolean(selectedTextItem)
+  const textFamily = selectedTextItem?.fontFamily ?? textFontFamily
+  const textSize = selectedTextItem?.fontSize ?? textFontSize
+  const textBold = selectedTextItem?.fontBold ?? textFontBold
+  const textColor = selectedTextItem?.color ?? color
   const showArrowSettings = tool === 'arrow'
   const showInkDynamics = tool === 'pen' || tool === 'eraser'
   const showBrushSize = tool !== 'stamp' && tool !== 'move' && tool !== 'text' && tool !== 'select' && tool !== 'wand'
@@ -95,8 +104,12 @@ export default function OptionsBar({
             <select
               id="sketch-text-font"
               className="options-bar-font-select"
-              value={textFontFamily}
-              onChange={(e) => onTextFontFamilyChange(e.target.value)}
+              value={textFamily}
+              onChange={(e) => {
+                const v = e.target.value
+                if (selectedTextItem) onUpdateSelectedText?.({ fontFamily: v })
+                else onTextFontFamilyChange(v)
+              }}
             >
               {GOOGLE_FONT_OPTIONS.map((f) => (
                 <option key={f} value={f}>{f}</option>
@@ -108,8 +121,13 @@ export default function OptionsBar({
               <button
                 key={key}
                 type="button"
-                className={`options-bar-brand-font-btn ${textFontFamily === brandFonts?.[key] ? 'active' : ''}`}
-                onClick={() => onApplyBrandFont(key)}
+                className={`options-bar-brand-font-btn ${textFamily === brandFonts?.[key] ? 'active' : ''}`}
+                onClick={() => {
+                  const v = brandFonts?.[key]
+                  if (!v) return
+                  if (selectedTextItem) onUpdateSelectedText?.({ fontFamily: v })
+                  else onApplyBrandFont(key)
+                }}
                 title={`Use brand ${label.toLowerCase()} font (${brandFonts?.[key]})`}
               >
                 {label}
@@ -123,16 +141,24 @@ export default function OptionsBar({
               type="range"
               min="8"
               max="120"
-              value={textFontSize}
-              onChange={(e) => onTextFontSizeChange(Number(e.target.value))}
+              value={textSize}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                if (selectedTextItem) onUpdateSelectedText?.({ fontSize: v })
+                else onTextFontSizeChange(v)
+              }}
             />
-            <span className="options-bar-value">{textFontSize}</span>
+            <span className="options-bar-value">{textSize}</span>
           </div>
           <label className="options-bar-bold-toggle">
             <input
               type="checkbox"
-              checked={textFontBold}
-              onChange={(e) => onTextFontBoldChange(e.target.checked)}
+              checked={textBold}
+              onChange={(e) => {
+                const v = e.target.checked
+                if (selectedTextItem) onUpdateSelectedText?.({ fontBold: v })
+                else onTextFontBoldChange(v)
+              }}
             />
             Bold
           </label>
@@ -141,26 +167,37 @@ export default function OptionsBar({
               <button
                 key={c}
                 type="button"
-                className={`sketch-color-swatch ${color === c ? 'active' : ''}`}
+                className={`sketch-color-swatch ${textColor === c ? 'active' : ''}`}
                 style={{ '--swatch-color': c }}
-                onClick={() => onColorChange(c)}
+                onClick={() => {
+                  if (selectedTextItem) onUpdateSelectedText?.({ color: c })
+                  else onColorChange(c)
+                }}
                 title={c}
                 aria-label={`Text color ${c}`}
               />
             ))}
             <button
               type="button"
-              className={`sketch-color-swatch options-bar-brand-text-swatch ${color === brandColors?.text ? 'active' : ''}`}
+              className={`sketch-color-swatch options-bar-brand-text-swatch ${textColor === brandColors?.text ? 'active' : ''}`}
               style={{ '--swatch-color': brandColors?.text ?? '#212529' }}
-              onClick={() => onColorChange(brandColors?.text ?? '#212529')}
+              onClick={() => {
+                const c = brandColors?.text ?? '#212529'
+                if (selectedTextItem) onUpdateSelectedText?.({ color: c })
+                else onColorChange(c)
+              }}
               title="Brand text color"
               aria-label="Brand text color"
             />
             <input
               type="color"
               className="sketch-color-picker"
-              value={color}
-              onChange={(e) => onColorChange(e.target.value)}
+              value={textColor}
+              onChange={(e) => {
+                const c = e.target.value
+                if (selectedTextItem) onUpdateSelectedText?.({ color: c })
+                else onColorChange(c)
+              }}
               title="Custom text color"
             />
           </div>
@@ -325,6 +362,16 @@ export default function OptionsBar({
       )}
 
       <div className="options-bar-spacer" />
+
+      {onCanvasBackgroundColorChange && (
+        <div className="options-bar-group options-bar-bg-group" onPointerDown={(e) => e.stopPropagation()}>
+          <CanvasBackgroundPicker
+            value={canvasBackgroundColor}
+            brandColors={brandColors}
+            onChange={onCanvasBackgroundColorChange}
+          />
+        </div>
+      )}
 
       <div className="options-bar-group options-bar-format-group" role="group" aria-label="Canvas aspect ratio">
         {SKETCH_FORMATS.map((f) => (

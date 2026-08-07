@@ -1,8 +1,9 @@
 /**
  * Persists tool/generation settings that aren't tied to any specific drawing —
  * pen tool, color, pen/eraser sizes, smoothing/wobble, zoom, canvas format,
- * selected style, instructions, variation count, and UI toggles. These carry over
+ * selected style, variation count, and UI toggles. These carry over
  * when switching drawings/tabs and across page reloads.
+ * (Per-drawing prompt text lives in IndexedDB — see App.jsx loadDrawing.)
  */
 import { normalizeSketchFormatId } from './canvasFormat'
 import {
