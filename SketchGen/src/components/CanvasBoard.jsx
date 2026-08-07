@@ -3,6 +3,7 @@ import { DEFAULT_SKETCH_FORMAT_ID, getSketchFormat, GENERATION_SAFE_ZONE_INSET }
 import { ensureGoogleFontLoaded } from '../constants/brand'
 import { drawArrowShape } from '../constants/arrowStyles'
 import { cleanUpSketchImageData, snapPointToHorizontalVertical } from '../utils/sketchAssist'
+import { defringeImageData, defringeRegion } from '../utils/defringe'
 import { separateIntoParts, hitTestPartAt } from '../utils/separateIllustration'
 import {
   maskFromPolygon,
@@ -25,6 +26,7 @@ import {
   serializeTextItems,
   measureTextItem,
 } from '../utils/textLayerItems'
+import { smoothLassoPolygon, smoothPolylineToSvgPath, traceSmoothClosedPath } from '../utils/pathSmoothing'
 import { copyHexToClipboard } from '../utils/clipboard'
 import { blendModeToCompositeOperation, normalizeBlendMode } from '../utils/layerBlend'
 import './CanvasBoard.css'
@@ -334,6 +336,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     textFontBold = false,
     arrowStyleId = 'straight',
     penSnapHV = false,
+    defringeMode = 'auto',
+    defringeStrength = 0.85,
     backgroundColor = BACKGROUND_COLOR,
     showSafeZone = false,
     placing,
@@ -365,6 +369,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const textFontBoldRef = useRef(textFontBold)
   const arrowStyleRef = useRef(arrowStyleId)
   const penSnapHVRef = useRef(penSnapHV)
+  const defringeModeRef = useRef(defringeMode)
+  const defringeStrengthRef = useRef(defringeStrength)
   const backgroundColorRef = useRef(backgroundColor)
   const placingRef = useRef(placing)
   const formatRef = useRef(formatId)
@@ -381,6 +387,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const wobbleDirRef = useRef({ x: 1, y: 0 })
   const lastRawPointRef = useRef(null)
   const lastStrokeWidthRef = useRef(null)
+  const strokeCurvePointRef = useRef(null)
+  const strokeCurveMidRef = useRef(null)
 
   // Layer stack: bottom-to-top array of { id, name, visible, canvas, ctx }.
   // `canvasRef`/`ctxRef` above are the single VISIBLE canvas — tools never draw
@@ -421,6 +429,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   useEffect(() => { textFontBoldRef.current = textFontBold }, [textFontBold])
   useEffect(() => { arrowStyleRef.current = arrowStyleId }, [arrowStyleId])
   useEffect(() => { penSnapHVRef.current = penSnapHV }, [penSnapHV])
+  useEffect(() => { defringeModeRef.current = defringeMode }, [defringeMode])
+  useEffect(() => { defringeStrengthRef.current = defringeStrength }, [defringeStrength])
   useEffect(() => {
     backgroundColorRef.current = backgroundColor
   }, [backgroundColor])
@@ -839,7 +849,25 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   function lassoPointsFromDraft(draft) {
     if (!draft?.end) return null
     if (draft.mode === 'rect') return rectToPolygon(draft.start, draft.end)
-    return draft.points.length >= 3 ? draft.points : null
+    return draft.points.length >= 3 ? smoothLassoPolygon(draft.points, { closed: true }) : null
+  }
+
+  function appendLassoPoint(draft, pos) {
+    const last = draft.points[draft.points.length - 1]
+    const dist = Math.hypot(pos.x - last.x, pos.y - last.y)
+    if (dist < 1) return
+    if (dist <= 5) {
+      draft.points.push(pos)
+      return
+    }
+    const steps = Math.max(2, Math.ceil(dist / 3))
+    for (let s = 1; s <= steps; s += 1) {
+      const t = s / steps
+      draft.points.push({
+        x: last.x + (pos.x - last.x) * t,
+        y: last.y + (pos.y - last.y) * t,
+      })
+    }
   }
 
   function finishLassoDraft(toolId) {
@@ -1188,6 +1216,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       }
       return {
         formatId: formatRef.current,
+        backgroundColor: backgroundColorRef.current,
         layers: layersRef.current.map((l) => ({
           id: l.id,
           name: l.name,
@@ -1336,6 +1365,25 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       pushHistory()
       onCommit?.()
     },
+    defringeActiveLayer: () => {
+      const layer = getActiveLayer()
+      if (layer?.parts?.length) flattenLayerParts(layer)
+      const ctx = getActiveCtx()
+      if (!ctx) return false
+      const w = W()
+      const h = H()
+      const imageData = ctx.getImageData(0, 0, w, h)
+      defringeImageData(imageData, w, h, {
+        mode: defringeModeRef.current,
+        strength: defringeStrengthRef.current,
+      })
+      ctx.putImageData(imageData, 0, 0)
+      hasContentRef.current = true
+      renderComposite()
+      pushHistory()
+      onCommit?.()
+      return true
+    },
     /** Split the active layer into connected parts (icons, labels, arrows) for individual move. */
     separateActiveLayerIntoParts: () => {
       mergeFloatingSelection(true)
@@ -1405,22 +1453,69 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     liftPixelSelectionToFloating: () => liftPixelSelectionToFloating(),
   }))
 
-  const strokeTo = (ctx, from, to, strokeColor, width, eraser = false) => {
+  const paintStrokeDot = (ctx, point, strokeColor, width, eraser = false) => {
     ctx.save()
+    if (eraser) ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = eraser ? '#000000' : strokeColor
+    ctx.beginPath()
+    ctx.arc(point.x, point.y, width / 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  const configureInkStroke = (ctx, strokeColor, width, eraser = false) => {
     if (eraser) ctx.globalCompositeOperation = 'destination-out'
     ctx.strokeStyle = eraser ? '#000000' : strokeColor
     ctx.lineWidth = width
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
+  }
+
+  const resetStrokeCurve = () => {
+    strokeCurvePointRef.current = null
+    strokeCurveMidRef.current = null
+  }
+
+  const strokeTo = (ctx, from, to, strokeColor, width, eraser = false) => {
+    const prev = strokeCurvePointRef.current ?? from
+    const next = to
+
+    if (!strokeCurvePointRef.current) {
+      paintStrokeDot(ctx, next, strokeColor, width, eraser)
+      strokeCurvePointRef.current = next
+      return
+    }
+
+    const mid = { x: (prev.x + next.x) / 2, y: (prev.y + next.y) / 2 }
+    ctx.save()
+    configureInkStroke(ctx, strokeColor, width, eraser)
     ctx.beginPath()
-    ctx.moveTo(from.x, from.y)
-    ctx.lineTo(to.x, to.y)
+    const start = strokeCurveMidRef.current ?? prev
+    ctx.moveTo(start.x, start.y)
+    ctx.quadraticCurveTo(prev.x, prev.y, mid.x, mid.y)
     ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(to.x, to.y, width / 2, 0, Math.PI * 2)
-    ctx.fillStyle = eraser ? '#000000' : strokeColor
-    ctx.fill()
     ctx.restore()
+
+    strokeCurvePointRef.current = next
+    strokeCurveMidRef.current = mid
+  }
+
+  const flushStrokeCurve = (ctx, endPoint, strokeColor, width, eraser = false) => {
+    const prev = strokeCurvePointRef.current
+    const mid = strokeCurveMidRef.current
+    if (!prev || !endPoint) {
+      resetStrokeCurve()
+      return
+    }
+    ctx.save()
+    configureInkStroke(ctx, strokeColor, width, eraser)
+    ctx.beginPath()
+    ctx.moveTo(mid ? mid.x : prev.x, mid ? mid.y : prev.y)
+    ctx.quadraticCurveTo(prev.x, prev.y, endPoint.x, endPoint.y)
+    ctx.stroke()
+    paintStrokeDot(ctx, endPoint, strokeColor, width, eraser)
+    ctx.restore()
+    resetStrokeCurve()
   }
 
   const stampPlacedImage = (ctx, pos, maxDim) => {
@@ -1738,6 +1833,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       lastPointRef.current = pos
       blurRegion(ctx, pos.x, pos.y, sizeRef.current)
       renderComposite()
+    } else if (currentTool === 'defringe') {
+      lastPointRef.current = pos
+      defringeRegion(ctx, pos.x, pos.y, sizeRef.current, {
+        mode: defringeModeRef.current,
+        strength: defringeStrengthRef.current,
+      })
+      renderComposite()
     } else {
       smoothPointRef.current = null
       wobblePhaseRef.current = 0
@@ -1748,6 +1850,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       const width = pressureWidth(e, sizeRef.current)
       lastStrokeWidthRef.current = width
       const erasing = currentTool === 'eraser'
+      resetStrokeCurve()
       strokeTo(ctx, drawnPos, drawnPos, colorRef.current, width, erasing)
       renderComposite()
     }
@@ -1778,11 +1881,13 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         if (draft.mode === 'rect') {
           setLassoPreview({ mode: 'rect', points: rectToPolygon(draft.start, pos), end: pos })
         } else {
-          const last = draft.points[draft.points.length - 1]
-          if (Math.hypot(pos.x - last.x, pos.y - last.y) >= 2) {
-            draft.points.push(pos)
-          }
-          setLassoPreview({ mode: 'lasso', points: [...draft.points, pos], end: pos })
+          appendLassoPoint(draft, pos)
+          setLassoPreview({
+            mode: 'lasso',
+            points: draft.points,
+            end: pos,
+            previewPath: smoothPolylineToSvgPath(draft.points, true),
+          })
         }
       }
       return
@@ -1865,6 +1970,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       return
     }
 
+    if (currentTool === 'defringe') {
+      defringeRegion(ctx, pos.x, pos.y, sizeRef.current, {
+        mode: defringeModeRef.current,
+        strength: defringeStrengthRef.current,
+      })
+      lastPointRef.current = pos
+      renderComposite()
+      return
+    }
+
     lastRawPointRef.current = pos
     const drawnPos = resolveInkPoint(pos, lastPointRef.current)
     const width = pressureWidth(e, sizeRef.current)
@@ -1934,14 +2049,8 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         // stroke actually reaches where the pointer was released instead of
         // stopping short.
         const erasing = tool === 'eraser'
-        strokeTo(
-          ctx,
-          lastPointRef.current,
-          lastRawPointRef.current,
-          colorRef.current,
-          lastStrokeWidthRef.current ?? sizeRef.current,
-          erasing
-        )
+        const width = lastStrokeWidthRef.current ?? sizeRef.current
+        flushStrokeCurve(ctx, lastRawPointRef.current, colorRef.current, width, erasing)
         renderComposite()
       }
       const pixelSel = getActivePixelSelection()
@@ -1960,6 +2069,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     smoothPointRef.current = null
     wobblePhaseRef.current = 0
     wobbleDirRef.current = { x: 1, y: 0 }
+    resetStrokeCurve()
     shapeSnapshotRef.current = null
     shapeStartRef.current = null
   }
@@ -1996,7 +2106,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         >
           <canvas
             ref={canvasRef}
-            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'wand' ? ' tool-wand' : ''}`}
+            className={`sketch-canvas tool-${tool}${placing ? ' tool-placing' : ''}${activeLayerHasParts && tool === 'move' ? ' tool-move-parts' : ''}${tool === 'wand' ? ' tool-wand' : ''}${tool === 'defringe' ? ' tool-defringe' : ''}`}
             style={{ backgroundColor }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -2059,7 +2169,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
             >
               {lassoPreview?.points?.length ? (
                 <path
-                  d={polygonToSvgPath(lassoPreview.points, lassoPreview.mode === 'rect')}
+                  d={lassoPreview.previewPath ?? smoothPolylineToSvgPath(lassoPreview.points, lassoPreview.mode !== 'rect')}
                   className="canvas-lasso-preview"
                 />
               ) : null}

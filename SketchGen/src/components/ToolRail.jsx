@@ -111,6 +111,18 @@ export const TOOLS = [
     ),
   },
   {
+    id: 'defringe',
+    label: 'Defringe — paint over halos (white or dark edges) to smooth anti-aliasing',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="5" width="14" height="14" rx="2" />
+        <path d="M5 12h14" strokeDasharray="2 2" opacity="0.45" />
+        <path d="M12 5v14" strokeDasharray="2 2" opacity="0.45" />
+        <path d="M8 8l8 8M16 8l-8 8" strokeWidth="1.5" opacity="0.55" />
+      </svg>
+    ),
+  },
+  {
     id: 'line',
     label: 'Line (hold Shift to snap 45°)',
     icon: (

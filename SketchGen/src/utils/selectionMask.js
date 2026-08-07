@@ -1,3 +1,5 @@
+import { traceSmoothClosedPath } from './pathSmoothing'
+
 function parseHexRgb(hex) {
   const clean = String(hex || '#000000').replace('#', '')
   const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean
@@ -125,11 +127,7 @@ export function maskFromPolygon(points, width, height) {
   const ctx = canvas.getContext('2d')
   if (!points.length) return new Uint8Array(width * height)
   ctx.beginPath()
-  ctx.moveTo(points[0].x, points[0].y)
-  for (let i = 1; i < points.length; i += 1) {
-    ctx.lineTo(points[i].x, points[i].y)
-  }
-  ctx.closePath()
+  traceSmoothClosedPath(ctx, points)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
   const data = ctx.getImageData(0, 0, width, height).data

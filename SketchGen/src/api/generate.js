@@ -1,26 +1,53 @@
 import { editImage } from '@shared/openai'
 import { fitDataUrlToSketchSize, getSketchFormat, normalizeSketchFormatId, GENERATION_SAFE_ZONE_INSET } from '../utils/canvasFormat'
 import { createLocalImageVariants } from '../utils/localImageVariants'
+import {
+  BRAND_BACKGROUND_COLOR_FIELDS,
+  normalizeBrandColors,
+  normalizeBrandFonts,
+  normalizeHexColor,
+} from '../constants/brand'
 
-function buildBrandDirective(brand, useBrandColors) {
+function buildBrandDirective(brand, useBrandColors, documentBackgroundHex) {
   if (!useBrandColors || !brand?.colors) return ''
-  const c = brand.colors
+  const c = normalizeBrandColors(brand.colors)
   const palette = [
     `primary ${c.primary}`,
     `secondary ${c.secondary}`,
     `tertiary ${c.tertiary}`,
     `accent ${c.accent}`,
-    `background ${c.background}`,
+    `bright background ${c.brightBg}`,
+    `dark background ${c.darkBg}`,
+    `colored background ${c.coloredBg}`,
     `border and linework ${c.border}`,
     `text ${c.text}`,
   ].join(', ')
-  const fonts = brand.fonts
-  const fontNote = fonts?.headline && fonts?.body && fonts?.accent
-    ? ` For any typography, use "${fonts.headline}" for headlines, "${fonts.body}" for body text and labels, and "${fonts.accent}" for accent callouts (Google Font styles).`
-    : fonts?.headline && fonts?.body
-      ? ` For any typography, use "${fonts.headline}" for headlines and "${fonts.body}" for body text and labels (Google Font styles).`
+  const fonts = normalizeBrandFonts(brand.fonts)
+  const fontNote = fonts.headline && fonts.body && fonts.accent
+    ? ` For typography, use "${fonts.headline}" for headlines, "${fonts.body}" for body text and labels, and "${fonts.accent}" for accent callouts (Google Font styles).`
+    : fonts.headline && fonts.body
+      ? ` For typography, use "${fonts.headline}" for headlines and "${fonts.body}" for body text and labels (Google Font styles).`
       : ''
-  return ` Use this brand color palette throughout the illustration where color applies: ${palette}. Prefer these colors over arbitrary ones unless instructions explicitly override.${fontNote}`
+
+  let canvasBgNote = ''
+  const docBg = documentBackgroundHex
+    ? normalizeHexColor(documentBackgroundHex, c.brightBg)
+    : null
+  if (docBg) {
+    const role = BRAND_BACKGROUND_COLOR_FIELDS.find(
+      ({ key }) => c[key]?.toLowerCase() === docBg.toLowerCase()
+    )
+    canvasBgNote = role
+      ? ` The main canvas/slide background must be ${docBg} (brand ${role.label}).`
+      : ` The main canvas/slide background must be ${docBg}.`
+  }
+
+  return (
+    ' MANDATORY BRAND PALETTE — you must color the finished illustration using only these exact hex values'
+    + ` for backgrounds, fills, accents, typography, icons, and charts: ${palette}.${canvasBgNote}`
+    + ' Do not introduce other hues unless the artist instructions explicitly require a specific different color.'
+    + fontNote
+  )
 }
 
 /** Ensures the model keeps all artwork inside the output frame (avoids clipped titles/graphics). */
@@ -42,15 +69,18 @@ function multiVariantPromptNote(variantCount) {
 /**
  * Build the image-edit prompt from a style preset and optional free-text instructions.
  */
-export function buildPrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1) {
+export function buildPrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1, documentBackgroundHex = null) {
   const format = getSketchFormat(formatId)
   const aspectNote = `The finished image must keep the exact same aspect ratio and framing as the sketch (${format.label}, ${format.width}×${format.height}). Do not crop to a different shape.`
   const boundsNote = buildSafeCompositionNote()
-  const brandNote = buildBrandDirective(brand, useBrandColors)
+  const brandNote = buildBrandDirective(brand, useBrandColors, documentBackgroundHex)
   const variantNote = multiVariantPromptNote(variantCount)
   const extra = instructions?.trim() ? ` Additional instructions from the artist: ${instructions.trim()}` : ''
   if (style.type === 'image') {
-    return `Convert this rough sketch into a finished illustration. Preserve the exact composition, proportions, subject matter, and layout of the sketch — do not add, remove, or move elements. ${aspectNote} ${boundsNote} The second attached image is a style reference — match its visual style: color palette, linework, rendering technique, and overall mood.${brandNote}${variantNote}${extra}`
+    const styleRefNote = useBrandColors
+      ? ' The second attached image is a style reference — match its linework, rendering technique, and mood, but apply the mandatory brand hex palette for all color choices (not the reference image colors).'
+      : ' The second attached image is a style reference — match its visual style: color palette, linework, rendering technique, and overall mood.'
+    return `Convert this rough sketch into a finished illustration. Preserve the exact composition, proportions, subject matter, and layout of the sketch — do not add, remove, or move elements. ${aspectNote} ${boundsNote}${styleRefNote}${brandNote}${variantNote}${extra}`
   }
   const base = `Convert this rough sketch into a finished illustration. Preserve the exact composition, proportions, subject matter, and layout of the sketch — do not add, remove, or move elements. ${aspectNote} ${boundsNote} Render it in the following style: ${style.prompt}.${brandNote}${variantNote}`
   return base + extra
@@ -59,15 +89,18 @@ export function buildPrompt(style, instructions, formatId, brand, useBrandColors
 /**
  * Prompt for iterating on an already-generated illustration (Improve generation).
  */
-export function buildImprovePrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1) {
+export function buildImprovePrompt(style, instructions, formatId, brand, useBrandColors, variantCount = 1, documentBackgroundHex = null) {
   const format = getSketchFormat(formatId)
   const aspectNote = `Keep the exact same aspect ratio and framing (${format.label}, ${format.width}×${format.height}). Do not crop to a different shape.`
   const boundsNote = buildSafeCompositionNote()
-  const brandNote = buildBrandDirective(brand, useBrandColors)
+  const brandNote = buildBrandDirective(brand, useBrandColors, documentBackgroundHex)
   const variantNote = multiVariantPromptNote(variantCount)
   const artist = instructions?.trim() || 'Refine and improve this illustration.'
   if (style.type === 'image') {
-    return `Edit this finished illustration according to the artist's instructions. Preserve composition, proportions, and subject matter unless the instructions explicitly ask to change them. ${aspectNote} ${boundsNote} Keep consistency with the attached style reference where appropriate.${brandNote}${variantNote} Artist instructions: ${artist}`
+    const styleRefNote = useBrandColors
+      ? ' Keep consistency with the attached style reference for technique and mood, but recolor using the mandatory brand hex palette when colors change.'
+      : ' Keep consistency with the attached style reference where appropriate.'
+    return `Edit this finished illustration according to the artist's instructions. Preserve composition, proportions, and subject matter unless the instructions explicitly ask to change them. ${aspectNote} ${boundsNote}${styleRefNote}${brandNote}${variantNote} Artist instructions: ${artist}`
   }
   const styleNote = style.prompt
     ? ` Maintain the overall look: ${style.prompt}.`
@@ -93,6 +126,7 @@ export async function generateStyledImage({
   referenceImageDataUrl = null,
   brand = null,
   useBrandColors = false,
+  documentBackgroundColor = null,
   quality = 'high',
   variantCount = 1,
   signal = null,
@@ -100,11 +134,19 @@ export async function generateStyledImage({
   const format = getSketchFormat(normalizeSketchFormatId(formatId))
   const count = Math.min(3, Math.max(1, Math.floor(variantCount) || 1))
   const improving = Boolean(referenceImageDataUrl)
+  const normalizedBrand = brand
+    ? { colors: normalizeBrandColors(brand.colors), fonts: normalizeBrandFonts(brand.fonts) }
+    : null
+  const docBg = useBrandColors && documentBackgroundColor
+    ? normalizeHexColor(documentBackgroundColor, normalizedBrand?.colors?.brightBg ?? '#ffffff')
+    : null
   const prompt = improving
-    ? buildImprovePrompt(style, instructions, format.id, brand, useBrandColors, count)
-    : buildPrompt(style, instructions, format.id, brand, useBrandColors, count)
+    ? buildImprovePrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
+    : buildPrompt(style, instructions, format.id, normalizedBrand, useBrandColors, count, docBg)
   const primaryImage = improving ? referenceImageDataUrl : sketchDataUrl
-  const bg = brand?.colors?.background ?? '#ffffff'
+  const fitBg = useBrandColors
+    ? (docBg ?? normalizedBrand?.colors?.brightBg ?? '#ffffff')
+    : (normalizedBrand?.colors?.brightBg ?? '#ffffff')
   const raw = await editImage({
     prompt,
     imageDataUrl: primaryImage,
@@ -115,7 +157,7 @@ export async function generateStyledImage({
     signal,
   })
 
-  let fitted = await fitVariantOutputs(raw, format, bg)
+  let fitted = await fitVariantOutputs(raw, format, fitBg)
 
   if (count > 1 && fitted.length < count && fitted.length > 0) {
     const local = await createLocalImageVariants(fitted[0], count - fitted.length, {

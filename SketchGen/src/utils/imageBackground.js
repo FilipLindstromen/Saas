@@ -8,7 +8,7 @@ function loadImageElement(dataUrl) {
 }
 
 /** Most common color along the image border (assumed background). */
-function estimateBackgroundColor(data, width, height) {
+export function estimateBackgroundColor(data, width, height) {
   const buckets = new Map()
   const bucketKey = (r, g, b) => `${r >> 4},${g >> 4},${b >> 4}`
 

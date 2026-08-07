@@ -32,6 +32,11 @@ export default function OptionsBar({
   onPenSnapHVChange,
   onCleanUpSketch,
   onSeparateParts,
+  defringeMode,
+  onDefringeModeChange,
+  defringeStrength,
+  onDefringeStrengthChange,
+  onDefringeLayer,
   selectionActive,
   selectionFloating,
   selectionScale,
@@ -312,6 +317,43 @@ export default function OptionsBar({
           <path d="M10 6.5h4M12 6.5V10" strokeDasharray="2 2" />
         </svg>
       </button>
+
+      {tool === 'defringe' && (
+        <div className="options-bar-group options-bar-defringe-group">
+          <label htmlFor="defringe-mode">Halo</label>
+          <select
+            id="defringe-mode"
+            className="options-bar-font-select"
+            value={defringeMode}
+            onChange={(e) => onDefringeModeChange(e.target.value)}
+            title="Whether to remove light (white) or dark edge halos"
+          >
+            <option value="auto">Auto</option>
+            <option value="light">Light / white</option>
+            <option value="dark">Dark</option>
+          </select>
+          <div className="options-bar-slider-group">
+            <label htmlFor="defringe-strength">Strength</label>
+            <input
+              id="defringe-strength"
+              type="range"
+              min="35"
+              max="100"
+              value={Math.round(defringeStrength * 100)}
+              onChange={(e) => onDefringeStrengthChange(Number(e.target.value) / 100)}
+            />
+            <span className="options-bar-value">{Math.round(defringeStrength * 100)}%</span>
+          </div>
+          <button
+            type="button"
+            className="options-bar-btn"
+            onClick={onDefringeLayer}
+            title="Remove halos on the entire active layer"
+          >
+            Whole layer
+          </button>
+        </div>
+      )}
 
       {(selectionActive || tool === 'move' || tool === 'lasso' || tool === 'lasso-fill' || tool === 'wand') && (
         <div className="options-bar-group options-bar-selection-group">

@@ -1,27 +1,36 @@
-/** Default brand palette — primary / secondary / tertiary / accent + neutrals. */
+/** Default brand palette — primary / secondary / tertiary / accent + backgrounds + neutrals. */
 export const DEFAULT_BRAND_COLORS = {
   primary: '#1971c2',
   secondary: '#495057',
   tertiary: '#9c36b5',
   accent: '#ff6b35',
-  background: '#ffffff',
+  brightBg: '#ffffff',
+  darkBg: '#141414',
+  coloredBg: '#e7f5ff',
   border: '#1a1a1a',
   text: '#212529',
 }
+
+export const BRAND_BACKGROUND_COLOR_FIELDS = [
+  { key: 'brightBg', label: 'Bright BG' },
+  { key: 'darkBg', label: 'Dark BG' },
+  { key: 'coloredBg', label: 'Colored BG' },
+]
 
 export const BRAND_COLOR_FIELDS = [
   { key: 'primary', label: 'Primary' },
   { key: 'secondary', label: 'Secondary' },
   { key: 'tertiary', label: 'Tertiary' },
   { key: 'accent', label: 'Accent' },
-  { key: 'background', label: 'Background' },
+  ...BRAND_BACKGROUND_COLOR_FIELDS,
   { key: 'border', label: 'Border' },
   { key: 'text', label: 'Text' },
 ]
 
 /** Map persisted keys from older SketchGen builds. */
 const LEGACY_BRAND_COLOR_KEY_MAP = {
-  bg: 'background',
+  bg: 'brightBg',
+  background: 'brightBg',
   line: 'border',
   main: 'primary',
   accent2: 'tertiary',
@@ -93,6 +102,7 @@ export function normalizeBrandColors(input) {
   for (const { key } of BRAND_COLOR_FIELDS) {
     base[key] = normalizeHexColor(migrated[key], DEFAULT_BRAND_COLORS[key])
   }
+  delete base.background
   return base
 }
 

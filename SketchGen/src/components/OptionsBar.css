@@ -7,6 +7,8 @@
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  position: relative;
+  z-index: 40;
 }
 
 .options-bar-group {
@@ -277,13 +279,14 @@
 
 .options-bar-bg-group {
   position: relative;
+  z-index: 2;
 }
 
 .options-bar-bg-group .canvas-bg-picker {
   position: relative;
   top: auto;
   left: auto;
-  z-index: auto;
+  z-index: 1;
 }
 
 .options-bar-bg-group .canvas-bg-picker-trigger {

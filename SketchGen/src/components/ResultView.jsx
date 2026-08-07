@@ -15,15 +15,23 @@ export default function ResultView({
   const format = getSketchFormat(formatId)
 
   if (view === 'compare') {
+    if (!beforeSrc && !afterSrc) return null
     return (
       <div className="result-view-wrap">
         <div className="result-view-viewport">
-          <CompareSlider
-            beforeSrc={sketchDataUrl}
-            afterSrc={generatedDataUrl}
-            formatId={formatId}
-            onAfterContextMenu={onImageContextMenu}
-          />
+          {!beforeSrc ? (
+            <div className="result-view-stage result-view-compare-fallback">
+              <img src={afterSrc} alt="Generated illustration" onContextMenu={(e) => onImageContextMenu?.(e, afterSrc)} />
+              <p className="result-view-compare-note">Original sketch was not saved for this generation.</p>
+            </div>
+          ) : (
+            <CompareSlider
+              beforeSrc={beforeSrc}
+              afterSrc={afterSrc}
+              formatId={formatId}
+              onAfterContextMenu={onImageContextMenu}
+            />
+          )}
         </div>
         <div className="result-view-actions">
           <ExportMenu onExport={onExport} />

@@ -10,20 +10,21 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   overflow: auto;
   border-radius: var(--card-radius);
   background: var(--bg-secondary);
+  padding: 0.5rem;
 }
 
 .result-view-stage {
   position: relative;
   margin: auto;
   flex-shrink: 0;
-  width: auto;
-  height: auto;
+  width: 100%;
   max-width: 100%;
+  height: auto;
   max-height: min(100%, 85vh);
   border-radius: var(--card-radius);
   box-shadow: var(--shadow-md);
@@ -63,4 +64,28 @@
   background: var(--bg-hover);
   color: var(--text-primary);
   border-color: var(--border-strong);
+}
+
+.result-view-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  text-align: center;
+  border-radius: var(--card-radius);
+  background: var(--bg-secondary);
+}
+
+.result-view-compare-note {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-subtle);
 }

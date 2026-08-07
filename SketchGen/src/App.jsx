@@ -143,10 +143,10 @@ export default function App() {
   const [penSnapHV, setPenSnapHV] = useState(savedSettings.penSnapHV)
   const [generationQuality, setGenerationQuality] = useState(savedSettings.generationQuality)
   const [addGenerationsAsLayers, setAddGenerationsAsLayers] = useState(savedSettings.addGenerationsAsLayers)
-  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState(() =>
-    normalizeHexColor(savedSettings.canvasBackgroundColor, DEFAULT_BRAND_COLORS.background)
-  )
+  const [canvasBackgroundColor, setCanvasBackgroundColor] = useState(DEFAULT_BRAND_COLORS.brightBg)
   const [showSafeZone, setShowSafeZone] = useState(Boolean(savedSettings.showSafeZone))
+  const [defringeMode, setDefringeMode] = useState(savedSettings.defringeMode)
+  const [defringeStrength, setDefringeStrength] = useState(savedSettings.defringeStrength)
   const [brandingDraft, setBrandingDraft] = useState(null)
 
   const [view, setView] = useState('sketch')
@@ -208,8 +208,9 @@ export default function App() {
     penSnapHV,
     generationQuality,
     addGenerationsAsLayers,
-    canvasBackgroundColor,
     showSafeZone,
+    defringeMode,
+    defringeStrength,
   }
 
   const flushAppSettings = useCallback(() => {
@@ -249,15 +250,26 @@ export default function App() {
   const loadDrawing = useCallback(async (projectId, tabId) => {
     const key = drawingKeyFor(projectId, tabId)
     const settingsFallback = loadAppSettings()
+    let snapshot = null
     try {
-      const snapshot = await kvGet(`canvas:${key}`)
+      snapshot = await kvGet(`canvas:${key}`)
       const format = snapshot?.formatId != null
         ? normalizeSketchFormatId(snapshot.formatId)
         : normalizeSketchFormatId(settingsFallback.canvasFormat)
       setCanvasFormat(format)
+      const legacyGlobalBg =
+        settingsFallback.canvasBackgroundColor != null
+          ? normalizeHexColor(settingsFallback.canvasBackgroundColor, DEFAULT_BRAND_COLORS.brightBg)
+          : null
+      const docBg = normalizeHexColor(
+        snapshot?.backgroundColor,
+        legacyGlobalBg ?? DEFAULT_BRAND_COLORS.brightBg
+      )
+      setCanvasBackgroundColor(docBg)
       if (snapshot?.layers?.length) await canvasRef.current?.restoreLayers({ ...snapshot, formatId: format })
       else canvasRef.current?.resetBlank(format)
     } catch {
+      setCanvasBackgroundColor(DEFAULT_BRAND_COLORS.brightBg)
       canvasRef.current?.resetBlank()
     }
     try {
@@ -368,7 +380,7 @@ export default function App() {
       clearTimeout(timer)
       flushAppSettings()
     }
-  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, penSnapHV, generationQuality, addGenerationsAsLayers, canvasBackgroundColor, flushAppSettings])
+  }, [tool, color, penSize, eraserSize, smoothing, wobble, zoom, canvasFormat, selectedStyleId, variations, styleSectionCollapsed, improveGeneration, brandColors, brandFonts, useBrandColorsInGeneration, textFontFamily, textFontSize, textFontBold, arrowStyleId, penSnapHV, generationQuality, addGenerationsAsLayers, showSafeZone, defringeMode, defringeStrength, flushAppSettings])
 
   // Per-drawing instructions (IndexedDB), debounced while typing.
   useEffect(() => {
@@ -650,6 +662,12 @@ export default function App() {
     canvasRef.current?.cleanUpActiveLayer?.()
   }, [])
 
+  const handleDefringeLayer = useCallback(() => {
+    setError('')
+    const ok = canvasRef.current?.defringeActiveLayer?.()
+    if (!ok) setError('Select a layer with artwork to defringe.')
+  }, [])
+
   const handleSeparateParts = useCallback(() => {
     setError('')
     const result = canvasRef.current?.separateActiveLayerIntoParts?.()
@@ -838,25 +856,44 @@ export default function App() {
   }, [])
 
   const handleSelectHistoryEntry = useCallback((entry) => {
-    setSketchSnapshot(entry.sketchDataUrl)
+    setSketchSnapshot(entry.sketchDataUrl ?? null)
     setGeneratedImage(entry.dataUrl)
     setActiveGenerationId(entry.id)
     setView((v) => (v === 'sketch' ? 'generated' : v))
   }, [])
 
+  const pickGenerationPreviewEntry = useCallback(() => {
+    if (activeGenerationId) {
+      const fromHistory = generationHistory.find((e) => e.id === activeGenerationId)
+      if (fromHistory) return fromHistory
+    }
+    if (generatedImage) {
+      return {
+        id: activeGenerationId,
+        dataUrl: generatedImage,
+        sketchDataUrl: sketchSnapshot,
+      }
+    }
+    return generationHistory[0] ?? null
+  }, [activeGenerationId, generationHistory, generatedImage, sketchSnapshot])
+
   const handleViewChange = useCallback(
     (nextView) => {
       if (nextView === 'generated' || nextView === 'compare') {
-        if (!generatedImage && generationHistory.length > 0) {
-          const latest = generationHistory[0]
-          setSketchSnapshot(latest.sketchDataUrl)
-          setGeneratedImage(latest.dataUrl)
-          setActiveGenerationId(latest.id)
+        const entry = pickGenerationPreviewEntry()
+        if (entry?.dataUrl) {
+          setGeneratedImage(entry.dataUrl)
+          setActiveGenerationId(entry.id ?? activeGenerationId)
+          let sketch = entry.sketchDataUrl ?? sketchSnapshot
+          if (!sketch && nextView === 'compare') {
+            sketch = canvasRef.current?.exportPNG?.() ?? null
+          }
+          setSketchSnapshot(sketch)
         }
       }
       setView(nextView)
     },
-    [generatedImage, generationHistory]
+    [pickGenerationPreviewEntry, activeGenerationId, sketchSnapshot]
   )
 
   const handleDeleteHistoryEntry = useCallback(async (id) => {
@@ -882,6 +919,56 @@ export default function App() {
     genQueueRef.current = genQueue
   }, [genQueue])
 
+  const patchGenQueue = useCallback((mapper) => {
+    setGenQueue((prev) => {
+      const next = mapper(prev)
+      genQueueRef.current = next
+      return next
+    })
+  }, [])
+
+  const pickNextQueuedJob = useCallback(() => {
+    return genQueueRef.current.find((j) => {
+      if (j.status !== 'queued') return false
+      const batch = genBatchesRef.current.get(j.id)
+      if (batch?.multiVariant && batch.jobIndex > 0) {
+        const leader = genQueueRef.current.find((l) => l.batchId === j.batchId && l.index === 0)
+        if (!leader || leader.status === 'queued' || leader.status === 'running') return false
+      }
+      return true
+    })
+  }, [])
+
+  const healGenerationQueue = useCallback(() => {
+    const prev = genQueueRef.current
+    let changed = false
+    const next = prev.map((j) => {
+      if (j.status === 'done' || j.status === 'error' || j.status === 'canceled') return j
+      const batch = genBatchesRef.current.get(j.id)
+      if (!batch) return j
+      const leaderBatch = genBatchesRef.current.get(`${batch.batchId}-0`)
+      const fromLeader = leaderBatch?.multiVariantResults?.[batch.jobIndex]
+      const fromSelf = leaderBatch?.multiVariantResults?.[batch.jobIndex] ?? batch.resultDataUrl
+      const dataUrl = batch.jobIndex === 0 ? (leaderBatch?.resultDataUrl ?? fromSelf ?? fromLeader) : fromLeader ?? fromSelf
+      if (dataUrl && (j.status === 'running' || j.status === 'queued')) {
+        changed = true
+        return {
+          ...j,
+          status: 'done',
+          dataUrl,
+          historyId: j.historyId || j.id,
+          sketchDataUrl: j.sketchDataUrl ?? batch.sketchDataUrl,
+        }
+      }
+      return j
+    })
+    if (changed) {
+      genQueueRef.current = next
+      setGenQueue(next)
+    }
+    return changed ? next : prev
+  }, [])
+
   const runGenerationJob = useCallback(async (jobId, { qualityOverride } = {}) => {
     const batch = genBatchesRef.current.get(jobId)
     if (!batch) return { ok: false }
@@ -895,20 +982,18 @@ export default function App() {
       const leaderBatch = genBatchesRef.current.get(leaderId)
       const dataUrl = leaderBatch?.multiVariantResults?.[batch.jobIndex]
       if (dataUrl) {
-        setGenQueue((prev) => {
-          const next = prev.map((j) =>
+        patchGenQueue((prev) =>
+          prev.map((j) =>
             j.id === jobId
               ? { ...j, status: 'done', dataUrl, historyId: jobId, sketchDataUrl: batch.sketchDataUrl }
               : j
           )
-          genQueueRef.current = next
-          return next
-        })
+        )
         return { ok: true, dataUrl, jobId }
       }
       const leaderJob = genQueueRef.current.find((j) => j.id === leaderId)
       if (leaderJob?.status === 'error') {
-        setGenQueue((prev) =>
+        patchGenQueue((prev) =>
           prev.map((j) => (j.id === jobId ? { ...j, status: 'error', error: leaderJob.error } : j))
         )
         return { ok: false, error: new Error(leaderJob.error || 'Generation failed.') }
@@ -916,7 +1001,7 @@ export default function App() {
       if (leaderJob?.status === 'canceled') {
         return { ok: false, canceled: true }
       }
-      return { ok: false }
+      return { ok: false, waitingForLeader: true }
     }
 
     const ac = new AbortController()
@@ -925,7 +1010,7 @@ export default function App() {
       batch.multiVariant && batch.variantCount > 1
         ? Array.from({ length: batch.variantCount }, (_, i) => `${batch.batchId}-${i}`)
         : [jobId]
-    setGenQueue((prev) =>
+    patchGenQueue((prev) =>
       prev.map((j) =>
         batchJobIds.includes(j.id) && (j.status === 'queued' || j.status === 'running')
           ? { ...j, status: 'running', error: null }
@@ -944,7 +1029,8 @@ export default function App() {
         formatId: batch.formatId,
         referenceImageDataUrl: batch.referenceImageDataUrl,
         brand: batch.brand,
-        useBrandColors: batch.useBrandColors,
+        useBrandColors: Boolean(batch.useBrandColors),
+        documentBackgroundColor: batch.documentBackgroundColor,
         quality,
         variantCount,
         signal: ac.signal,
@@ -953,7 +1039,7 @@ export default function App() {
       const dataUrls = Array.isArray(result) ? result : [result]
 
       if (canceledJobsRef.current.has(jobId)) {
-        setGenQueue((prev) =>
+        patchGenQueue((prev) =>
           prev.map((j) => (batchJobIds.includes(j.id) ? { ...j, status: 'canceled' } : j))
         )
         return { ok: false, canceled: true }
@@ -980,8 +1066,8 @@ export default function App() {
             await canvasRef.current?.addLayerFromImage?.(dataUrl, `Generation ${i + 1}`)
           }
         }
-        setGenQueue((prev) => {
-          const next = prev.map((j) => {
+        patchGenQueue((prev) =>
+          prev.map((j) => {
             if (j.batchId !== batch.batchId) return j
             const idx = j.index
             const dataUrl = dataUrls[idx]
@@ -994,13 +1080,12 @@ export default function App() {
               sketchDataUrl: batch.sketchDataUrl,
             }
           })
-          genQueueRef.current = next
-          return next
-        })
+        )
         return { ok: true, dataUrl: dataUrls[0], jobId }
       }
 
       const dataUrl = dataUrls[0]
+      genBatchesRef.current.set(jobId, { ...batch, resultDataUrl: dataUrl })
       const entry = {
         id: jobId,
         batchId: batch.batchId,
@@ -1016,32 +1101,30 @@ export default function App() {
       if (batch.addGenerationsAsLayers && batch.key === drawingKeyRef.current) {
         await canvasRef.current?.addLayerFromImage?.(dataUrl, `Generation ${batch.jobIndex + 1}`)
       }
-      setGenQueue((prev) => {
-        const next = prev.map((j) =>
+      patchGenQueue((prev) =>
+        prev.map((j) =>
           j.id === jobId
             ? { ...j, status: 'done', dataUrl, historyId: jobId, sketchDataUrl: batch.sketchDataUrl }
             : j
         )
-        genQueueRef.current = next
-        return next
-      })
+      )
       return { ok: true, dataUrl, jobId }
     } catch (err) {
       if (err?.name === 'AbortError' || canceledJobsRef.current.has(jobId)) {
-        setGenQueue((prev) =>
+        patchGenQueue((prev) =>
           prev.map((j) => (batchJobIds.includes(j.id) ? { ...j, status: 'canceled', error: null } : j))
         )
         return { ok: false, canceled: true }
       }
       const msg = err?.message || 'Generation failed.'
-      setGenQueue((prev) =>
+      patchGenQueue((prev) =>
         prev.map((j) => (batchJobIds.includes(j.id) ? { ...j, status: 'error', error: msg } : j))
       )
       return { ok: false, error: err }
     } finally {
       genAbortRef.current.delete(jobId)
     }
-  }, [])
+  }, [patchGenQueue])
 
   const handleCancelGenerationJob = useCallback((jobId) => {
     canceledJobsRef.current.add(jobId)
@@ -1064,19 +1147,22 @@ export default function App() {
 
     try {
       while (true) {
-        const job = genQueueRef.current.find((j) => j.status === 'queued')
+        const job = pickNextQueuedJob()
         if (!job) break
 
         const batch = genBatchesRef.current.get(job.id)
         const verb = batch?.referenceImageDataUrl ? 'Improving' : 'Generating'
         const labelPrefix = job.drawingLabel ? `${job.drawingLabel} — ` : ''
+        const batchJobs = genQueueRef.current.filter((j) => j.batchId === job.batchId)
+        const batchTotal = batchJobs.length
+        const batchDone = batchJobs.filter((j) => j.status === 'done').length
 
         setGenerationProgress({
           message: batch?.multiVariant
             ? `${labelPrefix}${verb} ${batch.variantCount} variations (one request)…`
             : `${labelPrefix}${verb} variation ${job.index + 1}…`,
-          completed: genQueueRef.current.filter((j) => j.status === 'done' && j.batchId === job.batchId).length,
-          total: genQueueRef.current.filter((j) => j.batchId === job.batchId).length,
+          completed: batchDone,
+          total: batchTotal,
           percent: 12,
         })
 
@@ -1090,6 +1176,22 @@ export default function App() {
         const result = await runGenerationJob(job.id)
         clearInterval(softTimer)
         softTimer = null
+
+        if (result.waitingForLeader) {
+          break
+        }
+
+        if (result.ok) {
+          const healed = healGenerationQueue()
+          const batchDoneNow = healed.filter((j) => j.batchId === job.batchId && j.status === 'done').length
+          const batchTotalNow = healed.filter((j) => j.batchId === job.batchId).length
+          setGenerationProgress({
+            message: 'Complete',
+            completed: batchDoneNow,
+            total: batchTotalNow,
+            percent: 100,
+          })
+        }
 
         if (result.ok && job.drawingKey === drawingKeyRef.current) {
           const showResult = !batch?.multiVariant || job.index === 0
@@ -1110,11 +1212,16 @@ export default function App() {
     } finally {
       if (softTimer) clearInterval(softTimer)
       queuePumpActiveRef.current = false
-      const stillActive = genQueueRef.current.some((j) => j.status === 'queued' || j.status === 'running')
+      const queue = healGenerationQueue()
+      const stillActive = queue.some((j) => j.status === 'queued' || j.status === 'running')
       setIsGenerating(stillActive)
-      if (!stillActive) setGenerationProgress(null)
+      if (!stillActive) {
+        setGenerationProgress(null)
+      } else if (pickNextQueuedJob()) {
+        void processGenerationQueue()
+      }
     }
-  }, [runGenerationJob, refreshHistory, sketchSnapshot])
+  }, [runGenerationJob, refreshHistory, sketchSnapshot, pickNextQueuedJob, healGenerationQueue])
 
   const handleRetryGenerationJob = useCallback(
     (jobId) => {
@@ -1195,7 +1302,9 @@ export default function App() {
 
     const sketchDataUrl = improveGeneration
       ? (sketchSnapshot || board?.exportPNG?.())
-      : board.exportPNG()
+      : useBrandColorsInGeneration
+        ? (board.exportCompositePNG?.(false) ?? board.exportPNG())
+        : board.exportPNG()
     const referenceImageDataUrl = improveGeneration ? generatedImage : null
     const total = variations
 
@@ -1212,8 +1321,9 @@ export default function App() {
         style,
         instructions,
         formatId: canvasFormat,
-        brand: { colors: brandColors, fonts: brandFonts },
+        brand: { colors: normalizeBrandColors(brandColors), fonts: normalizeBrandFonts(brandFonts) },
         useBrandColors: useBrandColorsInGeneration,
+        documentBackgroundColor: canvasBackgroundColor,
         key,
         quality: generationQuality,
         addGenerationsAsLayers,
@@ -1251,6 +1361,7 @@ export default function App() {
     brandColors,
     brandFonts,
     useBrandColorsInGeneration,
+    canvasBackgroundColor,
     generationQuality,
     addGenerationsAsLayers,
     processGenerationQueue,
@@ -1265,6 +1376,21 @@ export default function App() {
 
   const exportDisabled =
     view === 'sketch' ? !hasSketchContent : !generatedImage
+
+  const generationPreview = useMemo(() => {
+    if (generatedImage) {
+      return { dataUrl: generatedImage, sketchDataUrl: sketchSnapshot }
+    }
+    if (activeGenerationId) {
+      const hit = generationHistory.find((e) => e.id === activeGenerationId)
+      if (hit) return { dataUrl: hit.dataUrl, sketchDataUrl: hit.sketchDataUrl ?? null }
+    }
+    const latest = generationHistory[0]
+    if (latest) return { dataUrl: latest.dataUrl, sketchDataUrl: latest.sketchDataUrl ?? null }
+    return null
+  }, [generatedImage, sketchSnapshot, activeGenerationId, generationHistory])
+
+  const showResultWorkspace = view !== 'sketch' && Boolean(generationPreview?.dataUrl)
 
   // --- Projects ---
 
@@ -1558,6 +1684,11 @@ export default function App() {
           onPenSnapHVChange={setPenSnapHV}
           onCleanUpSketch={handleCleanUpSketch}
           onSeparateParts={handleSeparateParts}
+          defringeMode={defringeMode}
+          onDefringeModeChange={setDefringeMode}
+          defringeStrength={defringeStrength}
+          onDefringeStrengthChange={setDefringeStrength}
+          onDefringeLayer={handleDefringeLayer}
           selectionActive={selectionActive}
           selectionFloating={selectionFloating}
           selectionScale={selectionScale}
@@ -1601,55 +1732,66 @@ export default function App() {
               <GenerationProgress progress={generationProgress} />
             </div>
           )}
-          <div className="app-canvas-area" style={{ display: view === 'sketch' ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
-            <CanvasBoard
-              ref={canvasRef}
-              tool={tool}
-              color={color}
-              size={brushSize}
-              smoothing={smoothing}
-              wobble={wobble}
-              textFontFamily={textFontFamily}
-              textFontSize={textFontSize}
-              textFontBold={textFontBold}
-              arrowStyleId={arrowStyleId}
-              penSnapHV={penSnapHV}
-              backgroundColor={canvasBackgroundColor}
-              showSafeZone={showSafeZone}
-              brandColors={brandColors}
-              zoom={zoom}
-              formatId={canvasFormat}
-              placing={placing}
-              onPlaced={handlePlaced}
-              onDropFile={handleImportFile}
-              onHistoryChange={({ canUndo: cu, canRedo: cr }) => {
-                setCanUndo(cu)
-                setCanRedo(cr)
-                syncSketchContent()
-              }}
-              onLayersChange={handleLayersChange}
-              onCommit={() => {
-                scheduleAutosave()
-                syncSketchContent()
-                canvasRef.current?.refreshLayerPanel?.()
-              }}
-              onSelectionChange={handleSelectionChange}
-              onTextSelectionChange={handleTextSelectionChange}
-              onColorChange={setColor}
-            />
+          <div className="app-workspace">
+            <div
+              className="app-sketch-area"
+              style={{ display: view === 'sketch' ? 'flex' : 'none' }}
+            >
+              <CanvasBoard
+                ref={canvasRef}
+                tool={tool}
+                color={color}
+                size={brushSize}
+                smoothing={smoothing}
+                wobble={wobble}
+                textFontFamily={textFontFamily}
+                textFontSize={textFontSize}
+                textFontBold={textFontBold}
+                arrowStyleId={arrowStyleId}
+                penSnapHV={penSnapHV}
+                defringeMode={defringeMode}
+                defringeStrength={defringeStrength}
+                backgroundColor={canvasBackgroundColor}
+                showSafeZone={showSafeZone}
+                brandColors={brandColors}
+                zoom={zoom}
+                formatId={canvasFormat}
+                placing={placing}
+                onPlaced={handlePlaced}
+                onDropFile={handleImportFile}
+                onHistoryChange={({ canUndo: cu, canRedo: cr }) => {
+                  setCanUndo(cu)
+                  setCanRedo(cr)
+                  syncSketchContent()
+                }}
+                onLayersChange={handleLayersChange}
+                onCommit={() => {
+                  scheduleAutosave()
+                  syncSketchContent()
+                  canvasRef.current?.refreshLayerPanel?.()
+                }}
+                onSelectionChange={handleSelectionChange}
+                onTextSelectionChange={handleTextSelectionChange}
+                onColorChange={setColor}
+              />
+            </div>
+            {view !== 'sketch' && showResultWorkspace ? (
+              <ResultView
+                view={view}
+                formatId={canvasFormat}
+                sketchDataUrl={generationPreview.sketchDataUrl}
+                generatedDataUrl={generationPreview.dataUrl}
+                onUseAsSketch={handleUseAsSketch}
+                onImageContextMenu={handleImageContextMenu}
+                onExport={handleExport}
+              />
+            ) : null}
+            {view !== 'sketch' && !showResultWorkspace ? (
+              <div className="result-view-empty">
+                Select a generation in History to preview or compare.
+              </div>
+            ) : null}
           </div>
-
-          {view !== 'sketch' && generatedImage && (
-            <ResultView
-              view={view}
-              formatId={canvasFormat}
-              sketchDataUrl={sketchSnapshot}
-              generatedDataUrl={generatedImage}
-              onUseAsSketch={handleUseAsSketch}
-              onImageContextMenu={handleImageContextMenu}
-              onExport={handleExport}
-            />
-          )}
         </main>
 
         <aside className="app-sidebar">

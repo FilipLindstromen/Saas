@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BRAND_COLOR_FIELDS } from '../constants/brand'
+import { BRAND_BACKGROUND_COLOR_FIELDS } from '../constants/brand'
 import './CanvasBackgroundPicker.css'
 
 export default function CanvasBackgroundPicker({ value, brandColors, onChange }) {
@@ -45,9 +45,9 @@ export default function CanvasBackgroundPicker({ value, brandColors, onChange })
       </button>
       {open && (
         <div className="canvas-bg-picker-panel" role="listbox" aria-label="Canvas background">
-          <div className="canvas-bg-picker-section-label">Brand colors</div>
+          <div className="canvas-bg-picker-section-label">Backgrounds</div>
           <div className="canvas-bg-picker-brand-grid">
-            {BRAND_COLOR_FIELDS.map(({ key, label }) => {
+            {BRAND_BACKGROUND_COLOR_FIELDS.map(({ key, label }) => {
               const hex = brandColors?.[key] ?? '#ffffff'
               const active = value?.toLowerCase() === hex.toLowerCase()
               return (

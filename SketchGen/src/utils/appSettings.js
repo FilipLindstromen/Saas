@@ -3,7 +3,7 @@
  * pen tool, color, pen/eraser sizes, smoothing/wobble, zoom, canvas format,
  * selected style, variation count, and UI toggles. These carry over
  * when switching drawings/tabs and across page reloads.
- * (Per-drawing prompt text lives in IndexedDB — see App.jsx loadDrawing.)
+ * (Per-drawing prompt text and canvas background color live in IndexedDB — see App.jsx loadDrawing.)
  */
 import { normalizeSketchFormatId } from './canvasFormat'
 import {
@@ -24,7 +24,7 @@ const DEFAULTS = {
   color: '#1a1a1a',
   penSize: 6,
   eraserSize: 12,
-  smoothing: 0,
+  smoothing: 0.22,
   wobble: 0,
   zoom: 1,
   canvasFormat: '16:9',
@@ -43,13 +43,14 @@ const DEFAULTS = {
   penSnapHV: false,
   generationQuality: 'high',
   addGenerationsAsLayers: true,
-  canvasBackgroundColor: DEFAULT_BRAND_COLORS.background,
   showSafeZone: false,
+  defringeMode: 'auto',
+  defringeStrength: 0.85,
 }
 
 const VALID_TOOLS = new Set([
   'move', 'lasso', 'lasso-fill',
-  'pen', 'eraser', 'text', 'fill', 'eyedropper', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'stamp',
+  'pen', 'eraser', 'text', 'fill', 'eyedropper', 'wand', 'line', 'arrow', 'rect', 'circle', 'blur', 'defringe', 'stamp',
 ])
 
 export function loadAppSettings() {
@@ -86,8 +87,9 @@ export function loadAppSettings() {
     merged.generationQuality = normalizeGenerationQuality(merged.generationQuality)
     merged.addGenerationsAsLayers = merged.addGenerationsAsLayers !== false
     merged.penSnapHV = Boolean(merged.penSnapHV)
-    merged.canvasBackgroundColor = normalizeHexColor(merged.canvasBackgroundColor, DEFAULTS.canvasBackgroundColor)
     merged.showSafeZone = Boolean(merged.showSafeZone)
+    if (merged.defringeMode !== 'light' && merged.defringeMode !== 'dark') merged.defringeMode = 'auto'
+    merged.defringeStrength = clampNum(merged.defringeStrength, 0.35, 1, DEFAULTS.defringeStrength)
     if (typeof merged.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(merged.color)) {
       merged.color = DEFAULTS.color
     }

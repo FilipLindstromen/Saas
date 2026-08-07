@@ -53,6 +53,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--button-radius);
   box-shadow: var(--shadow-md);
+  z-index: 100;
 }
 
 .canvas-bg-picker-section-label {
