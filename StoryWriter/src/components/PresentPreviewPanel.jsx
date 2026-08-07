@@ -52,10 +52,12 @@ export default function PresentPreviewPanel({
   const animation = resolveAnimationForSentence(scene.text, rules);
   const useLineReveal = (scene.rotateSpans?.length ?? 0) > 0 || (scene.bulletSpans?.length ?? 0) > 0;
   const hasBullets = (scene.bulletSpans?.length ?? 0) > 0;
+  const hasRotate = (scene.rotateSpans?.length ?? 0) > 0;
   const rows = useLineReveal
     ? buildLineRevealRowsSimple(scene.text, scene.rotateSpans ?? [], scene.bulletSpans ?? [], revealStep)
     : null;
   const layout = scene.layout ?? 'center';
+  const hasDarkText = Boolean(scene.darkText);
 
   return (
     <div className="present-preview-panel" aria-label="Present preview">
@@ -64,6 +66,8 @@ export default function PresentPreviewPanel({
           'present-preview-panel__stage',
           layout === 'left' && 'present-preview-panel__stage--left',
           hasBullets && 'present-preview-panel__stage--bullets',
+          hasRotate && 'present-preview-panel__stage--text-rotate',
+          hasDarkText && 'present-preview-panel__stage--dark-text',
         ]
           .filter(Boolean)
           .join(' ')}

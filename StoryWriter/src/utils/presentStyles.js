@@ -1,7 +1,7 @@
 import { normalizeHeadlineSpans, mergeHeadlineSpans } from './headlines';
 import { remapOffsetSpans } from './textEditMap';
 
-export const PRESENT_TEXT_STYLES = ['emphasis', 'caption', 'large', 'whisper'];
+export const PRESENT_TEXT_STYLES = ['emphasis', 'caption', 'large', 'whisper', 'dark-text'];
 export const PRESENT_LAYOUT_STYLES = ['align-left', 'align-center'];
 
 export function normalizePresentStyleSpans(spans, contentLength) {
@@ -118,6 +118,10 @@ export function resolveSceneLayout(localStyleSpans) {
   return 'center';
 }
 
+export function resolveSceneDarkText(localStyleSpans) {
+  return (localStyleSpans ?? []).some((s) => s.style === 'dark-text');
+}
+
 export function buildPresentStyledParts(text, headlineSpans, presentStyleSpans) {
   const content = String(text ?? '');
   if (!content) return [];
@@ -147,15 +151,16 @@ export function buildPresentStyledParts(text, headlineSpans, presentStyleSpans) 
     const caption = styles.some((s) => s.style === 'caption' && s.start <= start && s.end >= end);
     const large = styles.some((s) => s.style === 'large' && s.start <= start && s.end >= end);
     const whisper = styles.some((s) => s.style === 'whisper' && s.start <= start && s.end >= end);
-    parts.push({ text: content.slice(start, end), headline, emphasis, caption, large, whisper });
+    const darkText = styles.some((s) => s.style === 'dark-text' && s.start <= start && s.end >= end);
+    parts.push({ text: content.slice(start, end), headline, emphasis, caption, large, whisper, darkText });
   }
-  return parts.length ? parts : [{ text: content, headline: false, emphasis: false, caption: false, large: false, whisper: false }];
+  return parts.length ? parts : [{ text: content, headline: false, emphasis: false, caption: false, large: false, whisper: false, darkText: false }];
 }
 
 export function presentStyledPartsForScene(sectionContent, rawStart, rawEnd, trimmedSceneText, headlineSpans, presentStyleSpans) {
   const full = String(sectionContent ?? '');
   const trimmed = String(trimmedSceneText ?? '');
-  if (!trimmed) return [{ text: '', headline: false, emphasis: false, caption: false, large: false, whisper: false }];
+  if (!trimmed) return [{ text: '', headline: false, emphasis: false, caption: false, large: false, whisper: false, darkText: false }];
 
   const rawScene = full.slice(rawStart, rawEnd);
   const lead = rawScene.indexOf(trimmed);
@@ -176,17 +181,26 @@ export function presentStyledPartsForScene(sectionContent, rawStart, rawEnd, tri
 
 export function partsForLineText(lineText, styledParts) {
   const line = String(lineText ?? '');
+  const emptyPart = {
+    text: line,
+    headline: false,
+    emphasis: false,
+    caption: false,
+    large: false,
+    whisper: false,
+    darkText: false,
+  };
   if (!line || !styledParts?.length) {
-    return [{ text: line, headline: false, emphasis: false, caption: false, large: false, whisper: false }];
+    return [emptyPart];
   }
   const trimmed = line.trim();
   if (!trimmed) {
-    return [{ text: line, headline: false, emphasis: false, caption: false, large: false, whisper: false }];
+    return [emptyPart];
   }
   for (const part of styledParts) {
     if (part.text.trim() === trimmed) {
       return [{ ...part, text: line }];
     }
   }
-  return [{ text: line, headline: false, emphasis: false, caption: false, large: false, whisper: false }];
+  return [emptyPart];
 }

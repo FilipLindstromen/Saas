@@ -83,6 +83,36 @@
   max-width: min(1280px, 96vw);
 }
 
+.present-view__inner--text-rotate {
+  align-items: stretch;
+  max-width: min(1280px, 96vw);
+}
+
+.present-view__inner--dark-text {
+  background: rgba(255, 255, 255, 0.94);
+  color: #111;
+  border-radius: 16px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+  max-width: min(1280px, 96vw);
+}
+
+.present-view__inner--dark-text .present-view__headline,
+.present-view__inner--dark-text .present-view__emphasis,
+.present-view__inner--dark-text .present-view__caption,
+.present-view__inner--dark-text .present-rotate,
+.present-view__inner--dark-text .present-view__sentence {
+  color: #111;
+}
+
+.present-view__inner--dark-text .present-view__caption {
+  opacity: 0.75;
+}
+
+.present-view__inner--dark-text .present-view__type-whisper {
+  color: #333;
+  opacity: 0.85;
+}
+
 .present-view__sentence-stage {
   position: relative;
   flex: 1;
@@ -296,12 +326,21 @@
 
 .present-rotate--text-rotate {
   width: 100%;
+  max-width: 100%;
+  align-self: stretch;
 }
 
 .present-rotate__slot {
   width: 100%;
-  max-width: min(900px, 100%);
+  max-width: min(1280px, 96vw);
   margin: 0.15em 0;
+}
+
+.present-rotate__line--rotate-in,
+.present-rotate__line--rotate-settled,
+.present-rotate__line--rotate-out {
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .present-rotate__slot-mask {

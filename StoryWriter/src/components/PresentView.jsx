@@ -40,13 +40,10 @@ function loadGoogleFont(family) {
 
 function backgroundUrlForSceneItem(item, sectionsData) {
   if (!item) return '';
+  const fromScene = item.imageUrl && String(item.imageUrl).trim();
+  if (fromScene) return fromScene;
   const sectionData = item.sectionId ? sectionsData[item.sectionId] : null;
-  const sentenceImages = sectionData?.sentenceImages;
-  const sentenceIndexInSection = item.sentenceIndexInSection ?? 0;
-  const sentenceImageUrl =
-    (item.imageUrl && String(item.imageUrl).trim()) ||
-    (Array.isArray(sentenceImages) ? (sentenceImages[sentenceIndexInSection] || '') : '');
-  return sentenceImageUrl || (sectionData?.backgroundImageUrl || '');
+  return sectionData?.backgroundImageUrl || '';
 }
 
 function samePresentBackground(urlA, urlB) {
@@ -156,16 +153,9 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
     const sentence = sentences[displayIndex] ?? '';
     return resolveAnimationForSentence(sentence, rules);
   }, [sentences, displayIndex, rules]);
-  const currentSectionId = currentItem?.sectionId;
-  const sentenceIndexInSection = currentItem?.sentenceIndexInSection ?? 0;
-  const sectionData = currentSectionId ? sectionsData[currentSectionId] : null;
-  const sentenceImages = sectionData?.sentenceImages;
-  const sentenceImageUrl =
-    (currentItem?.imageUrl && String(currentItem.imageUrl).trim()) ||
-    (Array.isArray(sentenceImages) ? (sentenceImages[sentenceIndexInSection] || '') : '');
-  const currentSectionBgUrl = backgroundUrlForSceneItem(currentItem, sectionsData);
   const displayBgIsVideo = isVideoBackgroundUrl(displayBgUrl);
   const sceneLayout = currentItem?.layout ?? 'center';
+  const hasDarkTextPresent = Boolean(currentItem?.darkText);
 
   const sentence = sentences[displayIndex] ?? '';
   const styledParts = currentItem?.styledParts;
@@ -181,6 +171,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
     [useLineRevealPresent, sentence, rotateSpans, bulletSpans, revealStep]
   );
   const hasBulletPresent = bulletSpans.length > 0;
+  const hasRotatePresent = rotateSpans.length > 0;
 
   useEffect(() => {
     onPresentIndexChange?.(displayIndex);
@@ -509,6 +500,8 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           'present-view__inner',
           sceneLayout === 'left' && 'present-view__inner--layout-left',
           hasBulletPresent && 'present-view__inner--bullets',
+          hasRotatePresent && 'present-view__inner--text-rotate',
+          hasDarkTextPresent && 'present-view__inner--dark-text',
         ]
           .filter(Boolean)
           .join(' ')}

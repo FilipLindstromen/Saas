@@ -2,6 +2,10 @@ import { isValidTargetOutcomeId } from '../constants/targetOutcomes';
 import { normalizePresentationAnimationRules } from './textAnimations';
 import { normalizeHeadlineSpans } from './headlines';
 import { normalizePresentStyleSpans } from './presentStyles';
+import {
+  normalizePresentSceneImages,
+  normalizePresentSceneImageLocks,
+} from './presentSceneImages';
 
 function persistHeadlineSpans(spans, contentLength) {
   return normalizeHeadlineSpans(spans, contentLength).map(({ start, end }) => ({ start, end }));
@@ -95,6 +99,8 @@ export function normalizeStoryData(raw, getDefaultSectionOrder, createEmptySecti
           backgroundImageCredit: typeof sectionsData[id].backgroundImageCredit === 'string' ? sectionsData[id].backgroundImageCredit : undefined,
           sentenceImages: arr,
           sentenceImageLocks: persistSentenceImageLocks(sectionsData[id].sentenceImageLocks),
+          presentSceneImages: normalizePresentSceneImages(sectionsData[id].presentSceneImages),
+          presentSceneImageLocks: normalizePresentSceneImageLocks(sectionsData[id].presentSceneImageLocks),
           headlineSpans: persistHeadlineSpans(sectionsData[id].headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(sectionsData[id].rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(sectionsData[id].bulletLineSpans, String(content).length),
@@ -143,6 +149,8 @@ export function saveContent(payload) {
           backgroundImageCredit: typeof section.backgroundImageCredit === 'string' ? section.backgroundImageCredit : undefined,
           sentenceImages: arr,
           sentenceImageLocks: persistSentenceImageLocks(section.sentenceImageLocks),
+          presentSceneImages: normalizePresentSceneImages(section.presentSceneImages),
+          presentSceneImageLocks: normalizePresentSceneImageLocks(section.presentSceneImageLocks),
           headlineSpans: persistHeadlineSpans(section.headlineSpans, String(content).length),
           rotateLineSpans: persistRotateSpans(section.rotateLineSpans, String(content).length),
           bulletLineSpans: persistBulletSpans(section.bulletLineSpans, String(content).length),

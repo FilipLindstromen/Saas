@@ -9,6 +9,10 @@ import {
   normalizedOffsetToRawOffset,
   buildPresentSceneList,
 } from './sentences';
+import {
+  remapPresentSceneImages,
+  remapPresentSceneImageLocks,
+} from './presentSceneImages';
 import { mapOldIndexToNew } from './textEditMap';
 
 /** Invisible boundary between framework sections in the unified editor (not shown in UI). */
@@ -107,6 +111,19 @@ export function applyUnifiedStoryEdit(sectionOrder, sectionsData, unified) {
       content: newContent,
       sentenceImages: remapSentenceImages(old.content ?? '', newContent, old.sentenceImages ?? []),
       sentenceImageLocks: remapSentenceLocks(old.content ?? '', newContent, old.sentenceImageLocks ?? []),
+      presentSceneImages: remapPresentSceneImages(
+        old.content ?? '',
+        newContent,
+        old.presentSceneImages ?? {},
+        old.sentenceImages ?? []
+      ),
+      presentSceneImageLocks: remapPresentSceneImageLocks(
+        old.content ?? '',
+        newContent,
+        old.presentSceneImageLocks ?? {},
+        old.presentSceneImages ?? {},
+        old.sentenceImages ?? []
+      ),
       headlineSpans: remapHeadlineSpans(old.content ?? '', newContent, old.headlineSpans ?? []),
       presentStyleSpans: remapPresentStyleSpans(old.content ?? '', newContent, old.presentStyleSpans ?? []),
       rotateLineSpans: remapRotateSpans(old.content ?? '', newContent, old.rotateLineSpans ?? []),

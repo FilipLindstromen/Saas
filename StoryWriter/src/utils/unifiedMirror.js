@@ -9,13 +9,14 @@ function styleFlagsForRange(styles, start, end) {
   const large = styles.some((s) => s.style === 'large' && s.start <= start && s.end >= end);
   const whisper = styles.some((s) => s.style === 'whisper' && s.start <= start && s.end >= end);
   const alignLeft = styles.some((s) => s.style === 'align-left' && s.start <= start && s.end >= end);
-  return { emphasis, caption, large, whisper, alignLeft };
+  const darkText = styles.some((s) => s.style === 'dark-text' && s.start <= start && s.end >= end);
+  return { emphasis, caption, large, whisper, alignLeft, darkText };
 }
 
 export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
   const unified = joinSectionContents(sectionOrder, sectionsData);
   if (!unified) {
-    return [{ text: '', hasImage: false, headline: false, rotate: false, bullet: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false }];
+    return [{ text: '', hasImage: false, headline: false, rotate: false, bullet: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false, darkText: false }];
   }
 
   const boundaries = new Set([0, unified.length]);
@@ -28,12 +29,13 @@ export function buildUnifiedMirrorParts(sectionOrder, sectionsData) {
   for (const span of getUnifiedSectionSpans(sectionOrder, sectionsData)) {
     const content = sectionsData[span.sectionId]?.content ?? '';
     const images = sectionsData[span.sectionId]?.sentenceImages ?? [];
+    const presentSceneImages = sectionsData[span.sectionId]?.presentSceneImages ?? {};
     const headlines = sectionsData[span.sectionId]?.headlineSpans ?? [];
     const rotates = sectionsData[span.sectionId]?.rotateLineSpans ?? [];
     const bullets = sectionsData[span.sectionId]?.bulletLineSpans ?? [];
     const presentStyles = sectionsData[span.sectionId]?.presentStyleSpans ?? [];
 
-    for (const seg of getSentenceSegments(content, images)) {
+    for (const seg of getSentenceSegments(content, images, presentSceneImages)) {
       if (!seg.hasImage) continue;
       const start = span.start + seg.start;
       const end = span.start + seg.end;
@@ -119,12 +121,13 @@ export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
   for (const span of getUnifiedSectionSpans(sectionOrder, sectionsData)) {
     const content = sectionsData[span.sectionId]?.content ?? '';
     const images = sectionsData[span.sectionId]?.sentenceImages ?? [];
+    const presentSceneImages = sectionsData[span.sectionId]?.presentSceneImages ?? {};
     const headlines = sectionsData[span.sectionId]?.headlineSpans ?? [];
     const rotates = sectionsData[span.sectionId]?.rotateLineSpans ?? [];
     const bullets = sectionsData[span.sectionId]?.bulletLineSpans ?? [];
     const presentStyles = sectionsData[span.sectionId]?.presentStyleSpans ?? [];
 
-    for (const seg of getSentenceSegments(content, images)) {
+    for (const seg of getSentenceSegments(content, images, presentSceneImages)) {
       if (!seg.hasImage) continue;
       imageRanges.push({ start: span.start + seg.start, end: span.start + seg.end });
     }
@@ -169,12 +172,15 @@ export function buildUnifiedLineGutter(sectionOrder, sectionsData) {
     const alignLeft = presentStyleRanges.some(
       (r) => r.style === 'align-left' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
     );
-    rows.push({ headline, rotate, bullet, hasImage, emphasis, caption, large, whisper, alignLeft });
+    const darkText = presentStyleRanges.some(
+      (r) => r.style === 'dark-text' && rangeOverlapsLine(r.start, r.end, lineStart, lineEnd)
+    );
+    rows.push({ headline, rotate, bullet, hasImage, emphasis, caption, large, whisper, alignLeft, darkText });
     offset = lineEnd + 1;
   }
   return rows.length
     ? rows
-    : [{ headline: false, rotate: false, bullet: false, hasImage: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false }];
+    : [{ headline: false, rotate: false, bullet: false, hasImage: false, emphasis: false, caption: false, large: false, whisper: false, alignLeft: false, darkText: false }];
 }
 
 export function buildUnifiedMirrorPartsSafe(sectionOrder, sectionsData) {

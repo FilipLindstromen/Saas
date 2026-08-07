@@ -4,7 +4,10 @@ import {
   getSentenceStarts,
   getGlobalSceneIndexForSentence,
   buildPresentSceneList,
+  getPresentScenes,
+  getSceneStartForSentenceIndex,
 } from '../utils/sentences';
+import { isSceneLocked } from '../utils/presentSceneImages';
 import {
   joinSectionContents,
   locateSentenceAtUnifiedOffset,
@@ -197,6 +200,7 @@ function UnifiedEditEditor({
       let isLarge = false;
       let isWhisper = false;
       let isAlignLeft = false;
+      let isDarkText = false;
       if (range) {
         const sectionContent = sectionsData[range.sectionId]?.content ?? '';
         const presentStyles = sectionsData[range.sectionId]?.presentStyleSpans ?? [];
@@ -224,6 +228,7 @@ function UnifiedEditEditor({
         isLarge = selectionHasPresentStyle(presentStyles, range.start, range.end, len, 'large');
         isWhisper = selectionHasPresentStyle(presentStyles, range.start, range.end, len, 'whisper');
         isAlignLeft = selectionHasPresentStyle(presentStyles, range.start, range.end, len, 'align-left');
+        isDarkText = selectionHasPresentStyle(presentStyles, range.start, range.end, len, 'dark-text');
       }
       setContextMenu({
         open: true,
@@ -238,6 +243,7 @@ function UnifiedEditEditor({
         isLarge,
         isWhisper,
         isAlignLeft,
+        isDarkText,
       });
     },
     [sectionOrder, sectionsData]
@@ -254,6 +260,7 @@ function UnifiedEditEditor({
       isLarge,
       isWhisper,
       isAlignLeft,
+      isDarkText,
     } = contextMenu;
     const hasRange = Boolean(range);
 
@@ -363,6 +370,7 @@ function UnifiedEditEditor({
       styleToggle('caption', isCaption, 'Caption', 'Remove caption'),
       styleToggle('large', isLarge, 'Large type', 'Remove large type'),
       styleToggle('whisper', isWhisper, 'Whisper', 'Remove whisper'),
+      styleToggle('dark-text', isDarkText, 'Dark text', 'Remove dark text'),
       {
         id: 'align-left',
         label: isAlignLeft ? 'Remove align left' : 'Align left',
@@ -419,7 +427,7 @@ function UnifiedEditEditor({
               </span>
             )}
             {line.hasImage && (
-              <span className="edit-step__gutter-mark edit-step__gutter-mark--image" title="Sentence background">
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--image" title="Present screen background">
                 ▣
               </span>
             )}
@@ -448,6 +456,11 @@ function UnifiedEditEditor({
                 W
               </span>
             )}
+            {line.darkText && (
+              <span className="edit-step__gutter-mark edit-step__gutter-mark--dark-text" title="Dark text (light panel)">
+                D
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -464,6 +477,7 @@ function UnifiedEditEditor({
             part.caption && 'edit-step__content-caption',
             part.large && 'edit-step__content-large',
             part.whisper && 'edit-step__content-whisper',
+            part.darkText && 'edit-step__content-dark-text',
             part.alignLeft && 'edit-step__content-align-left',
             part.hasImage && 'unified-story-editor__mirror-highlight edit-step__content-highlight',
           ]
@@ -588,15 +602,26 @@ export default function EditView({
 
   const isSentenceLocked = useCallback(
     (sectionId, sentenceIndex) => {
-      const locks = sectionsData[sectionId]?.sentenceImageLocks;
-      return Array.isArray(locks) && Boolean(locks[sentenceIndex]);
+      const section = sectionsData[sectionId];
+      const content = section?.content ?? '';
+      const sceneStart = getSceneStartForSentenceIndex(content, sentenceIndex);
+      return isSceneLocked(section?.presentSceneImageLocks, sceneStart);
     },
     [sectionsData]
   );
 
-  const activeSentenceImageUrl = activeSentence
-    ? (sectionsData[activeSentence.sectionId]?.sentenceImages?.[activeSentence.sentenceIndex] || '')
-    : '';
+  const sceneForActiveSentence = useMemo(() => {
+    if (!activeSentence) return null;
+    const section = sectionsData[activeSentence.sectionId];
+    const content = section?.content ?? '';
+    const scenes = getPresentScenes(content, {
+      presentSceneImages: section?.presentSceneImages ?? {},
+      sentenceImages: section?.sentenceImages ?? [],
+    });
+    return scenes.find((sc) => sc.sentenceIndices.includes(activeSentence.sentenceIndex)) ?? null;
+  }, [activeSentence, sectionsData]);
+
+  const activeSentenceImageUrl = sceneForActiveSentence?.imageUrl ?? '';
   const activeSentenceHasMedia = Boolean(String(activeSentenceImageUrl).trim());
   const activeSentenceLocked = activeSentence
     ? isSentenceLocked(activeSentence.sectionId, activeSentence.sentenceIndex)
@@ -632,8 +657,13 @@ export default function EditView({
   const handleOpenSentencePicker = useCallback(
     (sectionId, sentenceIndex, { autoSearch = false } = {}) => {
       if (isSentenceLocked(sectionId, sentenceIndex)) return;
-      const url = String(sectionsData[sectionId]?.sentenceImages?.[sentenceIndex] ?? '').trim();
-      if (url) return;
+      const section = sectionsData[sectionId];
+      const scenes = getPresentScenes(section?.content ?? '', {
+        presentSceneImages: section?.presentSceneImages ?? {},
+        sentenceImages: section?.sentenceImages ?? [],
+      });
+      const sc = scenes.find((s) => s.sentenceIndices.includes(sentenceIndex));
+      if (sc?.imageUrl) return;
       setPickerAutoSearch(autoSearch);
       setManualPickerOpen(true);
     },
@@ -703,11 +733,11 @@ export default function EditView({
   }, [activeSentence, sectionOrder, sectionsData]);
 
   const manualActionLabel = useMemo(() => {
-    if (useImport) return 'Import image for sentence';
-    if (useAiSketch) return 'Generate sketch for sentence';
-    if (useStock && sentenceImageSource.includes('video')) return 'Search video for sentence';
-    if (useStock) return 'Search image for sentence';
-    return 'Find background for sentence';
+    if (useImport) return 'Import image for present screen';
+    if (useAiSketch) return 'Generate sketch for present screen';
+    if (useStock && sentenceImageSource.includes('video')) return 'Search video for present screen';
+    if (useStock) return 'Search image for present screen';
+    return 'Find background for present screen';
   }, [useImport, useAiSketch, useStock, sentenceImageSource]);
 
   const handleToggleActiveSentenceLock = useCallback(() => {
@@ -730,14 +760,15 @@ export default function EditView({
       for (const sectionId of sectionOrder) {
         const section = sectionsData[sectionId];
         const content = section?.content ?? '';
-        const { sentences } = getSentenceStarts(content);
-        const existing = section?.sentenceImages ?? [];
-        const locks = section?.sentenceImageLocks ?? [];
-        for (let i = 0; i < sentences.length; i++) {
-          if (Boolean(locks[i])) continue;
-          const hasImage = Array.isArray(existing) && (existing[i] ?? '').toString().trim() !== '';
-          if (hasImage) continue;
-          const query = sentences[i].slice(0, 80).trim();
+        const scenes = getPresentScenes(content, {
+          presentSceneImages: section?.presentSceneImages ?? {},
+          sentenceImages: section?.sentenceImages ?? [],
+        });
+        for (const sc of scenes) {
+          const sceneStart = sc.start;
+          if (isSceneLocked(section?.presentSceneImageLocks, sceneStart)) continue;
+          if (sc.imageUrl) continue;
+          const query = sc.text.slice(0, 80).trim();
           if (!query) continue;
           try {
             const result = await resolveSentenceBackgroundImage({
@@ -747,10 +778,10 @@ export default function EditView({
               sketchInstructions,
             });
             if (result) {
-              onSentenceImageChange?.(sectionId, i, result.url, result.credit);
+              onSentenceImageChange?.(sectionId, sc.primarySentenceIndex, result.url, result.credit);
             }
           } catch {
-            /* skip sentence on failure */
+            /* skip scene on failure */
           }
         }
       }
@@ -824,7 +855,7 @@ export default function EditView({
       </div>
       <aside
         className={`edit-view__side${pickerOpen ? ' edit-view__side--picker-open' : ''}`}
-        aria-label="Sentence background"
+        aria-label="Present screen background"
         onMouseDown={(e) => {
           if (e.target.closest('.edit-view__side-picker, .sketch-bg-panel, .unsplash-picker-inline, .import-image-panel')) {
             return;
@@ -838,7 +869,7 @@ export default function EditView({
         <div className="edit-view__side-options">
           <fieldset className="edit-view__source-field">
             <legend className="edit-view__source-legend">Background source</legend>
-            <div className="edit-view__source-grid" role="radiogroup" aria-label="Sentence background source">
+            <div className="edit-view__source-grid" role="radiogroup" aria-label="Present screen background source">
               {SENTENCE_IMAGE_SOURCE_OPTIONS.map((o) => {
                 const checked = sentenceImageSource === o.value;
                 return (
@@ -867,7 +898,7 @@ export default function EditView({
               checked={imageSearchOnLineClick}
               onChange={handleImageSearchOnLineClickChange}
             />
-            <span>Auto search when selecting a sentence</span>
+            <span>Auto search when selecting text in a screen</span>
           </label>
           {useAiSketch && (
             <label className="edit-view__side-option edit-view__side-option--stack">
@@ -887,7 +918,7 @@ export default function EditView({
         {activeSentence ? (
         <section className="edit-view__side-section edit-view__side-section--selected" aria-label="Selected background">
           <>
-              <p className="edit-view__side-sentence">{activeSentenceText || 'This sentence'}</p>
+              <p className="edit-view__side-sentence">{activeSentenceText || 'This present screen'}</p>
               {activeSentenceHasMedia ? (
                 <div className="edit-view__side-preview edit-view__side-preview--selected">
                   {isVideoBackgroundUrl(activeSentenceImageUrl) ? (
@@ -898,13 +929,13 @@ export default function EditView({
                       playsInline
                       loop
                       autoPlay
-                      aria-label="Sentence background video"
+                      aria-label="Present screen background video"
                     />
                   ) : (
                     <img
                       className="edit-view__side-thumb"
                       src={activeSentenceImageUrl}
-                      alt="Sentence background"
+                      alt="Present screen background"
                     />
                   )}
                 </div>

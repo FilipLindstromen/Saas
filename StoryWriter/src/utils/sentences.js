@@ -3,6 +3,7 @@ import {
   presentStyledPartsForScene,
   presentStyleSpansForScene,
   resolveSceneLayout,
+  resolveSceneDarkText,
 } from './presentStyles';
 import { rotateSpansForScene, bulletSpansForScene, getLineRevealStepCount } from './lineReveal';
 
@@ -89,11 +90,53 @@ export function normalizedOffsetToRawOffset(content, normOff) {
   return s.length;
 }
 
+const PRESENT_SCENE_BREAK = /\n[\t ]*\n+/g;
+
+function parseImageArgs(secondArg, thirdArg) {
+  if (Array.isArray(secondArg)) {
+    return { presentSceneImages: {}, sentenceImages: secondArg };
+  }
+  if (secondArg && typeof secondArg === 'object') {
+    return {
+      presentSceneImages: secondArg.presentSceneImages ?? {},
+      sentenceImages: secondArg.sentenceImages ?? [],
+    };
+  }
+  return { presentSceneImages: {}, sentenceImages: [] };
+}
+
+export function resolveSceneImageUrl(sceneStart, presentSceneImages, legacySentenceImages, sentenceIndices) {
+  const key = String(sceneStart);
+  const fromScene = presentSceneImages?.[key];
+  if (fromScene != null && String(fromScene).trim()) {
+    return String(fromScene).trim();
+  }
+  const images = Array.isArray(legacySentenceImages) ? legacySentenceImages : [];
+  for (const i of sentenceIndices ?? []) {
+    const url = images[i];
+    if (url != null && String(url).trim()) return String(url).trim();
+  }
+  return '';
+}
+
+export function getSceneStartForSentenceIndex(content, sentenceIndex) {
+  const scenes = getPresentScenes(content);
+  const hit = scenes.find((sc) => sc.sentenceIndices.includes(sentenceIndex));
+  return hit != null ? hit.start : null;
+}
+
 /** Return segments of raw content for highlight layer: [{ start, end, text, hasImage }, ...]. */
-export function getSentenceSegments(content, sentenceImages = []) {
+export function getSentenceSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
   const raw = String(content ?? '');
   const { sentences, starts } = getSentenceStarts(content);
   if (!sentences.length) return [];
+
+  const scenes = getPresentScenes(content, { presentSceneImages, sentenceImages: legacySentenceImages });
+  const sentenceHasSceneImage = new Set();
+  for (const sc of scenes) {
+    if (!sc.imageUrl) continue;
+    for (const i of sc.sentenceIndices) sentenceHasSceneImage.add(i);
+  }
 
   const segments = [];
   let cursor = 0;
@@ -109,7 +152,7 @@ export function getSentenceSegments(content, sentenceImages = []) {
         start: rawStart,
         end: rawEnd,
         text: raw.slice(rawStart, rawEnd),
-        hasImage: Boolean(sentenceImages[i]),
+        hasImage: sentenceHasSceneImage.has(i),
       });
       cursor = rawEnd;
       continue;
@@ -118,7 +161,7 @@ export function getSentenceSegments(content, sentenceImages = []) {
       start: span.start,
       end: span.end,
       text: span.text,
-      hasImage: Boolean(sentenceImages[i]),
+      hasImage: sentenceHasSceneImage.has(i),
     });
     cursor = span.end;
     while (cursor < raw.length && /[\s\n]/.test(raw[cursor])) cursor += 1;
@@ -128,26 +171,31 @@ export function getSentenceSegments(content, sentenceImages = []) {
 }
 
 /** Segments for edit highlight — same boundaries as present mode. */
-export function getSentenceHighlightSegments(content, sentenceImages = []) {
-  return getSentenceSegments(content, sentenceImages).map(({ start, end, hasImage }) => ({
+export function getSentenceHighlightSegments(content, legacySentenceImages = [], presentSceneImages = {}) {
+  return getSentenceSegments(content, legacySentenceImages, presentSceneImages).map(({ start, end, hasImage }) => ({
     start,
     end,
     hasImage,
   }));
 }
 
-const PRESENT_SCENE_BREAK = /\n[\t ]*\n+/g;
-
 /**
  * Present-mode scenes: blocks separated by a blank line (double line break).
  * Preserves single line breaks inside each scene as authored in the editor.
  */
-export function getPresentScenes(content, sentenceImages = [], headlineSpans = [], rotateLineSpans = [], bulletLineSpans = [], presentStyleSpans = []) {
+export function getPresentScenes(
+  content,
+  imageArg = {},
+  headlineSpans = [],
+  rotateLineSpans = [],
+  bulletLineSpans = [],
+  presentStyleSpans = []
+) {
   const raw = String(content ?? '');
   if (!raw.trim()) return [];
 
-  const images = Array.isArray(sentenceImages) ? sentenceImages : [];
-  const segments = getSentenceSegments(content, images);
+  const { presentSceneImages, sentenceImages } = parseImageArgs(imageArg);
+  const segments = getSentenceSegments(content);
   const scenes = [];
   let chunkStart = 0;
   let match;
@@ -162,14 +210,12 @@ export function getPresentScenes(content, sentenceImages = [], headlineSpans = [
       if (seg.end > rawStart && seg.start < rawEnd) sentenceIndices.push(i);
     }
     const primarySentenceIndex = sentenceIndices[0] ?? 0;
-    let imageUrl = '';
-    for (const i of sentenceIndices) {
-      const img = images[i];
-      if (img != null && String(img).trim()) {
-        imageUrl = String(img).trim();
-        break;
-      }
-    }
+    const imageUrl = resolveSceneImageUrl(
+      rawStart,
+      presentSceneImages,
+      sentenceImages,
+      sentenceIndices
+    );
 
     const rotateSpans = rotateSpansForScene(raw, rawStart, rawEnd, text, rotateLineSpans);
     const bulletSpans = bulletSpansForScene(raw, rawStart, rawEnd, text, bulletLineSpans);
@@ -181,6 +227,7 @@ export function getPresentScenes(content, sentenceImages = [], headlineSpans = [
       sentenceIndices,
       primarySentenceIndex,
       imageUrl,
+      darkText: resolveSceneDarkText(localStyles),
       styledParts: presentStyledPartsForScene(raw, rawStart, rawEnd, text, headlineSpans, presentStyleSpans),
       layout: resolveSceneLayout(localStyles),
       rotateSpans,
@@ -206,26 +253,35 @@ export function buildPresentSceneList(sectionOrder, sectionsData) {
   for (const sectionId of sectionOrder) {
     const section = sectionsData[sectionId];
     const content = section?.content ?? '';
+    const presentSceneImages = section?.presentSceneImages ?? {};
     const sentenceImages = section?.sentenceImages ?? [];
     const headlineSpans = section?.headlineSpans ?? [];
     const rotateLineSpans = section?.rotateLineSpans ?? [];
     const bulletLineSpans = section?.bulletLineSpans ?? [];
     const presentStyleSpans = section?.presentStyleSpans ?? [];
-    const scenes = getPresentScenes(content, sentenceImages, headlineSpans, rotateLineSpans, bulletLineSpans, presentStyleSpans);
+    const scenes = getPresentScenes(
+      content,
+      { presentSceneImages, sentenceImages },
+      headlineSpans,
+      rotateLineSpans,
+      bulletLineSpans,
+      presentStyleSpans
+    );
     for (const scene of scenes) {
       out.push({
         text: scene.text,
         sectionId,
         sentenceIndexInSection: scene.primarySentenceIndex,
         sentenceIndices: scene.sentenceIndices,
+        sceneStart: scene.start,
         imageUrl: scene.imageUrl,
+        darkText: scene.darkText,
         styledParts: scene.styledParts,
         layout: scene.layout,
         rotateSpans: scene.rotateSpans,
         bulletSpans: scene.bulletSpans,
         lineRevealStepCount: scene.lineRevealStepCount,
         rotateStepCount: scene.rotateStepCount,
-        sceneStart: scene.start,
         sceneEnd: scene.end,
       });
     }
@@ -238,7 +294,10 @@ export function getGlobalSceneIndexForSentence(sectionOrder, sectionsData, secti
   let global = 0;
   for (const sid of sectionOrder) {
     const section = sectionsData[sid];
-    const scenes = getPresentScenes(section?.content ?? '', section?.sentenceImages ?? []);
+    const scenes = getPresentScenes(section?.content ?? '', {
+      presentSceneImages: section?.presentSceneImages ?? {},
+      sentenceImages: section?.sentenceImages ?? [],
+    });
     if (sid === sectionId) {
       const sceneIdx = scenes.findIndex((sc) => sc.sentenceIndices.includes(sentenceIndexInSection));
       return global + (sceneIdx >= 0 ? sceneIdx : 0);

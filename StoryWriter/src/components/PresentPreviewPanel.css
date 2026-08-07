@@ -43,6 +43,24 @@
   align-self: stretch;
 }
 
+.present-preview-panel__stage--text-rotate {
+  max-width: 100%;
+}
+
+.present-preview-panel__stage--text-rotate .present-rotate__slot {
+  max-width: 100%;
+}
+
+.present-preview-panel__stage--dark-text {
+  background: rgba(255, 255, 255, 0.94);
+  color: #111;
+}
+
+.present-preview-panel__stage--dark-text .present-rotate,
+.present-preview-panel__stage--dark-text .present-view__sentence {
+  color: #111;
+}
+
 .present-preview-panel__stage .present-rotate {
   font-size: inherit !important;
 }

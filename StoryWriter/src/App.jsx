@@ -11,7 +11,11 @@ import {
   FRAMEWORKS,
 } from './constants/frameworks';
 import { TARGET_OUTCOMES, DEFAULT_TARGET_OUTCOME_ID, getTargetOutcome } from './constants/targetOutcomes';
-import { getSentenceStarts } from './utils/sentences';
+import { getSceneStartForSentenceIndex, getPresentScenes } from './utils/sentences';
+import {
+  normalizePresentSceneImages,
+  normalizePresentSceneImageLocks,
+} from './utils/presentSceneImages';
 import { generateFullStory } from './services/openai';
 import { resolveSentenceBackgroundImage } from './services/sentenceBackgroundAi';
 import SettingsModal from '@shared/SettingsModal/SettingsModal';
@@ -251,14 +255,33 @@ function App() {
   const handleSentenceImageChange = useCallback((sectionId, sentenceIndex, url) => {
     setPersisted((prev) => {
       const section = prev.sectionsData[sectionId] ?? {};
+      const content = section.content ?? '';
+      const sceneStart = getSceneStartForSentenceIndex(content, sentenceIndex);
+      if (sceneStart == null) return prev;
+
+      const presentSceneImages = { ...normalizePresentSceneImages(section.presentSceneImages) };
+      const key = String(sceneStart);
+      if (url) presentSceneImages[key] = url;
+      else delete presentSceneImages[key];
+
       const arr = Array.isArray(section.sentenceImages) ? [...section.sentenceImages] : [];
-      while (arr.length <= sentenceIndex) arr.push('');
-      arr[sentenceIndex] = url || '';
+      const scenes = getPresentScenes(content, {
+        presentSceneImages,
+        sentenceImages: arr,
+      });
+      const scene = scenes.find((s) => s.start === sceneStart);
+      if (scene) {
+        for (const i of scene.sentenceIndices) {
+          while (arr.length <= i) arr.push('');
+          arr[i] = '';
+        }
+      }
+
       return {
         ...prev,
         sectionsData: {
           ...prev.sectionsData,
-          [sectionId]: { ...section, sentenceImages: arr },
+          [sectionId]: { ...section, presentSceneImages, sentenceImages: arr },
         },
       };
     });
@@ -267,14 +290,20 @@ function App() {
   const handleSentenceImageLockChange = useCallback((sectionId, sentenceIndex, locked) => {
     setPersisted((prev) => {
       const section = prev.sectionsData[sectionId] ?? {};
-      const locks = Array.isArray(section.sentenceImageLocks) ? [...section.sentenceImageLocks] : [];
-      while (locks.length <= sentenceIndex) locks.push(false);
-      locks[sentenceIndex] = Boolean(locked);
+      const content = section.content ?? '';
+      const sceneStart = getSceneStartForSentenceIndex(content, sentenceIndex);
+      if (sceneStart == null) return prev;
+      const presentSceneImageLocks = {
+        ...normalizePresentSceneImageLocks(section.presentSceneImageLocks),
+      };
+      const key = String(sceneStart);
+      if (locked) presentSceneImageLocks[key] = true;
+      else delete presentSceneImageLocks[key];
       return {
         ...prev,
         sectionsData: {
           ...prev.sectionsData,
-          [sectionId]: { ...section, sentenceImageLocks: locks },
+          [sectionId]: { ...section, presentSceneImageLocks },
         },
       };
     });
@@ -333,12 +362,13 @@ function App() {
       for (const sectionId of sectionOrder) {
         const section = sectionsData[sectionId];
         const content = section?.content ?? '';
-        const { sentences } = getSentenceStarts(content);
-        const existing = section?.sentenceImages ?? [];
-        for (let i = 0; i < sentences.length; i++) {
-          const hasImage = Array.isArray(existing) && (existing[i] ?? '').toString().trim() !== '';
-          if (hasImage) continue;
-          const query = sentences[i].slice(0, 80).trim();
+        const scenes = getPresentScenes(content, {
+          presentSceneImages: section?.presentSceneImages ?? {},
+          sentenceImages: section?.sentenceImages ?? [],
+        });
+        for (const sc of scenes) {
+          if (sc.imageUrl) continue;
+          const query = sc.text.slice(0, 80).trim();
           if (!query) continue;
           try {
             const result = await resolveSentenceBackgroundImage({
@@ -348,7 +378,7 @@ function App() {
               sketchInstructions,
             });
             if (result?.url) {
-              handleSentenceImageChange(sectionId, i, result.url, result.credit);
+              handleSentenceImageChange(sectionId, sc.primarySentenceIndex, result.url, result.credit);
             }
           } catch (err) {
             setError(err.message || 'Failed to set background image.');
@@ -365,6 +395,8 @@ function App() {
       const section = sectionsData[sectionId];
       if (!section) continue;
       if (String(section.backgroundImageUrl ?? '').trim()) return true;
+      const sceneImgs = Object.values(normalizePresentSceneImages(section.presentSceneImages ?? {}));
+      if (sceneImgs.some((u) => String(u).trim())) return true;
       const imgs = section.sentenceImages ?? [];
       if (imgs.some((u) => String(u ?? '').trim())) return true;
     }
@@ -374,7 +406,7 @@ function App() {
   const handleRemoveAllBgImages = useCallback(() => {
     if (
       !window.confirm(
-        'Remove all sentence backgrounds and section fallback images from this story? Locked images will be cleared too.'
+        'Remove all present-screen backgrounds and section fallback images from this story? Locked images will be cleared too.'
       )
     ) {
       return;
@@ -392,6 +424,8 @@ function App() {
           ...section,
           sentenceImages: clearedImages,
           sentenceImageLocks: clearedLocks,
+          presentSceneImages: {},
+          presentSceneImageLocks: {},
           backgroundImageUrl: undefined,
           backgroundImageCredit: undefined,
         };

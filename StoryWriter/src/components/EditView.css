@@ -647,6 +647,19 @@
   border-radius: 2px;
 }
 
+.edit-step__content-dark-text {
+  background: color-mix(in srgb, #f8fafc 88%, transparent);
+  color: #111;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-radius: 2px;
+}
+
+.edit-step__gutter-mark--dark-text {
+  color: #111;
+  background: color-mix(in srgb, #f8fafc 70%, var(--surface));
+}
+
 .edit-step__content-align-left {
   border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
   padding-left: 2px;
