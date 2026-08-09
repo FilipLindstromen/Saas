@@ -1978,6 +1978,35 @@
   color: #34d399;
 }
 
+/* Base style for standalone secondary buttons outside a .toolbar context
+   (the .toolbar button rule only applies to toolbar descendants). */
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  padding: 8px 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: transform 0.22s ease, background 0.24s ease, border-color 0.24s ease,
+    color 0.2s ease, box-shadow 0.28s ease;
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--button-hover-bg);
+  border-color: var(--button-hover-border);
+  box-shadow: var(--glow-primary);
+  transform: translateY(-1px);
+}
+
+.ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .toolbar button.toggle-off {
   opacity: 0.55;
 }
@@ -2302,9 +2331,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  font-weight: 600;
-  padding: 10px 22px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  flex-shrink: 0;
   border-radius: 12px;
   border: 1px solid var(--accent);
   background: var(--accent-gradient);

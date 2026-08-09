@@ -99,7 +99,8 @@ const LS_KEYS = {
   documentVisible: "powerwriter.documentVisible",
   inlineEditorVisible: "powerwriter.inlineEditorVisible",
   chatVisible: "powerwriter.chatVisible",
-  audioEditorVisible: "powerwriter.audioEditorVisible"
+  audioEditorVisible: "powerwriter.audioEditorVisible",
+  chatResponses: "powerwriter.chatResponsesByPath"
 } as const;
 const DEFAULT_SIDEBAR_WIDTH = 280;
 const DEFAULT_INSTRUCTIONS_RATIO = 0.32;
@@ -1079,9 +1080,18 @@ export default function App() {
   const [loadingSelection, setLoadingSelection] = useState(false);
 
   const [chatPrompt, setChatPrompt] = useState("");
-  const [chatResponses, setChatResponses] = useState<
-    { id: number; message: string }[]
-  >([]);
+  /** Generate/Review results, keyed by document (or folder) path so each stays with its own item. */
+  const [chatResponsesByPath, setChatResponsesByPath] = useState<
+    Record<string, { id: number; message: string }[]>
+  >(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = window.localStorage.getItem(LS_KEYS.chatResponses);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocGenerating, setIsDocGenerating] = useState(false);
   const [isDocReviewing, setIsDocReviewing] = useState(false);
@@ -1413,6 +1423,14 @@ export default function App() {
       instructionsRatio.toFixed(4)
     );
   }, [instructionsRatio]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      LS_KEYS.chatResponses,
+      JSON.stringify(chatResponsesByPath)
+    );
+  }, [chatResponsesByPath]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -2272,6 +2290,23 @@ export default function App() {
     selected?.type === "document"
       ? documentDetails?.content ?? ""
       : "";
+
+  const chatResponseKey = selected?.path ?? "__global__";
+  const chatResponses = chatResponsesByPath[chatResponseKey] ?? [];
+  const setChatResponses = (
+    updater:
+      | { id: number; message: string }[]
+      | ((
+          prev: { id: number; message: string }[]
+        ) => { id: number; message: string }[])
+  ) => {
+    setChatResponsesByPath((prev) => {
+      const current = prev[chatResponseKey] ?? [];
+      const next =
+        typeof updater === "function" ? updater(current) : updater;
+      return { ...prev, [chatResponseKey]: next };
+    });
+  };
 
   const showDocumentPanel = selected?.type === "document";
 
@@ -4761,9 +4796,10 @@ export default function App() {
                           isDocGenerating ||
                           isDocReviewing
                         }
+                        title={isDocGenerating ? "Generating…" : "Generate"}
+                        aria-label={isDocGenerating ? "Generating…" : "Generate"}
                       >
                         <IconSparkles size={18} />
-                        {isDocGenerating ? "Generating…" : "Generate"}
                       </button>
                       <button
                         type="button"
@@ -4775,8 +4811,10 @@ export default function App() {
                           isDocGenerating ||
                           isDocReviewing
                         }
+                        title={isDocReviewing ? "Reviewing…" : "Review"}
+                        aria-label={isDocReviewing ? "Reviewing…" : "Review"}
                       >
-                        {isDocReviewing ? "Reviewing…" : "Review"}
+                        <IconEye size={18} />
                       </button>
                       <button
                         type="button"
@@ -4792,14 +4830,22 @@ export default function App() {
                           !documentDetails ||
                           isRambleProcessing
                         }
-                        title="Record a ramble and transcribe it into this document"
+                        title={
+                          isRambleProcessing
+                            ? "Transcribing…"
+                            : isRambling
+                            ? "Stop rambling"
+                            : "Record a ramble and transcribe it into this document"
+                        }
+                        aria-label={
+                          isRambleProcessing
+                            ? "Transcribing…"
+                            : isRambling
+                            ? "Stop rambling"
+                            : "Ramble"
+                        }
                       >
-                        <IconMic size={16} />
-                        {isRambleProcessing
-                          ? "Transcribing…"
-                          : isRambling
-                          ? "Stop"
-                          : "Ramble"}
+                        <IconMic size={18} />
                       </button>
                     </div>
                   </div>
