@@ -103,7 +103,7 @@ export const STYLES = [
     id: 'playful-editorial',
     name: 'Playful Editorial',
     emoji: '🙃',
-    prompt: 'a playful editorial infographic design with bold flat vector illustrations, expressive geometric cartoon characters, quirky hand-drawn faces, chunky typography, colorful color-blocked sections, simple visual metaphors, clean diagrams, modern retro poster aesthetics, slightly naive illustration, high visual personality, minimal shading, sophisticated composition, friendly but not childish. Avoid corporate SaaS illustration, generic wellness aesthetics, photorealism, clinical medical illustrations, excessive gradients, and overly polished 3D graphics',
+    prompt: 'a playful editorial illustration on a single solid flat background color, featuring one bold flat-vector illustration or expressive geometric cartoon character with a quirky hand-drawn face, chunky confident shapes, modern retro poster aesthetics, slightly naive illustration style, high visual personality, minimal shading, sophisticated simple composition, friendly but not childish. Avoid corporate SaaS illustration, generic wellness aesthetics, photorealism, clinical medical illustrations, excessive gradients, overly polished 3D graphics, and busy multi-section infographic layouts',
   },
   {
     id: 'playful-web-infographic',
