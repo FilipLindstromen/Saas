@@ -200,6 +200,111 @@ const renderFormattedText = (value: string): ReactNode[] => {
   });
 };
 
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+/** Inverse of renderInlineSegments: markdown inline syntax -> HTML string. */
+const inlineToHtml = (line: string): string => {
+  const escaped = escapeHtml(line);
+  const afterBold = escaped.split(/(\*\*[^*]*\*\*)/g).filter((s) => s !== "");
+  let html = "";
+  for (const chunk of afterBold) {
+    const boldM = chunk.match(/^\*\*([\s\S]*?)\*\*$/);
+    if (boldM) {
+      html += `<strong>${boldM[1]}</strong>`;
+      continue;
+    }
+    const italicPass = chunk.split(/(\*[^*]*\*)/g).filter((s) => s !== "");
+    for (const seg of italicPass) {
+      const itM = seg.match(/^\*([^*]+)\*$/);
+      html += itM ? `<em>${itM[1]}</em>` : seg;
+    }
+  }
+  return html;
+};
+
+/** Inverse of renderFormattedText: markdown source -> editable HTML (one <div> per line). */
+const markdownToEditableHtml = (value: string): string => {
+  return value
+    .split("\n")
+    .map((line) => {
+      if (!line.trim()) {
+        return `<div class="formatted-text-spacer"><br></div>`;
+      }
+      const hr = line.match(/^(?:---|\*\*\*|___)\s*$/);
+      if (hr) {
+        return `<div class="formatted-text-hr"><br></div>`;
+      }
+      const listMatch = line.match(/^\s{0,3}[-*+]\s+(.+)$/);
+      if (listMatch) {
+        return `<div class="formatted-text-line formatted-text-list-item">${inlineToHtml(listMatch[1])}</div>`;
+      }
+      const bq = line.match(/^>\s{0,1}(.+)$/);
+      if (bq) {
+        return `<div class="formatted-text-line formatted-text-blockquote">${inlineToHtml(bq[1])}</div>`;
+      }
+      const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+      const headingLevel = headingMatch ? headingMatch[1].length : null;
+      const content =
+        headingMatch && headingMatch[2] != null ? headingMatch[2] : line;
+      if (headingLevel) {
+        return `<div class="formatted-text-line formatted-text-heading-${headingLevel}">${inlineToHtml(content)}</div>`;
+      }
+      return `<div class="formatted-text-line">${inlineToHtml(content)}</div>`;
+    })
+    .join("");
+};
+
+/** Inverse of inlineToHtml: walk a line element's children back into markdown syntax. */
+const inlineNodeToMarkdown = (node: ChildNode): string => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ?? "";
+  }
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "br") return "";
+    const inner = Array.from(el.childNodes).map(inlineNodeToMarkdown).join("");
+    if (tag === "strong" || tag === "b") return `**${inner}**`;
+    if (tag === "em" || tag === "i") return `*${inner}*`;
+    return inner;
+  }
+  return "";
+};
+
+/** Walk one top-level line element back into a markdown source line. */
+const lineElementToMarkdown = (el: HTMLElement): string => {
+  const className = el.className || "";
+  const text = Array.from(el.childNodes).map(inlineNodeToMarkdown).join("");
+  if (className.includes("formatted-text-spacer")) return "";
+  if (className.includes("formatted-text-hr")) return "---";
+  if (className.includes("formatted-text-list-item")) return `- ${text}`;
+  if (className.includes("formatted-text-blockquote")) return `> ${text}`;
+  const headingMatch = className.match(/formatted-text-heading-(\d)/);
+  if (headingMatch) return `${"#".repeat(Number(headingMatch[1]))} ${text}`;
+  return text;
+};
+
+/** Inverse of markdownToEditableHtml: current DOM state of the editable body -> markdown source. */
+const serializeEditableBody = (container: HTMLElement): string => {
+  const children = Array.from(container.childNodes);
+  if (children.length === 0) return "";
+  return children
+    .map((node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        return lineElementToMarkdown(node as HTMLElement);
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent ?? "";
+      }
+      return "";
+    })
+    .join("\n");
+};
+
 const inferBlobExtension = (mimeType: string): string => {
   if (mimeType.includes("audio/mpeg")) return "mp3";
   if (mimeType.includes("audio/wav")) return "wav";
@@ -772,6 +877,71 @@ function TreeNodeItem({
   );
 }
 
+/**
+ * Single editable view combining "Preview" and "Source": bold/headings/etc.
+ * render live, but the element itself is directly editable. Formatting is
+ * only reflowed (from raw markdown chars back into rendered elements) when
+ * the field isn't focused, so we never fight the browser for the caret
+ * while the user is actively typing.
+ */
+function FormattedEditableBody({
+  value,
+  onChange,
+  onSelect,
+  onEditorBlur,
+  placeholder
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  onSelect: (text: string, x: number, y: number) => void;
+  onEditorBlur?: () => void;
+  placeholder: string;
+}) {
+  const divRef = useRef<HTMLDivElement | null>(null);
+  const renderedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const el = divRef.current;
+    if (!el) return;
+    if (document.activeElement === el) return;
+    if (renderedRef.current === value) return;
+    el.innerHTML = value ? markdownToEditableHtml(value) : "";
+    renderedRef.current = value;
+  }, [value]);
+
+  const handleBlur = () => {
+    const el = divRef.current;
+    if (!el) return;
+    const next = serializeEditableBody(el);
+    if (next !== value) {
+      onChange(next);
+    }
+    onEditorBlur?.();
+  };
+
+  const handleMouseUp = (event: React.MouseEvent<HTMLDivElement>) => {
+    const selection = window.getSelection();
+    const text = selection ? selection.toString().trim() : "";
+    if (!text) return;
+    const x = Math.min(event.clientX, window.innerWidth - SELECTION_MENU_WIDTH);
+    const y = Math.min(event.clientY, window.innerHeight - SELECTION_MENU_HEIGHT);
+    onSelect(text, x, y);
+  };
+
+  return (
+    <div
+      ref={divRef}
+      className="document-body-preview document-body-editable"
+      contentEditable
+      suppressContentEditableWarning
+      onBlur={handleBlur}
+      onMouseUp={handleMouseUp}
+      data-placeholder={placeholder}
+      aria-label="Document content"
+    />
+  );
+}
+
 export default function App() {
   console.info("[PowerWriter] bundle version 2025-02-20-1");
   const [tree, setTree] = useState<TreeNode[]>([]);
@@ -898,10 +1068,6 @@ export default function App() {
   );
   const [documentDetails, setDocumentDetails] =
     useState<DocumentDetails | null>(null);
-  /** Document main body: formatted preview vs raw markdown source. */
-  const [documentBodyView, setDocumentBodyView] = useState<"preview" | "source">(
-    "preview"
-  );
   const [loadingSelection, setLoadingSelection] = useState(false);
 
   const [chatPrompt, setChatPrompt] = useState("");
@@ -924,6 +1090,7 @@ export default function App() {
     useState<string>(DEFAULT_FOLDER_COLOR);
   const [folderColorCustom, setFolderColorCustom] = useState(false);
   const [showAggregated, setShowAggregated] = useState(false);
+  const [showDocumentReference, setShowDocumentReference] = useState(false);
   const [userApiKey, setUserApiKey] = useState("");
   const [settingsKey, setSettingsKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -1943,10 +2110,6 @@ export default function App() {
   useEffect(() => {
     setSelectionMenu(null);
   }, [selected?.path]);
-
-  useEffect(() => {
-    setDocumentBodyView("preview");
-  }, [selected?.path, selected?.type]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -3139,44 +3302,6 @@ export default function App() {
     }
   };
 
-  const handleDocumentMouseUp = (
-    event: React.MouseEvent<HTMLTextAreaElement>
-  ) => {
-    if (selected?.type !== "document" || !documentDetails) {
-      setSelectionMenu(null);
-      return;
-    }
-    const { selectionStart, selectionEnd, value } = event.currentTarget;
-    if (
-      selectionStart === null ||
-      selectionEnd === null ||
-      selectionStart === selectionEnd
-    ) {
-      setSelectionMenu(null);
-      return;
-    }
-    const selectedText = value
-      .slice(selectionStart, selectionEnd)
-      .trim();
-    if (!selectedText) {
-      setSelectionMenu(null);
-      return;
-    }
-    const x = Math.min(
-      event.clientX,
-      window.innerWidth - SELECTION_MENU_WIDTH
-    );
-    const y = Math.min(
-      event.clientY,
-      window.innerHeight - SELECTION_MENU_HEIGHT
-    );
-    setSelectionMenu({
-      text: selectedText,
-      x,
-      y
-    });
-  };
-
   const startVariantFlow = async (mode: VariantMode, source: string) => {
     if (!selected || selected.type !== "document") {
       setStatus({
@@ -3755,26 +3880,18 @@ export default function App() {
                         void handleReferenceFilesSelected(event)
                       }
                     />
-                    <ReferenceMaterialPanel
-                      label="Document reference"
-                      hint="Extra sources for this document only. Parent folder references are included automatically when you generate."
-                      referenceMaterial={documentDetails.referenceMaterial}
-                      disabled={loadingSelection || isDocGenerating}
-                      uploading={isReferenceUploading}
-                      uploadButtonLabel={
-                        documentDetails.referenceMaterial?.files.length
-                          ? "Add more files"
-                          : "Upload reference files"
-                      }
-                      onUploadClick={() =>
-                        referenceFilesInputRef.current?.click()
-                      }
-                      onAddUrl={handleAddDocumentReferenceUrl}
-                      onRemoveFile={(filePath) =>
-                        void handleRemoveDocumentReferenceFile(filePath)
-                      }
-                      onRemoveAll={() => void handleClearReferenceMaterial()}
-                    />
+                    <button
+                      type="button"
+                      className="ghost document-reference-toggle-btn"
+                      onClick={() => setShowDocumentReference(true)}
+                    >
+                      Document reference
+                      {documentDetails.referenceMaterial?.files.length ? (
+                        <span className="reference-count-badge">
+                          {documentDetails.referenceMaterial.files.length}
+                        </span>
+                      ) : null}
+                    </button>
                   </>
                 ) : null}
               </div>
@@ -4467,36 +4584,6 @@ export default function App() {
                 </div>
                 <div className="toolbar document-header-actions">
                   {documentDetails ? (
-                    <div
-                      className="document-view-toggle"
-                      role="group"
-                      aria-label="Document view"
-                    >
-                      <button
-                        type="button"
-                        className={
-                          documentBodyView === "preview"
-                            ? "toggle-active"
-                            : "toggle-off"
-                        }
-                        onClick={() => setDocumentBodyView("preview")}
-                      >
-                        Preview
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          documentBodyView === "source"
-                            ? "toggle-active"
-                            : "toggle-off"
-                        }
-                        onClick={() => setDocumentBodyView("source")}
-                      >
-                        Source
-                      </button>
-                    </div>
-                  ) : null}
-                  {documentDetails ? (
                     <label className="toolbar-checkbox">
                       <input
                         type="checkbox"
@@ -4545,40 +4632,23 @@ export default function App() {
                   </div>
                 ) : null}
                 <div className="document-body-editor">
-                  {documentBodyView === "source" ? (
-                    <textarea
-                      value={currentDocumentContent}
-                      onChange={(event) => {
-                        if (documentDetails) {
-                          setDocumentDetails({
-                            ...documentDetails,
-                            content: event.target.value
-                          });
-                        }
-                      }}
-                      onMouseUp={handleDocumentMouseUp}
-                      onScroll={() => setSelectionMenu(null)}
-                      onBlur={() => setSelectionMenu(null)}
-                      placeholder="Start writing your meditation script…"
-                    />
-                  ) : (
-                    <div
-                      className="document-body-preview"
-                      onScroll={() => setSelectionMenu(null)}
-                      aria-label="Formatted document preview"
-                    >
-                      {currentDocumentContent.trim() ? (
-                        <div className="formatted-text document-formatted">
-                          {renderFormattedText(currentDocumentContent)}
-                        </div>
-                      ) : (
-                        <p className="document-body-placeholder">
-                          No content yet. Switch to <strong>Source</strong> to
-                          write, or generate a draft.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <FormattedEditableBody
+                    key={selected?.type === "document" ? selected.path : ""}
+                    value={currentDocumentContent}
+                    onChange={(next) => {
+                      if (documentDetails) {
+                        setDocumentDetails({
+                          ...documentDetails,
+                          content: next
+                        });
+                      }
+                    }}
+                    onSelect={(text, x, y) =>
+                      setSelectionMenu({ text, x, y })
+                    }
+                    onEditorBlur={() => setSelectionMenu(null)}
+                    placeholder="Start writing your meditation script…"
+                  />
                 </div>
               </div>
             </section>
@@ -4631,6 +4701,14 @@ export default function App() {
                 <div className="toolbar">
                   <button
                     type="button"
+                    className="ghost"
+                    onClick={() => setChatResponses([])}
+                    disabled={chatResponses.length === 0}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
                     className="primary"
                     onClick={handleGenerate}
                     disabled={isGenerating || !chatPrompt.trim()}
@@ -4656,6 +4734,24 @@ export default function App() {
                         key={item.id}
                         style={{ marginBottom: 12 }}
                       >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "flex-end"
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() =>
+                              setChatResponses((prev) =>
+                                prev.filter((r) => r.id !== item.id)
+                              )
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
                         <div className="formatted-text">
                           {renderFormattedText(item.message)}
                         </div>
@@ -4792,6 +4888,54 @@ export default function App() {
                   {renderFormattedText(aggregatedPreview)}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDocumentReference && documentDetails ? (
+        <div
+          className="overlay aggregated-overlay"
+          role="presentation"
+          onClick={() => setShowDocumentReference(false)}
+        >
+          <div
+            className="aggregated-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Document reference"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header">
+              <h2>Document reference</h2>
+              <div className="toolbar">
+                <button
+                  type="button"
+                  onClick={() => setShowDocumentReference(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="panel-body">
+              <ReferenceMaterialPanel
+                label="Document reference"
+                hint="Extra sources for this document only. Parent folder references are included automatically when you generate."
+                referenceMaterial={documentDetails.referenceMaterial}
+                disabled={loadingSelection || isDocGenerating}
+                uploading={isReferenceUploading}
+                uploadButtonLabel={
+                  documentDetails.referenceMaterial?.files.length
+                    ? "Add more files"
+                    : "Upload reference files"
+                }
+                onUploadClick={() => referenceFilesInputRef.current?.click()}
+                onAddUrl={handleAddDocumentReferenceUrl}
+                onRemoveFile={(filePath) =>
+                  void handleRemoveDocumentReferenceFile(filePath)
+                }
+                onRemoveAll={() => void handleClearReferenceMaterial()}
+              />
             </div>
           </div>
         </div>

@@ -133,6 +133,12 @@
   }
 }
 
+.canvas-smart-guide-line {
+  stroke: #ff2fb0;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
 .sketch-canvas.tool-move-parts {
   cursor: move;
 }

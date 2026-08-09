@@ -1484,7 +1484,8 @@
 .instructions-panel,
 .document-panel,
 .inline-panel,
-.audio-editor-panel {
+.audio-editor-panel,
+.chat-panel {
   display: flex;
   flex-direction: column;
   padding: 28px;
@@ -2195,6 +2196,27 @@
   cursor: not-allowed;
 }
 
+.document-reference-toggle-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reference-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent, #ff6b35);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .document-reference-controls {
   display: flex;
   flex-direction: column;
@@ -2344,6 +2366,23 @@
 
 .document-formatted {
   color: var(--text-primary);
+}
+
+.document-body-editable {
+  cursor: text;
+  transition: border-color 0.2s ease, box-shadow 0.26s ease;
+}
+
+.document-body-editable:focus {
+  outline: none;
+  border-color: var(--field-border-active);
+  box-shadow: 0 0 0 4px rgba(111, 149, 255, 0.12), var(--field-shadow);
+}
+
+.document-body-editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
 .document-body-placeholder {

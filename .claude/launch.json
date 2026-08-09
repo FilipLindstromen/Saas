@@ -18,6 +18,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "CopyLearner", "run", "dev"],
       "port": 5185
+    },
+    {
+      "name": "PowerWriter",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "PowerWriter/PowerWriter/client", "run", "dev"],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

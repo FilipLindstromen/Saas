@@ -323,6 +323,56 @@ function resizeLayerCanvas(sourceCanvas, oldW, oldH, newW, newH) {
   return { canvas, ctx }
 }
 
+const SNAP_THRESHOLD = 8
+
+/**
+ * Smart-guide snapping: checks whether a dragged box's left/center/right edge
+ * lands within `threshold` canvas px of the canvas's left/center/right (and
+ * same for top/center/bottom), and returns the smallest adjustment needed to
+ * snap it exactly there, plus which guide line(s) to draw.
+ */
+function computeSnap(bounds, canvasW, canvasH, threshold = SNAP_THRESHOLD) {
+  const { x, y, w: bw, h: bh } = bounds
+  const vEdges = [{ v: x, o: 0 }, { v: x + bw / 2, o: bw / 2 }, { v: x + bw, o: bw }]
+  const hEdges = [{ v: y, o: 0 }, { v: y + bh / 2, o: bh / 2 }, { v: y + bh, o: bh }]
+  const vTargets = [0, canvasW / 2, canvasW]
+  const hTargets = [0, canvasH / 2, canvasH]
+
+  let bestDx = 0
+  let bestDist = Infinity
+  let guideV = null
+  for (const target of vTargets) {
+    for (const edge of vEdges) {
+      const d = target - edge.v
+      if (Math.abs(d) <= threshold && Math.abs(d) < bestDist) {
+        bestDist = Math.abs(d)
+        bestDx = d
+        guideV = target
+      }
+    }
+  }
+
+  let bestDy = 0
+  bestDist = Infinity
+  let guideH = null
+  for (const target of hTargets) {
+    for (const edge of hEdges) {
+      const d = target - edge.v
+      if (Math.abs(d) <= threshold && Math.abs(d) < bestDist) {
+        bestDist = Math.abs(d)
+        bestDy = d
+        guideH = target
+      }
+    }
+  }
+
+  return {
+    dx: bestDx,
+    dy: bestDy,
+    guides: { v: guideV !== null ? [guideV] : [], h: guideH !== null ? [guideH] : [] },
+  }
+}
+
 const CanvasBoard = forwardRef(function CanvasBoard(
   {
     tool,
@@ -350,6 +400,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onSelectionChange,
     onTextSelectionChange,
     onColorChange,
+    onCanvasContextMenu,
   },
   ref
 ) {
@@ -386,6 +437,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const smoothPointRef = useRef(null)
   const wobblePhaseRef = useRef(0)
   const wobbleDirRef = useRef({ x: 1, y: 0 })
+  const wobbleSeedRef = useRef({ a: 0, b: 0, c: 0 })
   const lastRawPointRef = useRef(null)
   const lastStrokeWidthRef = useRef(null)
   const strokeCurvePointRef = useRef(null)
@@ -414,6 +466,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
   const moveTextOriginsRef = useRef(null)
   const [lassoPreview, setLassoPreview] = useState(null)
   const [selectionOutline, setSelectionOutline] = useState(null)
+  const [smartGuides, setSmartGuides] = useState(null)
   const [pixelSelectionOverlayUrl, setPixelSelectionOverlayUrl] = useState(null)
   const [brushPreview, setBrushPreview] = useState(null)
   const [textEditor, setTextEditor] = useState(null)
@@ -1366,6 +1419,32 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       pushHistory()
       onCommit?.()
     },
+    /** Mirror the active layer's pixels in place (axis: 'horizontal' | 'vertical'). */
+    flipActiveLayer: (axis) => {
+      ensureActiveLayerFlatForDrawing()
+      const layer = getActiveLayer()
+      if (!layer || layer.locked) return false
+      const w = W()
+      const h = H()
+      const { canvas, ctx } = createLayerCanvas(w, h)
+      ctx.save()
+      if (axis === 'vertical') {
+        ctx.translate(0, h)
+        ctx.scale(1, -1)
+      } else {
+        ctx.translate(w, 0)
+        ctx.scale(-1, 1)
+      }
+      ctx.drawImage(layer.canvas, 0, 0)
+      ctx.restore()
+      layer.canvas = canvas
+      layer.ctx = ctx
+      hasContentRef.current = true
+      renderComposite()
+      pushHistory()
+      onCommit?.()
+      return true
+    },
     defringeActiveLayer: () => {
       const layer = getActiveLayer()
       if (layer?.parts?.length) flattenLayerParts(layer)
@@ -1480,6 +1559,37 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       return commitLassoPolygon(rectToPolygon({ x: 0, y: 0 }, { x: W(), y: H() }))
     },
     liftPixelSelectionToFloating: () => liftPixelSelectionToFloating(),
+    /** Promote the current floating selection into its own new layer instead of merging it back down. */
+    splitSelectionToLayer: () => {
+      const sel = floatingSelectionRef.current
+      if (!sel) return false
+      layerIdCounterRef.current += 1
+      const { canvas, ctx } = createLayerCanvas(W(), H())
+      drawFloatingSelection(ctx, sel)
+      const newLayer = {
+        id: `layer-${layerIdCounterRef.current}`,
+        name: `Layer ${layerIdCounterRef.current}`,
+        visible: true,
+        canvas,
+        ctx,
+        ...defaultLayerProps(),
+      }
+      const sourceIdx = layersRef.current.findIndex((l) => l.id === sel.layerId)
+      const insertAt = sourceIdx >= 0 ? sourceIdx + 1 : layersRef.current.length
+      const next = [...layersRef.current]
+      next.splice(insertAt, 0, newLayer)
+      layersRef.current = next
+      activeLayerIdRef.current = newLayer.id
+      floatingSelectionRef.current = null
+      setSelectionOutline(null)
+      hasContentRef.current = true
+      renderComposite()
+      notifyLayers()
+      emitSelectionChange()
+      pushHistory()
+      onCommit?.()
+      return true
+    },
   }))
 
   const paintStrokeDot = (ctx, point, strokeColor, width, eraser = false) => {
@@ -1611,11 +1721,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     wobblePhaseRef.current += dist
 
-    const amp = wobble * 9
-    // Two sine components at different frequencies/phases so the tremor
-    // reads as organic rather than a perfectly metronomic wave.
-    const wave = Math.sin(wobblePhaseRef.current * 0.09) * 0.7
-      + Math.sin(wobblePhaseRef.current * 0.23 + 1.7) * 0.3
+    const amp = wobble * 8
+    const seed = wobbleSeedRef.current
+    // Three sine components (fine tremor, a faster jitter, and a slow drift)
+    // at different frequencies, each phase-offset by a per-stroke random seed —
+    // real hand tremor is closer to filtered noise than a single clean wave,
+    // and a fixed phase made every stroke retrace the same identical squiggle.
+    // Weights sum to 1 so `amp` still bounds the max offset like before.
+    const wave = Math.sin(wobblePhaseRef.current * 0.11 + seed.a) * 0.5
+      + Math.sin(wobblePhaseRef.current * 0.29 + seed.b) * 0.25
+      + Math.sin(wobblePhaseRef.current * 0.045 + seed.c) * 0.25
     const offset = wave * amp
 
     return {
@@ -1777,6 +1892,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         return
       }
       const layer = getActiveLayer()
+      console.log('[DEBUG move pointerdown]', { layerId: layer?.id, locked: layer?.locked, partsLen: layer?.parts?.length, textLen: layer?.textItems?.length, ctxIsNull: !ctx })
       if (layer?.locked) return
       const compositeCtx = ctxRef.current
       if (layer?.textItems?.length && compositeCtx) {
@@ -1866,6 +1982,11 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       smoothPointRef.current = null
       wobblePhaseRef.current = 0
       wobbleDirRef.current = { x: 1, y: 0 }
+      wobbleSeedRef.current = {
+        a: Math.random() * Math.PI * 2,
+        b: Math.random() * Math.PI * 2,
+        c: Math.random() * Math.PI * 2,
+      }
       lastRawPointRef.current = pos
       const drawnPos = resolveInkPoint(pos, lastPointRef.current ?? pos)
       lastPointRef.current = drawnPos
@@ -1919,8 +2040,18 @@ const CanvasBoard = forwardRef(function CanvasBoard(
       if (selectionDragRef.current && floatingSelectionRef.current) {
         const drag = selectionDragRef.current
         const f = floatingSelectionRef.current
-        f.x = Math.round(drag.origX + pos.x - drag.startX)
-        f.y = Math.round(drag.origY + pos.y - drag.startY)
+        let nx = Math.round(drag.origX + pos.x - drag.startX)
+        let ny = Math.round(drag.origY + pos.y - drag.startY)
+        if (!e.shiftKey) {
+          const snap = computeSnap({ x: nx, y: ny, w: f.w, h: f.h }, W(), H())
+          nx += snap.dx
+          ny += snap.dy
+          setSmartGuides(snap.guides.v.length || snap.guides.h.length ? snap.guides : null)
+        } else {
+          setSmartGuides(null)
+        }
+        f.x = nx
+        f.y = ny
         f.outline = updateFloatingOutline(f)
         setSelectionOutline(f.outline)
         renderComposite()
@@ -1954,8 +2085,16 @@ const CanvasBoard = forwardRef(function CanvasBoard(
         }
         return
       }
-      const dx = Math.round(pos.x - moveStartRef.current.x)
-      const dy = Math.round(pos.y - moveStartRef.current.y)
+      let dx = Math.round(pos.x - moveStartRef.current.x)
+      let dy = Math.round(pos.y - moveStartRef.current.y)
+      if (!e.shiftKey) {
+        const snap = computeSnap({ x: dx, y: dy, w: W(), h: H() }, W(), H())
+        dx += snap.dx
+        dy += snap.dy
+        setSmartGuides(snap.guides.v.length || snap.guides.h.length ? snap.guides : null)
+      } else {
+        setSmartGuides(null)
+      }
       ctx.clearRect(0, 0, W(), H())
       ctx.putImageData(moveSnapshotRef.current, dx, dy)
       const origins = moveTextOriginsRef.current
@@ -2034,6 +2173,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
 
     if (drawingRef.current && toolRef.current === 'move') {
       drawingRef.current = false
+      setSmartGuides(null)
       if (selectionDragRef.current) {
         selectionDragRef.current = null
         pushHistory()
@@ -2097,6 +2237,15 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     onDropFile?.(file)
   }
 
+  const handleContextMenu = (e) => {
+    e.preventDefault()
+    onCanvasContextMenu?.({
+      clientX: e.clientX,
+      clientY: e.clientY,
+      hasFloatingSelection: Boolean(floatingSelectionRef.current),
+    })
+  }
+
   useEffect(() => {
     if (tool !== 'move') clearTextSelection()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2125,6 +2274,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerLeave}
             onPointerEnter={handlePointerEnter}
+            onContextMenu={handleContextMenu}
           />
           {showSafeZone && (
             <div
@@ -2172,7 +2322,7 @@ const CanvasBoard = forwardRef(function CanvasBoard(
               aria-hidden
             />
           )}
-          {(lassoPreview?.points?.length || selectionOutline?.length) && canvasW > 0 && canvasH > 0 && (
+          {(lassoPreview?.points?.length || selectionOutline?.length || smartGuides?.v?.length || smartGuides?.h?.length) && canvasW > 0 && canvasH > 0 && (
             <svg
               className="canvas-selection-overlay"
               viewBox={`0 0 ${canvasW} ${canvasH}`}
@@ -2191,6 +2341,12 @@ const CanvasBoard = forwardRef(function CanvasBoard(
                   className="canvas-selection-marching"
                 />
               ) : null}
+              {smartGuides?.v?.map((x) => (
+                <line key={`v${x}`} x1={x} y1={0} x2={x} y2={canvasH} className="canvas-smart-guide-line" />
+              ))}
+              {smartGuides?.h?.map((y) => (
+                <line key={`h${y}`} x1={0} y1={y} x2={canvasW} y2={y} className="canvas-smart-guide-line" />
+              ))}
             </svg>
           )}
         </div>

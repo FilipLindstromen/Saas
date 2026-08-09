@@ -14,6 +14,7 @@ import ImportPanel from './components/ImportPanel'
 import HistoryGallery from './components/HistoryGallery'
 import LayersPanel from './components/LayersPanel'
 import ImageContextMenu from './components/ImageContextMenu'
+import CanvasContextMenu from './components/CanvasContextMenu'
 import SettingsModal from '@shared/SettingsModal/SettingsModal'
 import BrandingSettings from './components/BrandingSettings'
 import { normalizeBrandColors, normalizeBrandFonts, normalizeHexColor, DEFAULT_BRAND_COLORS } from './constants/brand'
@@ -171,6 +172,7 @@ export default function App() {
   const [layers, setLayers] = useState([])
   const [activeLayerId, setActiveLayerId] = useState(null)
   const [imageContextMenu, setImageContextMenu] = useState(null)
+  const [canvasContextMenu, setCanvasContextMenu] = useState(null)
   const [selectionActive, setSelectionActive] = useState(false)
   const [selectionFloating, setSelectionFloating] = useState(false)
   const [selectionScale, setSelectionScale] = useState(100)
@@ -602,6 +604,10 @@ export default function App() {
     setImageContextMenu({ x: e.clientX, y: e.clientY, dataUrl })
   }, [])
 
+  const handleCanvasContextMenu = useCallback(({ clientX, clientY, hasFloatingSelection }) => {
+    setCanvasContextMenu({ x: clientX, y: clientY, hasFloatingSelection })
+  }, [])
+
   const handleExportImage = useCallback(async (action, { dataUrl: dataUrlOverride } = {}) => {
     setError('')
     try {
@@ -804,6 +810,14 @@ export default function App() {
 
   const handleDuplicateLayer = useCallback((id) => {
     canvasRef.current?.duplicateLayer?.(id)
+  }, [])
+
+  const handleFlipLayer = useCallback((axis) => {
+    canvasRef.current?.flipActiveLayer?.(axis)
+  }, [])
+
+  const handleSplitSelectionToLayer = useCallback(() => {
+    canvasRef.current?.splitSelectionToLayer?.()
   }, [])
 
   const handleToggleLayerLock = useCallback((id) => {
@@ -1735,6 +1749,8 @@ export default function App() {
           onDeleteSelection={handleDeleteSelection}
           onApplySelection={handleApplySelection}
           onBeginTransform={handleTransformShortcut}
+          onSplitSelectionToLayer={handleSplitSelectionToLayer}
+          onFlipLayer={handleFlipLayer}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onClear={handleClear}
@@ -1810,6 +1826,7 @@ export default function App() {
                 onSelectionChange={handleSelectionChange}
                 onTextSelectionChange={handleTextSelectionChange}
                 onColorChange={setColor}
+                onCanvasContextMenu={handleCanvasContextMenu}
               />
             </div>
             {view !== 'sketch' && showResultWorkspace ? (
@@ -1918,6 +1935,24 @@ export default function App() {
           onSetAsSketch={handleSetAsSketchFromMenu}
           onAddAsLayer={handleAddAsLayerFromMenu}
           onClose={() => setImageContextMenu(null)}
+        />
+      )}
+
+      {canvasContextMenu && (
+        <CanvasContextMenu
+          x={canvasContextMenu.x}
+          y={canvasContextMenu.y}
+          hasFloatingSelection={canvasContextMenu.hasFloatingSelection}
+          canDeleteLayer={layers.length > 1}
+          onFlipHorizontal={() => handleFlipLayer('horizontal')}
+          onFlipVertical={() => handleFlipLayer('vertical')}
+          onDuplicateLayer={() => handleDuplicateLayer(activeLayerId)}
+          onClearLayer={handleClear}
+          onDeleteLayer={() => handleRemoveLayer(activeLayerId)}
+          onSplitSelectionToLayer={handleSplitSelectionToLayer}
+          onApplySelection={handleApplySelection}
+          onDeleteSelection={handleDeleteSelection}
+          onClose={() => setCanvasContextMenu(null)}
         />
       )}
 

@@ -47,6 +47,8 @@ export default function OptionsBar({
   onDeleteSelection,
   onApplySelection,
   onBeginTransform,
+  onSplitSelectionToLayer,
+  onFlipLayer,
   onUndo,
   onRedo,
   onClear,
@@ -307,6 +309,33 @@ export default function OptionsBar({
 
       <button
         type="button"
+        className="options-bar-btn"
+        onClick={() => onFlipLayer?.('horizontal')}
+        title="Flip active layer horizontally"
+        aria-label="Flip layer horizontally"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 3v18" strokeDasharray="2 2" />
+          <path d="M17 8l3 4-3 4" />
+          <path d="M7 8l-3 4 3 4" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="options-bar-btn"
+        onClick={() => onFlipLayer?.('vertical')}
+        title="Flip active layer vertically"
+        aria-label="Flip layer vertically"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M3 12h18" strokeDasharray="2 2" />
+          <path d="M8 7l4-3 4 3" />
+          <path d="M8 17l4 3 4-3" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
         className="options-bar-btn options-bar-separate-btn"
         onClick={onSeparateParts}
         title="Split illustration into movable parts (icons, labels, arrows) on the active layer"
@@ -347,6 +376,21 @@ export default function OptionsBar({
           >
             Delete
           </button>
+          {selectionFloating && onSplitSelectionToLayer && (
+            <button
+              type="button"
+              className="options-bar-btn"
+              onClick={onSplitSelectionToLayer}
+              title="Split selection into its own new layer"
+              aria-label="Split selection into new layer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+                <path d="M10 6.5h4M12 6.5V10" strokeDasharray="2 2" />
+              </svg>
+            </button>
+          )}
           {selectionFloating && (
             <>
           <div className="options-bar-slider-group options-bar-selection-scale">
