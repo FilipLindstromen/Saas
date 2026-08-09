@@ -926,10 +926,11 @@ function FormattedEditableBody({
     onEditorBlur?.();
   };
 
-  const handleMouseUp = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     const selection = window.getSelection();
     const text = selection ? selection.toString().trim() : "";
     if (!text) return;
+    event.preventDefault();
     const x = Math.min(event.clientX, window.innerWidth - SELECTION_MENU_WIDTH);
     const y = Math.min(event.clientY, window.innerHeight - SELECTION_MENU_HEIGHT);
     onSelect(text, x, y);
@@ -942,7 +943,7 @@ function FormattedEditableBody({
       contentEditable
       suppressContentEditableWarning
       onBlur={handleBlur}
-      onMouseUp={handleMouseUp}
+      onContextMenu={handleContextMenu}
       data-placeholder={placeholder}
       aria-label="Document content"
     />
