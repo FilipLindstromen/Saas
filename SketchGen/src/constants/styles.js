@@ -99,6 +99,18 @@ export const STYLES = [
     emoji: '🥛',
     prompt: 'Oatly-inspired brand graphics: flat dusty sky-blue background, solid black and white only for all artwork (no gradients). Chunky hand-drawn/stamped typography — bold uneven all-caps titles, playful scripts, and text shaped into banners or simple objects ("written illustrations"). Flat black silhouette icons with slightly rough woodcut/stamp edges (trucks, gears, cartons, hands, arrows). Thin white dotted lines connecting steps in horizontal process flows. Whimsical DIY collage feel — informal, witty, anti-corporate — generous negative space, thick irregular outlines, minimal detail, no photorealism. Suitable for infographics, how-it-works diagrams, and packaging-style callouts',
   },
+  {
+    id: 'playful-editorial',
+    name: 'Playful Editorial',
+    emoji: '🙃',
+    prompt: 'a playful editorial infographic design with bold flat vector illustrations, expressive geometric cartoon characters, quirky hand-drawn faces, chunky typography, colorful color-blocked sections, simple visual metaphors, clean diagrams, modern retro poster aesthetics, slightly naive illustration, high visual personality, minimal shading, sophisticated composition, friendly but not childish. Avoid corporate SaaS illustration, generic wellness aesthetics, photorealism, clinical medical illustrations, excessive gradients, and overly polished 3D graphics',
+  },
+  {
+    id: 'playful-web-infographic',
+    name: 'Playful Web Infographic',
+    emoji: '📱',
+    prompt: 'a long-form vertical mobile landing-page / advertorial infographic layout, stacked into bold full-bleed color-blocked sections (saturated red, black, cream, orange, green, blue). A recurring simple flat cartoon mascot character — big white oval eyes with black pupils and a minimal expressive mouth shape — appears throughout to carry emotion and continuity. Chunky rounded bold sans-serif headlines in all caps, short punchy body copy, and clear typographic hierarchy. Numbered circular step badges connected by arrows in simple process-loop diagrams, paired icon-circle-plus-label explainer rows, and two-column comparison blocks (problem vs. solution). Rounded rectangle call-to-action buttons and a small shield/badge icon for a guarantee callout near the bottom. Flat vector shapes only, no gradients, no photorealism, high color contrast, generous padding, and a clean aligned grid — direct-response marketing / advertorial infographic aesthetic, friendly and energetic but professionally composed',
+  },
 ]
 
 export const DEFAULT_STYLE_ID = STYLES[0].id

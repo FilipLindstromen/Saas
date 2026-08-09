@@ -1845,6 +1845,17 @@ const CanvasBoard = forwardRef(function CanvasBoard(
     }
 
     const ctx = getActiveCtx()
+    console.log('[DEBUG pointerdown top]', {
+      currentTool,
+      ctxNull: !ctx,
+      activeLayerId: getActiveLayer()?.id,
+      hasFloating: Boolean(floatingSelectionRef.current),
+      isText: currentTool === 'text',
+      isPlacing: Boolean(placingRef.current?.img),
+      isLasso: LASSO_TOOLS.has(currentTool),
+      isWand: currentTool === 'wand',
+      isMove: currentTool === 'move',
+    })
     if (!ctx) return
 
     if (currentTool === 'text') {

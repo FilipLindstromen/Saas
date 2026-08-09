@@ -2337,6 +2337,35 @@
   box-shadow: none;
 }
 
+.document-ramble-btn {
+  background: var(--surface, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.14));
+  box-shadow: none;
+  color: var(--text-primary);
+}
+
+.document-ramble-btn:hover:not(:disabled) {
+  background: var(--hover, rgba(255, 255, 255, 0.1));
+  box-shadow: none;
+}
+
+.document-ramble-btn-active {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  animation: ramble-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ramble-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+}
+
 .document-body-editor {
   flex: 1;
   min-height: 0;

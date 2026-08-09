@@ -15,17 +15,17 @@ export const DOCUMENT_GENERATE_TASK = `Write or update the document body accordi
 
 Output only the document content (no preambles, labels, or meta commentary).`;
 
-export const DOCUMENT_REVIEW_TASK = `Review the current document against the folder and document instruction layers and any reference material provided.
+export const DOCUMENT_REVIEW_TASK = `Review the current document as a piece of writing. Use the folder and document instruction layers and any reference material only as background context for what this document is trying to be — do not report on how well it follows them.
 
-Do **not** rewrite the full document. Provide editorial feedback on what could be adjusted.
+Do **not** rewrite the full document. Provide editorial feedback on the content itself: tone, structure, clarity, pacing, accuracy, and length.
 
 Structure your response with clear headings, for example:
-- **Alignment with instructions** — what matches or misses folder/document rules
-- **Reference material** — gaps or opportunities compared to references
-- **Suggested adjustments** — specific, actionable changes (tone, structure, clarity, accuracy, length)
+- **Suggested adjustments** — specific, actionable changes to the writing
 - **Strengths** — what is already working well
 
-Be concise but specific. Quote short phrases from the draft when helpful. If the document is empty or very short, explain what is missing relative to the instructions.`;
+Do not include sections judging alignment with instructions or reference material (e.g. no "Alignment with instructions" or "Reference material" headings) — respond only to the content itself.
+
+Be concise but specific. Quote short phrases from the draft when helpful. If the document is empty or very short, say so plainly.`;
 
 export function formatInstructionSections(
   sections: InstructionSection[]

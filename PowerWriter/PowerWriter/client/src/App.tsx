@@ -22,6 +22,7 @@ import {
   deleteDocument,
   deleteFolder,
   uploadDocumentAudio,
+  transcribeDocumentAudio,
   uploadDocumentReferenceFiles,
   uploadFolderReferenceFiles,
   addDocumentReferenceUrl,
@@ -914,6 +915,12 @@ function FormattedEditableBody({
     if (!el) return;
     const next = serializeEditableBody(el);
     if (next !== value) {
+      // Reformat synchronously off the just-serialized string, rather than
+      // waiting for `value` to round-trip back through props: that gap left
+      // room for an unrelated re-render to run this effect against a DOM
+      // that had already moved on, doubling blank lines.
+      el.innerHTML = next ? markdownToEditableHtml(next) : "";
+      renderedRef.current = next;
       onChange(next);
     }
     onEditorBlur?.();
@@ -1077,6 +1084,11 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDocGenerating, setIsDocGenerating] = useState(false);
   const [isDocReviewing, setIsDocReviewing] = useState(false);
+  const [isRambling, setIsRambling] = useState(false);
+  const [isRambleProcessing, setIsRambleProcessing] = useState(false);
+  const rambleRecorderRef = useRef<MediaRecorder | null>(null);
+  const rambleStreamRef = useRef<MediaStream | null>(null);
+  const rambleChunksRef = useRef<Blob[]>([]);
   const [isReferenceUploading, setIsReferenceUploading] = useState(false);
   const referenceFilesInputRef = useRef<HTMLInputElement | null>(null);
   const folderReferenceFilesInputRef = useRef<HTMLInputElement | null>(null);
@@ -1416,6 +1428,18 @@ export default function App() {
         audioStreamRef.current.getTracks().forEach((track) => track.stop());
         audioStreamRef.current = null;
       }
+      if (
+        rambleRecorderRef.current &&
+        rambleRecorderRef.current.state !== "inactive"
+      ) {
+        rambleRecorderRef.current.ondataavailable = null;
+        rambleRecorderRef.current.onstop = null;
+        rambleRecorderRef.current.stop();
+      }
+      if (rambleStreamRef.current) {
+        rambleStreamRef.current.getTracks().forEach((track) => track.stop());
+        rambleStreamRef.current = null;
+      }
       if (videoStreamRef.current) {
         videoStreamRef.current.getTracks().forEach((track) => track.stop());
         videoStreamRef.current = null;
@@ -1616,6 +1640,14 @@ export default function App() {
       setIsRecordingAudio(false);
     }
   }, [isRecordingAudio, selected?.type]);
+
+  useEffect(() => {
+    if (!isRambling) return;
+    if (selected?.type !== "document") {
+      rambleRecorderRef.current?.stop();
+      setIsRambling(false);
+    }
+  }, [isRambling, selected?.type]);
 
   const stopMediaStream = () => {
     if (audioStreamRef.current) {
@@ -2842,6 +2874,123 @@ export default function App() {
       setStatus({ type: "error", message });
     } finally {
       setIsDocReviewing(false);
+    }
+  };
+
+  const startRamble = async () => {
+    if (selected?.type !== "document" || !documentDetails || isRambling) {
+      return;
+    }
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function" ||
+      typeof window.MediaRecorder === "undefined"
+    ) {
+      setStatus({
+        type: "error",
+        message: "Recording is not supported in this browser."
+      });
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true
+      });
+      rambleStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "audio/mp4"
+      });
+      rambleChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          rambleChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onerror = (event) => {
+        console.error("[Ramble] recorder error", event.error);
+        rambleStreamRef.current?.getTracks().forEach((track) => track.stop());
+        rambleStreamRef.current = null;
+        setIsRambling(false);
+        setStatus({
+          type: "error",
+          message: event.error?.message ?? "Ramble recording failed."
+        });
+      };
+      recorder.onstop = () => {
+        rambleStreamRef.current?.getTracks().forEach((track) => track.stop());
+        rambleStreamRef.current = null;
+        void finishRamble(rambleChunksRef.current.slice(), recorder.mimeType);
+        rambleChunksRef.current = [];
+      };
+      rambleRecorderRef.current = recorder;
+      recorder.start();
+      setIsRambling(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to access the microphone.";
+      setStatus({ type: "error", message });
+    }
+  };
+
+  const stopRamble = () => {
+    if (rambleRecorderRef.current && rambleRecorderRef.current.state !== "inactive") {
+      rambleRecorderRef.current.stop();
+    }
+    setIsRambling(false);
+  };
+
+  const finishRamble = async (chunks: Blob[], mimeType: string) => {
+    if (selected?.type !== "document" || !documentDetails || chunks.length === 0) {
+      return;
+    }
+    const path = selected.path;
+    setIsRambleProcessing(true);
+    try {
+      const blob = new Blob(chunks, { type: mimeType });
+      const uploadResult = await uploadDocumentAudio(path, blob, true);
+      const { transcription } = await transcribeDocumentAudio(
+        path,
+        userApiKey || undefined
+      );
+      const text = transcription.text.trim();
+      setDocumentDetails((prev) => {
+        if (!prev || prev.path !== path) return prev;
+        const existingRecordings = prev.recordings || [];
+        const newRecording = uploadResult.recording || {
+          id: uploadResult.recordingId || `rec_${Date.now()}`,
+          audioUrl: uploadResult.audioUrl,
+          audioFileName: uploadResult.audioFileName,
+          type: "audio" as const,
+          createdAt: Date.now()
+        };
+        return {
+          ...prev,
+          audioUrl: uploadResult.audioUrl,
+          audioFileName: uploadResult.audioFileName,
+          recordings: [...existingRecordings, newRecording],
+          content: text
+            ? prev.content
+              ? `${prev.content}\n\n${text}`
+              : text
+            : prev.content
+        };
+      });
+      setStatus(
+        text
+          ? { type: "success", message: "Ramble transcribed into the document" }
+          : { type: "error", message: "Transcription came back empty." }
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to transcribe ramble";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsRambleProcessing(false);
     }
   };
 
@@ -4627,6 +4776,29 @@ export default function App() {
                         }
                       >
                         {isDocReviewing ? "Reviewing…" : "Review"}
+                      </button>
+                      <button
+                        type="button"
+                        className={clsx(
+                          "document-generate-btn document-ramble-btn",
+                          isRambling && "document-ramble-btn-active"
+                        )}
+                        onClick={() =>
+                          isRambling ? stopRamble() : void startRamble()
+                        }
+                        disabled={
+                          loadingSelection ||
+                          !documentDetails ||
+                          isRambleProcessing
+                        }
+                        title="Record a ramble and transcribe it into this document"
+                      >
+                        <IconMic size={16} />
+                        {isRambleProcessing
+                          ? "Transcribing…"
+                          : isRambling
+                          ? "Stop"
+                          : "Ramble"}
                       </button>
                     </div>
                   </div>
