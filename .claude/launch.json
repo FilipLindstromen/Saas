@@ -25,6 +25,13 @@
       "runtimeArgs": ["--prefix", "PowerWriter/PowerWriter/client", "run", "dev"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "StoryWriter",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "StoryWriter", "run", "dev"],
+      "port": 5183,
+      "autoPort": true
     }
   ]
 }
