@@ -39,6 +39,14 @@ export const LINE_HEIGHT_OPTIONS = [
   { value: '2', label: '2' },
 ];
 
+/** Presentation stage shape. 'full' fills the viewport; the others letterbox to a fixed ratio. */
+export const PRESENTATION_ASPECT_RATIOS = [
+  { value: 'full', label: 'Full screen' },
+  { value: '16:9', label: '16:9 (widescreen)' },
+  { value: '1:1', label: '1:1 (square)' },
+  { value: '9:16', label: '9:16 (vertical)' },
+];
+
 /** Text animation when advancing sentences in Present mode (global fallback). */
 export const TEXT_ANIMATION_OPTIONS = [
   { value: 'drop-center', label: 'Drop to center' },
@@ -78,6 +86,9 @@ const defaults = {
   openaiApiKey: '',
   presentationFont: 'Poppins',
   presentationFontSize: 'medium',
+  presentationFontSizePercent: 100,
+  presentationTextWidthPercent: 90,
+  presentationAspectRatio: 'full',
   presentationLineHeight: '1.4',
   unsplashAccessKey: '',
   pexelsApiKey: '',
@@ -122,6 +133,11 @@ export function getSettings() {
       pixabayApiKey: apiKeys.pixabay || '',
       presentationBackgroundOpacity:
         typeof opacity === 'number' && opacity >= 0 && opacity <= 1 ? opacity : defaults.presentationBackgroundOpacity,
+      presentationFontSizePercent: clampNum(parsed.presentationFontSizePercent, 50, 200, defaults.presentationFontSizePercent),
+      presentationTextWidthPercent: clampNum(parsed.presentationTextWidthPercent, 20, 100, defaults.presentationTextWidthPercent),
+      presentationAspectRatio: PRESENTATION_ASPECT_RATIOS.some((o) => o.value === parsed.presentationAspectRatio)
+        ? parsed.presentationAspectRatio
+        : defaults.presentationAspectRatio,
       editImageSearchOnLineClick:
         parsed.editImageSearchOnLineClick !== undefined
           ? Boolean(parsed.editImageSearchOnLineClick)
@@ -196,6 +212,11 @@ export function saveSettings(settings) {
     pixabayApiKey: pixabayKey,
     presentationFont: PRESENTATION_FONTS.includes(font) ? font : defaults.presentationFont,
     presentationFontSize: ['small', 'medium', 'large'].includes(size) ? size : defaults.presentationFontSize,
+    presentationFontSizePercent: clampNum(settings.presentationFontSizePercent, 50, 200, defaults.presentationFontSizePercent),
+    presentationTextWidthPercent: clampNum(settings.presentationTextWidthPercent, 20, 100, defaults.presentationTextWidthPercent),
+    presentationAspectRatio: PRESENTATION_ASPECT_RATIOS.some((o) => o.value === settings.presentationAspectRatio)
+      ? settings.presentationAspectRatio
+      : defaults.presentationAspectRatio,
     presentationLineHeight: LINE_HEIGHT_OPTIONS.some((o) => o.value === settings.presentationLineHeight)
       ? settings.presentationLineHeight
       : defaults.presentationLineHeight,

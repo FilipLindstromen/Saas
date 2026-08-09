@@ -61,7 +61,17 @@ function samePresentBackground(urlA, urlB) {
 export default function PresentView({ sectionOrder, sectionsData, onExit, onPresentIndexChange, initialIndex = 0, animationRules, settingsVersion = 0 }) {
   const settings = getSettings();
   const fontFamily = `'${settings.presentationFont || 'Poppins'}', sans-serif`;
-  const fontSize = FONT_SIZE_MAP[settings.presentationFontSize] ?? FONT_SIZE_MAP.medium;
+  const baseFontSize = FONT_SIZE_MAP[settings.presentationFontSize] ?? FONT_SIZE_MAP.medium;
+  const fontSizePercent = typeof settings.presentationFontSizePercent === 'number'
+    ? settings.presentationFontSizePercent
+    : 100;
+  const fontSize = fontSizePercent === 100 ? baseFontSize : `calc((${baseFontSize}) * ${fontSizePercent / 100})`;
+  const textWidthPercent = typeof settings.presentationTextWidthPercent === 'number'
+    ? settings.presentationTextWidthPercent
+    : 90;
+  const aspectRatio = ['16:9', '1:1', '9:16'].includes(settings.presentationAspectRatio)
+    ? settings.presentationAspectRatio
+    : 'full';
   const lineHeight = ['1.2', '1.3', '1.4', '1.5', '1.6', '1.8', '2'].includes(settings.presentationLineHeight)
     ? settings.presentationLineHeight
     : '1.4';
@@ -479,24 +489,37 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
     );
   }
 
+  const aspectRatioParts = aspectRatio === '16:9' ? [16, 9] : aspectRatio === '1:1' ? [1, 1] : aspectRatio === '9:16' ? [9, 16] : null;
+  const bgFit = aspectRatio === 'full' ? 'cover' : 'contain';
+
   return (
     <div
       className={[
         'present-view present-view--fullscreen present-view--advance-on-click',
         imageOnlyPresent && 'present-view--image-only',
+        aspectRatio !== 'full' && 'present-view--letterboxed',
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ fontFamily }}
+      style={{ fontFamily, ['--present-text-width']: `${textWidthPercent}vw` }}
       onClick={goNext}
       role="presentation"
     >
+      <div
+        className="present-view__frame"
+        style={aspectRatioParts ? {
+          aspectRatio: `${aspectRatioParts[0]} / ${aspectRatioParts[1]}`,
+          ['--present-ratio-w']: aspectRatioParts[0],
+          ['--present-ratio-h']: aspectRatioParts[1],
+        } : undefined}
+      >
       <div className="present-view__capture">
       {displayBgUrl && !displayBgIsVideo && (
         <div
           className={`present-view__bg${bgAnimation ? ' present-view__bg--animated' : ''}`}
           style={{
             backgroundImage: `url(${displayBgUrl})`,
+            backgroundSize: bgAnimation ? undefined : bgFit,
             opacity: bgLayerOpacity,
             ...(bgAnimation ? {
               ['--present-bg-duration']: `${bgAnimationDuration}s`,
@@ -515,6 +538,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
           loop
           playsInline
           style={{
+            objectFit: bgFit,
             opacity: bgLayerOpacity,
             ...(bgAnimation ? {
               ['--present-bg-duration']: `${bgAnimationDuration}s`,
@@ -567,6 +591,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
             />
           ) : null}
         </div>
+      </div>
       </div>
       </div>
       {recordScreenEnabled && (

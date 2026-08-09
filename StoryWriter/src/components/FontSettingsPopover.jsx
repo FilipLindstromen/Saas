@@ -1,11 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
-import { getSettings, saveSettings, PRESENTATION_FONTS, PRESENTATION_SIZES, LINE_HEIGHT_OPTIONS } from '../utils/settings';
+import {
+  getSettings,
+  saveSettings,
+  PRESENTATION_FONTS,
+  PRESENTATION_SIZES,
+  LINE_HEIGHT_OPTIONS,
+  PRESENTATION_ASPECT_RATIOS,
+} from '../utils/settings';
 import './FontSettingsPopover.css';
 
 export default function FontSettingsPopover({ onApply }) {
   const [open, setOpen] = useState(false);
   const [font, setFont] = useState('Poppins');
   const [fontSize, setFontSize] = useState('medium');
+  const [fontSizePercent, setFontSizePercent] = useState(100);
+  const [textWidthPercent, setTextWidthPercent] = useState(90);
+  const [aspectRatio, setAspectRatio] = useState('full');
   const [lineHeight, setLineHeight] = useState('1.4');
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
@@ -15,6 +25,9 @@ export default function FontSettingsPopover({ onApply }) {
       const s = getSettings();
       setFont(s.presentationFont || 'Poppins');
       setFontSize(s.presentationFontSize || 'medium');
+      setFontSizePercent(s.presentationFontSizePercent ?? 100);
+      setTextWidthPercent(s.presentationTextWidthPercent ?? 90);
+      setAspectRatio(s.presentationAspectRatio || 'full');
       setLineHeight(LINE_HEIGHT_OPTIONS.some((o) => o.value === s.presentationLineHeight) ? s.presentationLineHeight : '1.4');
     }
   }, [open]);
@@ -36,6 +49,9 @@ export default function FontSettingsPopover({ onApply }) {
       ...s,
       presentationFont: font,
       presentationFontSize: fontSize,
+      presentationFontSizePercent: fontSizePercent,
+      presentationTextWidthPercent: textWidthPercent,
+      presentationAspectRatio: aspectRatio,
       presentationLineHeight: lineHeight,
     });
     setOpen(false);
@@ -85,6 +101,44 @@ export default function FontSettingsPopover({ onApply }) {
               onChange={(e) => setFontSize(e.target.value)}
             >
               {PRESENTATION_SIZES.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="font-settings-popover__label">
+            Font size (%)
+            <input
+              type="number"
+              className="font-settings-popover__select"
+              min={50}
+              max={200}
+              step={5}
+              value={fontSizePercent}
+              onChange={(e) => setFontSizePercent(Number(e.target.value))}
+            />
+          </label>
+          <label className="font-settings-popover__label">
+            Text width (% of screen)
+            <input
+              type="number"
+              className="font-settings-popover__select"
+              min={20}
+              max={100}
+              step={5}
+              value={textWidthPercent}
+              onChange={(e) => setTextWidthPercent(Number(e.target.value))}
+            />
+          </label>
+          <label className="font-settings-popover__label">
+            Presentation format
+            <select
+              className="font-settings-popover__select"
+              value={aspectRatio}
+              onChange={(e) => setAspectRatio(e.target.value)}
+            >
+              {PRESENTATION_ASPECT_RATIOS.map(({ value, label }) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
