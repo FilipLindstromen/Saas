@@ -501,7 +501,7 @@ export default function PresentView({ sectionOrder, sectionsData, onExit, onPres
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ fontFamily, ['--present-text-width']: `${textWidthPercent}vw` }}
+      style={{ fontFamily, ['--present-text-width']: `${textWidthPercent}%` }}
       onClick={goNext}
       role="presentation"
     >

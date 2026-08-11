@@ -1114,6 +1114,7 @@ export default function App() {
   const [folderColorCustom, setFolderColorCustom] = useState(false);
   const [showAggregated, setShowAggregated] = useState(false);
   const [showDocumentReference, setShowDocumentReference] = useState(false);
+  const [showFolderReference, setShowFolderReference] = useState(false);
   const [userApiKey, setUserApiKey] = useState("");
   const [settingsKey, setSettingsKey] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -3034,9 +3035,15 @@ export default function App() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const fileList = event.target.files;
-    event.target.value = "";
-    if (!fileList?.length || selected?.type !== "document") return;
+    if (!fileList?.length || selected?.type !== "document") {
+      event.target.value = "";
+      return;
+    }
+    // Snapshot into a real array before clearing the input — `fileList` is a
+    // live reference, so resetting `.value` first would empty it out from
+    // under us and every upload would silently no-op.
     const files = Array.from(fileList);
+    event.target.value = "";
 
     setIsReferenceUploading(true);
     try {
@@ -3066,9 +3073,12 @@ export default function App() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const fileList = event.target.files;
-    event.target.value = "";
-    if (!fileList?.length || selected?.type !== "folder") return;
+    if (!fileList?.length || selected?.type !== "folder") {
+      event.target.value = "";
+      return;
+    }
     const files = Array.from(fileList);
+    event.target.value = "";
 
     setIsReferenceUploading(true);
     try {
@@ -4030,27 +4040,18 @@ export default function App() {
                         void handleFolderReferenceFilesSelected(event)
                       }
                     />
-                    <ReferenceMaterialPanel
-                      label="Folder reference"
-                      hint="Applies to every document in this folder and subfolders (plus each document’s own references). Upload files or add a website URL."
-                      referenceMaterial={folderDetails.referenceMaterial}
-                      uploading={isReferenceUploading}
-                      uploadButtonLabel={
-                        folderDetails.referenceMaterial?.files.length
-                          ? "Add more files"
-                          : "Upload reference files"
-                      }
-                      onUploadClick={() =>
-                        folderReferenceFilesInputRef.current?.click()
-                      }
-                      onAddUrl={handleAddFolderReferenceUrl}
-                      onRemoveFile={(filePath) =>
-                        void handleRemoveFolderReferenceFile(filePath)
-                      }
-                      onRemoveAll={() =>
-                        void handleClearFolderReferenceMaterial()
-                      }
-                    />
+                    <button
+                      type="button"
+                      className="ghost document-reference-toggle-btn"
+                      onClick={() => setShowFolderReference(true)}
+                    >
+                      Folder reference
+                      {folderDetails.referenceMaterial?.files.length ? (
+                        <span className="reference-count-badge">
+                          {folderDetails.referenceMaterial.files.length}
+                        </span>
+                      ) : null}
+                    </button>
                   </>
                 ) : null}
                 {showDocumentPanel && documentDetails ? (
@@ -5154,6 +5155,55 @@ export default function App() {
                   void handleRemoveDocumentReferenceFile(filePath)
                 }
                 onRemoveAll={() => void handleClearReferenceMaterial()}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showFolderReference && folderDetails ? (
+        <div
+          className="overlay aggregated-overlay"
+          role="presentation"
+          onClick={() => setShowFolderReference(false)}
+        >
+          <div
+            className="aggregated-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Folder reference"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header">
+              <h2>Folder reference</h2>
+              <div className="toolbar">
+                <button
+                  type="button"
+                  onClick={() => setShowFolderReference(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="panel-body">
+              <ReferenceMaterialPanel
+                label="Folder reference"
+                hint="Applies to every document in this folder and subfolders (plus each document’s own references). Upload files or add a website URL."
+                referenceMaterial={folderDetails.referenceMaterial}
+                uploading={isReferenceUploading}
+                uploadButtonLabel={
+                  folderDetails.referenceMaterial?.files.length
+                    ? "Add more files"
+                    : "Upload reference files"
+                }
+                onUploadClick={() =>
+                  folderReferenceFilesInputRef.current?.click()
+                }
+                onAddUrl={handleAddFolderReferenceUrl}
+                onRemoveFile={(filePath) =>
+                  void handleRemoveFolderReferenceFile(filePath)
+                }
+                onRemoveAll={() => void handleClearFolderReferenceMaterial()}
               />
             </div>
           </div>
