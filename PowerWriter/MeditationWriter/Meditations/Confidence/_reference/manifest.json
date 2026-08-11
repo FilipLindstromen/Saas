@@ -1,0 +1,15 @@
+{
+  "uploadedAt": "2026-08-11T09:02:14.411Z",
+  "sourceFileName": "test-ref.txt",
+  "sourceNames": [
+    "test-ref.txt"
+  ],
+  "files": [
+    {
+      "path": "test-ref.txt",
+      "charCount": 48
+    }
+  ],
+  "totalChars": 48,
+  "skippedBinary": 0
+}
