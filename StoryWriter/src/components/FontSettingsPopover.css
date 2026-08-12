@@ -55,6 +55,26 @@
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
+.font-settings-popover__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.font-settings-popover__value {
+  font-weight: 600;
+  color: var(--accent, var(--text));
+}
+
+.font-settings-popover__slider {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  accent-color: var(--accent, currentColor);
+  cursor: pointer;
+}
+
 .font-settings-popover__actions {
   margin-top: 0.75rem;
   padding-top: 0.75rem;

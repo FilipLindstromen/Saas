@@ -108,10 +108,12 @@ export default function FontSettingsPopover({ onApply }) {
             </select>
           </label>
           <label className="font-settings-popover__label">
-            Font size (%)
+            <span className="font-settings-popover__label-row">
+              Font size <span className="font-settings-popover__value">{fontSizePercent}%</span>
+            </span>
             <input
-              type="number"
-              className="font-settings-popover__select"
+              type="range"
+              className="font-settings-popover__slider"
               min={50}
               max={200}
               step={5}
@@ -120,10 +122,12 @@ export default function FontSettingsPopover({ onApply }) {
             />
           </label>
           <label className="font-settings-popover__label">
-            Text width (% of screen)
+            <span className="font-settings-popover__label-row">
+              Text width <span className="font-settings-popover__value">{textWidthPercent}%</span>
+            </span>
             <input
-              type="number"
-              className="font-settings-popover__select"
+              type="range"
+              className="font-settings-popover__slider"
               min={20}
               max={100}
               step={5}
