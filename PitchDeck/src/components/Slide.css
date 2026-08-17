@@ -436,7 +436,7 @@
 }
 .play-mode .slide .slide-content.bulletpoints .slide-bullets {
   width: 100%;
-  max-width: 66.67%;
+  max-width: var(--slide-text-max-width, 66.67%);
 }
 
 /* Progressive bullet reveal: anchor list at top so items stack downward */
@@ -539,7 +539,7 @@
 }
 .play-mode .slide.content-vertical-top .slide-content.bulletpoints .slide-bullets {
   width: 100%;
-  max-width: 66.67%;
+  max-width: var(--slide-text-max-width, 66.67%);
 }
 
 .play-mode .slide.content-vertical-top .slide-content.default {
@@ -739,7 +739,7 @@
   flex-direction: column;
   gap: 0;
   width: 100%;
-  max-width: 66.67%;
+  max-width: var(--slide-text-max-width, 66.67%);
   list-style: none;
   padding: 0;
   margin: 0;
@@ -763,7 +763,7 @@
 
 /* Single text field for bulletpoints in edit mode */
 .slide-bullets-single-field {
-  max-width: 66.67%;
+  max-width: var(--slide-text-max-width, 66.67%);
   min-height: 6em;
 }
 

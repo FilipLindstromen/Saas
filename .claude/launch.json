@@ -32,6 +32,13 @@
       "runtimeArgs": ["--prefix", "StoryWriter", "run", "dev"],
       "port": 5183,
       "autoPort": true
+    },
+    {
+      "name": "PitchDeck",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "PitchDeck", "run", "dev"],
+      "port": 5174,
+      "autoPort": true
     }
   ]
 }

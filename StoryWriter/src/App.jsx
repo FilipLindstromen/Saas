@@ -1,7 +1,13 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import ThemeToggle from '@shared/ThemeToggle';
 import { getTheme, setTheme, initThemeSync } from '@shared/theme';
-import { getSettings, saveSettings, PRESENTATION_FONTS } from './utils/settings';
+import {
+  getSettings,
+  saveSettings,
+  PRESENTATION_FONTS,
+  PRESENTATION_ASPECT_RATIOS,
+  LINE_HEIGHT_OPTIONS,
+} from './utils/settings';
 import { normalizeStoryData } from './utils/persistence';
 import * as projectStorage from './utils/projectStorage';
 import {
@@ -88,6 +94,10 @@ function App() {
   const [theme, setThemeState] = useState(() => getTheme());
   const [settingsPresentationFont, setSettingsPresentationFont] = useState('Poppins');
   const [settingsPresentationSize, setSettingsPresentationSize] = useState('medium');
+  const [settingsFontSizePercent, setSettingsFontSizePercent] = useState(100);
+  const [settingsTextWidthPercent, setSettingsTextWidthPercent] = useState(90);
+  const [settingsAspectRatio, setSettingsAspectRatio] = useState('full');
+  const [settingsLineHeight, setSettingsLineHeight] = useState('1.4');
   const [copyFeedback, setCopyFeedback] = useState(false);
   const resizeStartRef = useRef({ x: 0, width: 0 });
   const copyFeedbackTimerRef = useRef(null);
@@ -193,6 +203,10 @@ function App() {
       const s = getSettings();
       setSettingsPresentationFont(s.presentationFont || 'Poppins');
       setSettingsPresentationSize(s.presentationFontSize || 'medium');
+      setSettingsFontSizePercent(s.presentationFontSizePercent ?? 100);
+      setSettingsTextWidthPercent(s.presentationTextWidthPercent ?? 90);
+      setSettingsAspectRatio(s.presentationAspectRatio || 'full');
+      setSettingsLineHeight(s.presentationLineHeight || '1.4');
     }
   }, [settingsOpen]);
 
@@ -957,7 +971,12 @@ function App() {
             ...getSettings(),
             presentationFont: settingsPresentationFont,
             presentationFontSize: settingsPresentationSize,
+            presentationFontSizePercent: settingsFontSizePercent,
+            presentationTextWidthPercent: settingsTextWidthPercent,
+            presentationAspectRatio: settingsAspectRatio,
+            presentationLineHeight: settingsLineHeight,
           });
+          setSettingsVersion((v) => v + 1);
         }}
       >
         <div className="shared-settings-field">
@@ -982,6 +1001,54 @@ function App() {
             <option value="small">Small</option>
             <option value="medium">Medium</option>
             <option value="large">Large</option>
+          </select>
+        </div>
+        <div className="shared-settings-field">
+          <label htmlFor="sw-font-size-percent">Font size ({settingsFontSizePercent}%)</label>
+          <input
+            id="sw-font-size-percent"
+            type="range"
+            min={50}
+            max={200}
+            step={5}
+            value={settingsFontSizePercent}
+            onChange={(e) => setSettingsFontSizePercent(Number(e.target.value))}
+          />
+        </div>
+        <div className="shared-settings-field">
+          <label htmlFor="sw-text-width-percent">Text width ({settingsTextWidthPercent}% of screen)</label>
+          <input
+            id="sw-text-width-percent"
+            type="range"
+            min={20}
+            max={100}
+            step={5}
+            value={settingsTextWidthPercent}
+            onChange={(e) => setSettingsTextWidthPercent(Number(e.target.value))}
+          />
+        </div>
+        <div className="shared-settings-field">
+          <label htmlFor="sw-aspect-ratio">Presentation format</label>
+          <select
+            id="sw-aspect-ratio"
+            value={settingsAspectRatio}
+            onChange={(e) => setSettingsAspectRatio(e.target.value)}
+          >
+            {PRESENTATION_ASPECT_RATIOS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="shared-settings-field">
+          <label htmlFor="sw-line-height">Line height</label>
+          <select
+            id="sw-line-height"
+            value={settingsLineHeight}
+            onChange={(e) => setSettingsLineHeight(e.target.value)}
+          >
+            {LINE_HEIGHT_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
           </select>
         </div>
       </SettingsModal>

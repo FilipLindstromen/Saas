@@ -105,6 +105,26 @@
   color: var(--text-muted);
 }
 
+.settings-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.settings-label-value {
+  font-weight: 600;
+  color: var(--accent, var(--text));
+}
+
+.settings-slider {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  accent-color: var(--accent, currentColor);
+  cursor: pointer;
+}
+
 .settings-actions {
   display: flex;
   gap: 0.75rem;
