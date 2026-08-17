@@ -151,7 +151,7 @@
 }
 
 .slide-content.centered .slide-text-field-wrap {
-  max-width: var(--slide-text-max-width, 85%);
+  max-width: var(--slide-text-max-width, 66.67%);
 }
 
 .slide-content.right .slide-text-field-wrap,
@@ -383,7 +383,7 @@
 .slide-text-centered-wrapper .slide-subtitle {
   text-align: center;
   width: 100%;
-  max-width: var(--slide-text-max-width, 85%);
+  max-width: var(--slide-text-max-width, 66.67%);
   box-sizing: border-box;
 }
 
@@ -642,10 +642,9 @@
   text-align: right;
 }
 
-/* Narrower text area only; same left position as default Left layout */
 .slide-text.left-video {
   text-align: left;
-  max-width: var(--slide-text-max-width, 45%);
+  max-width: var(--slide-text-max-width, 66.67%);
 }
 
 /* Present mode: ensure left-video text uses distance from edge/bottom and stays left-aligned */
@@ -655,10 +654,9 @@
   margin-right: auto;
 }
 
-/* Right with Video: text on right, narrower text area */
 .slide-text.right-video {
   text-align: right;
-  max-width: var(--slide-text-max-width, 45%);
+  max-width: var(--slide-text-max-width, 66.67%);
 }
 
 .slide-text:empty::before {

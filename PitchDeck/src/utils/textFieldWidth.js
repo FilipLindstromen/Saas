@@ -1,13 +1,15 @@
-/** Default max-width (% of slide) per layout — used when slide has no textMaxWidth override. */
+/** Default max-width (% of slide) — same for every layout, used when slide has no textMaxWidth override. */
+const DEFAULT_TEXT_MAX_WIDTH = 66.67
+
 export const TEXT_MAX_WIDTH_DEFAULTS = {
-  default: 66.67,
-  right: 66.67,
-  'left-video': 45,
-  'right-video': 45,
-  centered: 85,
-  bulletpoints: 66.67,
-  video: 66.67,
-  section: 100,
+  default: DEFAULT_TEXT_MAX_WIDTH,
+  right: DEFAULT_TEXT_MAX_WIDTH,
+  'left-video': DEFAULT_TEXT_MAX_WIDTH,
+  'right-video': DEFAULT_TEXT_MAX_WIDTH,
+  centered: DEFAULT_TEXT_MAX_WIDTH,
+  bulletpoints: DEFAULT_TEXT_MAX_WIDTH,
+  video: DEFAULT_TEXT_MAX_WIDTH,
+  section: DEFAULT_TEXT_MAX_WIDTH,
 }
 
 export function getDefaultTextMaxWidth(layout) {
