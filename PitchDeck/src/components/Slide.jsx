@@ -1776,15 +1776,6 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
   const hasDraggableBackground = !isPlayMode && onUpdate && !previewTextAnimation && (slide.imageUrl || slide.backgroundVideoUrl || slide.infographicProjectId)
   const textAnimSpeed = motion.textAnimationSpeed ?? 1
   const isTopAligned = contentVerticalAlign === 'top'
-  // Anchor the list to the top only while bullets are still being revealed one by one
-  // (so each new item appears below the last without the whole stack jumping). Once every
-  // bullet is showing, drop back to the normal top/bottom anchor so the at-rest position
-  // matches edit mode instead of staying pinned to the top for the rest of the slide.
-  const revealBulletsProgressively = isPlayMode
-    && layout === 'bulletpoints'
-    && visibleBulletIndex !== null
-    && visibleBulletIndex >= 0
-    && visibleBulletIndex < getBulletPoints().length - 1
   const slideStyle = {
     backgroundColor: hideBackground ? 'transparent' : slideBgColor,
     aspectRatio: aspectRatioValue,
@@ -1837,7 +1828,7 @@ function Slide({ slide, backgroundColor = '#1a1a1a', textColor = '#ffffff', font
 
   return (
     <div 
-      className={`slide ${formatClass} ${textArchetypeClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${revealBulletsProgressively ? 'bullets-progressive-reveal' : ''} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
+      className={`slide ${formatClass} ${textArchetypeClass} ${isTopAligned ? 'content-vertical-top' : 'content-vertical-bottom'} ${!textInlineBackground ? 'no-text-highlight' : ''} ${textAnimationClass} ${textEntrancePendingClass} ${bgBlurClass} ${previewTextAnimation ? 'preview-text-animation' : ''} ${isPlayMode ? 'play-mode' : ''} ${layout === 'left-video' ? 'layout-left-video' : ''} ${layout === 'right-video' ? 'layout-right-video' : ''} ${layout === 'video' ? 'layout-video' : ''} ${hasSelectedGraphic ? 'has-selected-graphic' : ''} ${hasSelectedSubSlide ? 'has-selected-subslide' : ''} ${hasSelectedTextField ? 'has-selected-text-field' : ''}`}
       ref={slideRef} 
       style={slideStyle}
       onPointerDown={handleSlidePointerDown}

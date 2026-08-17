@@ -338,6 +338,7 @@
 .slide-content {
   position: relative;
   z-index: 10;
+  width: 100%;
   height: 100%;
   display: flex;
   align-items: flex-end;
@@ -437,16 +438,6 @@
 .play-mode .slide .slide-content.bulletpoints .slide-bullets {
   width: 100%;
   max-width: var(--slide-text-max-width, 66.67%);
-}
-
-/* Progressive bullet reveal: anchor list at top so items stack downward */
-.play-mode .slide.bullets-progressive-reveal .slide-content.bulletpoints {
-  justify-content: flex-start;
-  align-items: flex-start;
-  padding-top: var(--slide-content-top, var(--slide-content-bottom, 12%));
-  padding-bottom: 4%;
-  padding-left: var(--slide-content-edge, 9%);
-  padding-right: 0;
 }
 
 .play-mode .slide .slide-content.right,
@@ -877,9 +868,11 @@
   margin-bottom: 0;
 }
 
-/* Present mode: hide bullets until revealed */
+/* Present mode: hide bullets until revealed, but keep their layout space reserved
+   (not display:none) so the list's size — and its anchored position — stays the
+   same throughout the reveal instead of shifting as each bullet is added. */
 .slide-bullet.hidden {
-  display: none;
+  visibility: hidden;
 }
 
 /* One line at a time reveal (play mode) */
