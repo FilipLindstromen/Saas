@@ -24,6 +24,7 @@ window.SAAS_APPS_CATALOG = [
       { name: 'Uploader', href: 'Uploader/', icon: 'uploader.svg' },
       { name: 'VSL Writer', href: 'VSLWriter/', icon: 'vsl-writer.svg' },
       { name: 'TypoAnimation', href: 'TypoAnimation/', icon: 'typo-animation.svg' },
+      { name: 'BRollEditor', href: 'BRollEditor/', icon: 'broll-editor.svg' },
     ],
   },
   {
@@ -75,6 +76,7 @@ window.SAAS_APPS_CATALOG = [
       { name: 'BrainDump', href: 'BrainDump/', icon: 'braindump.svg' },
       { name: 'PostIt', href: 'PostIt/', icon: 'postit.svg' },
       { name: 'CopyLearner', href: 'CopyLearner/', icon: 'bullet-generator.svg' },
+      { name: 'LinguaFlash', href: 'LinguaFlash/', icon: 'linguaflash.svg' },
     ],
   },
   {

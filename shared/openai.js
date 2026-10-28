@@ -91,6 +91,43 @@ export async function transcribeAudio(audioBlob, apiKey) {
   return (data.text || '').trim();
 }
 
+/**
+ * Transcribe audio with word-level timestamps (Whisper verbose_json).
+ * Used by tools that need to sync visuals (b-roll, captions) to individual words.
+ * @param {Blob} audioBlob
+ * @param {string} [apiKey]
+ * @returns {Promise<{text: string, words: Array<{text: string, startMs: number, endMs: number}>}>}
+ */
+export async function transcribeAudioWithWordTimestamps(audioBlob, apiKey) {
+  const key = getKey(apiKey);
+  if (!key) throw new Error('OpenAI API key is not set. Open Settings to add your key.');
+
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'recording.webm');
+  formData.append('model', 'whisper-1');
+  formData.append('response_format', 'verbose_json');
+  formData.append('timestamp_granularities[]', 'word');
+
+  const res = await fetch(`${OPENAI_API}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Transcription failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const words = (data.words || []).map((w) => ({
+    text: String(w.word ?? '').trim(),
+    startMs: Math.round((w.start ?? 0) * 1000),
+    endMs: Math.round((w.end ?? 0) * 1000),
+  }));
+  return { text: (data.text || '').trim(), words };
+}
+
 async function dataUrlToBlob(dataUrl) {
   const res = await fetch(dataUrl);
   return res.blob();

@@ -1,0 +1,91 @@
+.export-tab {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.export-tab--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.export-tab__card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+  padding: 1.5rem;
+}
+
+.export-tab__card h2 {
+  font-size: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.export-tab__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.export-tab__option {
+  padding: 0.65rem 0.9rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  transition: var(--transition-fast);
+}
+
+.export-tab__option.active {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.export-tab__option:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.export-tab__hint {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.85rem;
+}
+
+.export-tab__render-btn {
+  width: 100%;
+  padding: 0.8rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: var(--button-radius);
+}
+
+.export-tab__render-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.export-tab__error {
+  margin-top: 0.85rem;
+  font-size: 0.8125rem;
+  color: #fca5a5;
+}
+
+.export-tab__download {
+  display: inline-block;
+  margin-top: 0.85rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  text-decoration: none;
+}

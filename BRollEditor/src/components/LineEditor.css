@@ -1,0 +1,262 @@
+.line-editor {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+
+.line-editor__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  padding: 0.4rem 0.6rem;
+  min-height: 44px;
+  border-bottom: 1px solid var(--border-default);
+  transition: var(--transition-fast);
+}
+
+.line-editor__row:last-child {
+  border-bottom: none;
+}
+
+.line-editor__row:hover {
+  background: var(--bg-hover);
+}
+
+.line-editor__row--active {
+  background: var(--bg-elevated);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.line-editor__select {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.line-editor__thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  padding: 0;
+}
+
+.line-editor__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.line-editor__thumb-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.line-editor__thumb-placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 1rem;
+}
+
+.line-editor__badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 0.5rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  padding: 1px 3px;
+}
+
+.line-editor__text {
+  flex: 1 1 160px;
+  /* A real floor, not 0 — without it a flex:1 item with flex-wrap on its row just gets
+     squeezed down to a sliver (wrapping one character per line) instead of the row wrapping
+     its other children below, since a 0-basis flex item always "fits" on the current line. */
+  min-width: 140px;
+  resize: none;
+  overflow: hidden;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--button-radius);
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+.line-editor__text:focus {
+  background: var(--bg-primary);
+  border-color: var(--accent);
+}
+
+.line-editor__text::placeholder {
+  color: var(--text-tertiary);
+}
+
+.line-editor__side {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.line-editor__time {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  margin-right: 0.25rem;
+}
+
+.line-editor__kenburns {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.line-editor__btn {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--button-radius);
+  white-space: nowrap;
+}
+
+.line-editor__btn--primary {
+  color: #fff;
+  background: var(--accent-gradient);
+  border: none;
+}
+
+.line-editor__btn--ghost {
+  color: var(--text-tertiary);
+  background: transparent;
+  border-color: transparent;
+}
+
+.line-editor__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  transition: var(--transition-fast);
+}
+
+.line-editor__icon-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.line-editor__icon-btn--ghost {
+  color: var(--text-tertiary);
+  background: transparent;
+  border-color: transparent;
+}
+
+.line-editor__icon-btn--ghost:hover {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.line-editor__gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0.15rem 0;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-primary);
+}
+
+.line-editor__gap-add {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 999px;
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+
+.line-editor__gap:hover .line-editor__gap-add {
+  opacity: 1;
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+}
+
+.line-editor__gap-add:hover {
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+.line-editor__delay-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+}
+
+.line-editor__delay-chip input {
+  width: 34px;
+  padding: 0.1rem 0.2rem;
+  font-size: 0.6875rem;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.line-editor__delay-chip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-tertiary);
+  background: transparent;
+}
+
+.line-editor__delay-chip button:hover {
+  color: #fca5a5;
+}

@@ -1,0 +1,10 @@
+# runtime data: uploaded audio and rendered exports
+/server/uploads/
+/server/renders/
+
+# packaged desktop app
+/BRollEditor-win32-x64/
+/electron/renderer.log
+
+# typescript
+*.tsbuildinfo

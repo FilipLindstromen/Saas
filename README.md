@@ -24,6 +24,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
 | SketchGen | `/SketchGen` | Draw a sketch, generate a styled illustration with AI |
 | CopyLearner | `/CopyLearner` | Swipeable micro-lessons generated from your own uploaded content, with spaced repetition |
+| LinguaFlash | `/LinguaFlash` | RSVP speed-reading app for Swedish/English vocabulary; exportable to iOS via Capacitor |
 | Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |
 | Reel Recorder | `/ReelRecorder` | Reel/short-form video recorder |
@@ -36,6 +37,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
 | MetaConnect | `/MetaConnect` | Meta (FB/IG) comment-to-DM automation + lead form sync to Systeme.io (requires server; deploy to Vercel or run locally) |
 | TypoAnimation | `/TypoAnimation` | Kinetic-typography VSL video generator: script → styled animated scenes, webcam voice sync, MP4 export (requires server; deploy to Vercel or run locally) |
+| BRollEditor | `/BRollEditor` | Record/import narration → transcribe → pick b-roll per line from Pexels/Pixabay/Unsplash → export synced MP4 (requires server; deploy to Vercel or run locally) |
 
 ## Deploying to GitHub Pages (optional)
 

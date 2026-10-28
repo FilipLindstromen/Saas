@@ -1,0 +1,27 @@
+.cut-audio-player {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.cut-audio-player__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: 50%;
+}
+
+.cut-audio-player__time {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

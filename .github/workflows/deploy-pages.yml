@@ -176,6 +176,13 @@ jobs:
           node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/CopyLearner/
           cp -r dist ../deploy/CopyLearner
 
+      - name: Build LinguaFlash
+        run: |
+          cd LinguaFlash
+          npm install
+          node node_modules/vite/bin/vite.js build --base=/${{ github.event.repository.name }}/LinguaFlash/
+          cp -r dist ../deploy/LinguaFlash
+
       - name: Build Native Ads Generator
         run: |
           cd NativeAdsGenerator

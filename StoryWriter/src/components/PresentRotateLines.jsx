@@ -43,7 +43,11 @@ export default function PresentRotateLines({
           const prevParts = row.previousText
             ? applyHeadlineToLineText(row.previousText, styledParts)
             : null;
-          const runStepAnim = row.animate && phase === 'enter';
+          // Animate every rotate-step transition, not just the one that coincides with the
+          // slide's own enter phase — advancing to the next rotating line within the same
+          // slide keeps `phase` at 'idle' the whole time, so gating on 'enter' only animated
+          // the very first line and left every later one appearing instantly with no mask.
+          const runStepAnim = row.animate && phase !== 'exit';
           return (
             <div
               key={`rotate-step-${index}-${animKey}`}
@@ -73,7 +77,7 @@ export default function PresentRotateLines({
                     'present-rotate__line',
                     runStepAnim && 'present-rotate__line--rotate-in',
                     phase === 'exit' && 'present-rotate__line--out',
-                    phase === 'idle' && 'present-rotate__line--rotate-settled',
+                    !runStepAnim && 'present-rotate__line--rotate-settled',
                   ]
                     .filter(Boolean)
                     .join(' ')}

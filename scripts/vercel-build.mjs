@@ -31,6 +31,7 @@ const VITE_APPS = [
   ["InfoGraphics", "/InfoGraphics/"],
   ["SketchGen", "/SketchGen/"],
   ["CopyLearner", "/CopyLearner/"],
+  ["LinguaFlash", "/LinguaFlash/"],
   ["NativeAdsGenerator", "/NativeAdsGenerator/"],
   ["AutoCaptions", "/AutoCaptions/"],
   ["VideoQuiz/app", "/VideoQuiz/"],
@@ -108,6 +109,15 @@ taLanding = taLanding.replace(/__TYPOANIMATION_APP_URL__/g, typoAnimationUrl || 
 mkdirSync(path.join(DEPLOY, "TypoAnimation"), { recursive: true });
 writeFileSync(path.join(DEPLOY, "TypoAnimation", "index.html"), taLanding);
 console.log("TypoAnimation landing written (Open TypoAnimation →", typoAnimationUrl || "(set TYPOANIMATION_APP_URL)", ")");
+
+// BRollEditor landing (Vite app + small Node/Express server for Remotion rendering — needs
+// its own deployment; links out once BROLLEDITOR_APP_URL is set)
+const brollEditorUrl = process.env.BROLLEDITOR_APP_URL || "";
+let brLanding = readFileSync(path.join(docs, "broll-editor-landing.html"), "utf8");
+brLanding = brLanding.replace(/__BROLLEDITOR_APP_URL__/g, brollEditorUrl || "#");
+mkdirSync(path.join(DEPLOY, "BRollEditor"), { recursive: true });
+writeFileSync(path.join(DEPLOY, "BRollEditor", "index.html"), brLanding);
+console.log("BRollEditor landing written (Open BRollEditor →", brollEditorUrl || "(set BROLLEDITOR_APP_URL)", ")");
 
 // Build each Vite app with base path and copy dist to deploy
 for (const [projectPath, basePath] of VITE_APPS) {

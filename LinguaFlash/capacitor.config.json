@@ -1,0 +1,10 @@
+{
+  "appId": "com.filiplindstrom.linguaflash",
+  "appName": "LinguaFlash",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "backgroundColor": "#0b0d12",
+  "ios": {
+    "contentInset": "never"
+  }
+}
