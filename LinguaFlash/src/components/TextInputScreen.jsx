@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { parseText } from '../lib/parse';
+import GlosorImport from './GlosorImport';
 
 const SAMPLE = `hus - house
 bil - car
@@ -70,6 +71,11 @@ export default function TextInputScreen({
         </select>
         <p className="setup-hint">Enter Swedish on the left and {languageName} on the right. Changing language keeps your text.</p>
       </div>
+
+      <GlosorImport onImport={({ text, separator: importedSeparator }) => {
+        setSeparator(importedSeparator);
+        setRawText(text);
+      }} />
 
       <details className="instructions">
         <summary>How to enter words</summary>

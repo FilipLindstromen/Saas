@@ -47,6 +47,22 @@ interleaved with the next pair.
   word/sentence small above the English word instead of flashing it as its own
   big word, so the English gets the screen time.
 
+## Import from Glosor.eu
+
+Paste a public `https://glosor.eu/ovning/...html` URL into **Import from Glosor.eu**
+and click **Fetch words**. Preview the columns, choose which is Swedish, then
+click **Use pairs** to replace your text. Swedish is placed on the left and
+the separator is set automatically. Select the matching English/Spanish language.
+
+The importer reads Glosor.eu's public `#listOfQuestions` word-list structure.
+It preserves sentences, accents, and alternative translations. Private exercises
+and other websites are unsupported. It does not execute scripts from the page.
+
+URL fetching runs through `/api/glosor`, a restricted Vercel function in the root
+SaaS project. Local `npm run dev` provides the same endpoint through Vite middleware.
+Static-only hosting (GitHub Pages) and standalone Capacitor builds need a server
+for URL import; manual text entry continues to work there.
+
 ## Optional reading exercises
 
 In Flash and Mixed modes, each exercise can be switched on or off before

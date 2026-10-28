@@ -430,6 +430,21 @@ button {
   white-space: pre;
 }
 
+.glosor-import {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.glosor-import h2 { margin: 0; }
+.glosor-url-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.glosor-url-row input { flex: 1 1 240px; width: auto; min-width: 0; }
+.glosor-preview { display: grid; gap: 12px; min-width: 0; }
+.glosor-preview a { color: var(--accent); }
+.glosor-preview table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.glosor-preview th, .glosor-preview td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.glosor-preview th { color: var(--text-dim); font-size: 0.8rem; }
+
 .word-pre {
   flex: 1 1 0;
   min-width: 0;
