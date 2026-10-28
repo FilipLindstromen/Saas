@@ -22,6 +22,7 @@ export default function Controls({
   currentPairIndex,
   totalPairs,
   timeLabel,
+  hintDisabled = false,
 }) {
   const wpmFill = ((wpm - MIN_WPM) / (MAX_WPM - MIN_WPM)) * 100;
 
@@ -53,10 +54,11 @@ export default function Controls({
         type="button"
         role="switch"
         aria-checked={svHint}
+        disabled={hintDisabled}
         className="switch-row"
         onClick={() => onSvHintChange(!svHint)}
       >
-        <span>Swedish hint above</span>
+        <span>{hintDisabled ? 'Swedish hint off for this exercise' : 'Swedish hint above'}</span>
         <span className="switch-track">
           <span className="switch-thumb" />
         </span>

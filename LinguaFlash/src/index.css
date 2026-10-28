@@ -397,6 +397,39 @@ button {
   font-size: 1.6rem;
 }
 
+.word-row--phrase {
+  display: block;
+  text-align: center;
+  font-size: clamp(1.1rem, 5vw, 2.6rem);
+  overflow-wrap: anywhere;
+}
+
+.word-row--phrase .word-pre,
+.word-row--phrase .word-post {
+  white-space: pre-wrap;
+}
+
+.separator-input {
+  width: min(100%, 240px);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: 1rem ui-monospace, monospace;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.separator-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#separator-help code {
+  white-space: pre;
+}
+
 .word-pre {
   flex: 1 1 0;
   min-width: 0;
@@ -583,6 +616,13 @@ button {
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+}
+
+.reader-screen > .quiz-screen {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .quiz-prompt {

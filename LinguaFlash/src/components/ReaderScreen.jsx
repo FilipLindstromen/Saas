@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { parseText, buildTokenStream, buildTimedTokenStream } from '../lib/parse';
+import { parseText, buildTokenStream, buildTimedTokenStream, buildMixedTokenStream } from '../lib/parse';
 import {
   generateWordBasedColors,
   generateRainbowColors,
-  darkenColor,
+  mutedBackground,
   LANGUAGE_COLORS,
 } from '../lib/colors';
 import { formatSeconds } from '../lib/format';
@@ -11,10 +11,11 @@ import { useRSVPPlayer } from '../hooks/useRSVPPlayer';
 import { useCountdown } from '../hooks/useCountdown';
 import WordDisplay from './WordDisplay';
 import Controls from './Controls';
+import MixedQuestion from './MixedQuestion';
 
 // Comfortably outlasts any WPM setting (max slider value is 600) for the
 // chosen duration, so the timed stream never runs dry before time is up.
-const TOKENS_PER_MINUTE_CEILING = 700;
+const TOKENS_PER_MINUTE_CEILING = 2400;
 
 export default function ReaderScreen({
   rawText,
@@ -26,24 +27,31 @@ export default function ReaderScreen({
   svHint,
   setSvHint,
   onBack,
+  mixed = false,
+  training,
+  separator,
+  language,
 }) {
-  const { pairs } = useMemo(() => parseText(rawText), [rawText]);
+  const { pairs } = useMemo(() => parseText(rawText, separator), [rawText, separator]);
   const tokens = useMemo(() => {
-    if (!sessionMinutes) return buildTokenStream(pairs);
-    return buildTimedTokenStream(pairs, sessionMinutes * TOKENS_PER_MINUTE_CEILING);
-  }, [pairs, sessionMinutes]);
+    if (mixed) return buildMixedTokenStream(pairs, sessionMinutes ? sessionMinutes * TOKENS_PER_MINUTE_CEILING : null, training);
+    if (!sessionMinutes) return buildTokenStream(pairs, training);
+    return buildTimedTokenStream(pairs, sessionMinutes * TOKENS_PER_MINUTE_CEILING, training);
+  }, [pairs, sessionMinutes, mixed, training]);
 
   const wordColors = useMemo(() => generateWordBasedColors(pairs.length), [pairs.length]);
   const rainbowColors = useMemo(() => generateRainbowColors(pairs.length), [pairs.length]);
   // Color BG reuses the same random per-pair palette, just applied to the
   // background instead of the focus letter.
-  const bgColors = wordColors;
+  const bgColors = useMemo(() => wordColors.map(mutedBackground), [wordColors]);
 
   // With the hint on, Swedish is shown small above the English word instead of
   // being flashed as its own big word, so English gets the screen time.
-  const player = useRSVPPlayer(tokens, wpm, svHint ? 'sv' : null);
+  const hintDisabled = training?.recallGap || training?.repeatPairs || training?.swedishFirst === false;
+  const showHint = svHint && !hintDisabled;
+  const player = useRSVPPlayer(tokens, wpm, showHint ? 'sv' : null);
   const token = player.currentToken;
-  const hint = svHint && token && token.lang === 'en' ? token.svText : null;
+  const hint = showHint && token && token.lang === 'en' ? token.svText : null;
 
   // The single color that identifies a pair, used for the completed-pair
   // flash. Language mode has no single per-pair color (it's blue/red by
@@ -61,7 +69,7 @@ export default function ReaderScreen({
   const focusColor = (() => {
     if (!token) return LANGUAGE_COLORS.sv;
     if (colorMode === 'language') return LANGUAGE_COLORS[token.lang];
-    if (colorMode === 'colorBg') return darkenColor(bgColor);
+    if (colorMode === 'colorBg') return wordColors[token.pairIndex] ?? LANGUAGE_COLORS.sv;
     return getPairIdentityColor(token.pairIndex);
   })();
 
@@ -75,11 +83,11 @@ export default function ReaderScreen({
   const lastPairStartRef = useRef(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (training?.pairFlash === false || !token || token.type === 'quiz' || token.type === 'gap') return;
     const pairStart = player.index - token.wordIndexInPair;
     const isNewPair = lastPairStartRef.current !== pairStart;
     lastPairStartRef.current = pairStart;
-    if (isNewPair && pairStart > 0) {
+    if (isNewPair && pairStart > 0 && token.repetition === 0 && tokens[pairStart - 1].type !== 'quiz') {
       setFlash({
         key: `${pairStart}`,
         color: getPairIdentityColor(tokens[pairStart - 1].pairIndex),
@@ -106,7 +114,14 @@ export default function ReaderScreen({
 
   return (
     <div className="reader-screen">
-      <WordDisplay token={token} focusColor={focusColor} bgColor={bgColor} hint={hint} />
+      {token?.type === 'quiz' && !countdown.expired ? (
+        <MixedQuestion key={player.index} pairs={pairs} pairIndex={token.pairIndex} language={language}
+          accentColor={getPairIdentityColor(token.pairIndex)} tinted={colorMode === 'colorBg'}
+          isPlaying={player.isPlaying} onComplete={player.advance} />
+      ) : (
+        <WordDisplay token={token?.type === 'quiz' ? null : token} focusColor={focusColor} language={language}
+          bgColor={bgColor} hint={hint} colorHint={colorMode === 'word'} />
+      )}
 
       {flash && (
         <div
@@ -132,7 +147,8 @@ export default function ReaderScreen({
         onWpmChange={setWpm}
         colorMode={colorMode}
         onColorModeChange={setColorMode}
-        svHint={svHint}
+        svHint={showHint}
+        hintDisabled={hintDisabled}
         onSvHintChange={setSvHint}
         currentPairIndex={token ? token.pairIndex : pairs.length - 1}
         totalPairs={pairs.length}

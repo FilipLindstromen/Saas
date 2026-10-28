@@ -5,6 +5,13 @@ export const LANGUAGE_COLORS = {
 
 export const NEUTRAL_COLOR = '#e7e9ee';
 
+// Retain each pair's hue in a muted dark tint instead of a bright full screen.
+export function mutedBackground(hex) {
+  const channels = hex.replace('#', '').match(/../g).map(channel => parseInt(channel, 16));
+  const base = [16, 21, 30];
+  return '#' + channels.map((channel, i) => Math.round(base[i] * 0.85 + channel * 0.15).toString(16).padStart(2, '0')).join('');
+}
+
 const PALETTE = [
   '#f472b6', // pink
   '#34d399', // green

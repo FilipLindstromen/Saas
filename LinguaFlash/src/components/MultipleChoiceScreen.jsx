@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseText, shuffleArray } from '../lib/parse';
-import { generateWordBasedColors, LANGUAGE_COLORS } from '../lib/colors';
+import { generateWordBasedColors, LANGUAGE_COLORS, mutedBackground } from '../lib/colors';
 import { formatSeconds } from '../lib/format';
 import { useCountdown } from '../hooks/useCountdown';
 
@@ -11,8 +11,8 @@ function freshQueue(count) {
   return shuffleArray(Array.from({ length: count }, (_, i) => i));
 }
 
-export default function MultipleChoiceScreen({ rawText, colorMode, sessionMinutes, onBack }) {
-  const { pairs } = useMemo(() => parseText(rawText), [rawText]);
+export default function MultipleChoiceScreen({ rawText, colorMode, sessionMinutes, onBack, separator, language = 'en' }) {
+  const { pairs } = useMemo(() => parseText(rawText, separator), [rawText, separator]);
   const bgColors = useMemo(() => generateWordBasedColors(pairs.length), [pairs.length]);
 
   const [queue, setQueue] = useState(() => freshQueue(pairs.length));
@@ -108,7 +108,7 @@ export default function MultipleChoiceScreen({ rawText, colorMode, sessionMinute
         <>
           <div
             className={`quiz-prompt ${isBg ? 'quiz-prompt--tinted' : ''}`}
-            style={isBg ? { backgroundColor: accentColor } : undefined}
+            style={isBg ? { backgroundColor: mutedBackground(accentColor) } : undefined}
           >
             <div className="quiz-lang-tag">SV</div>
             <div className="quiz-word" style={!isBg ? { color: accentColor } : undefined}>
@@ -128,6 +128,7 @@ export default function MultipleChoiceScreen({ rawText, colorMode, sessionMinute
               return (
                 <button
                   key={optionPairIndex}
+                  lang={language}
                   type="button"
                   className={`quiz-option ${stateClass}`}
                   disabled={selected !== null}

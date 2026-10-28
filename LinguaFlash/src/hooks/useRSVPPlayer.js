@@ -3,12 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // Pacing: a base duration from WPM, stretched a bit for longer words and
 // with extra breathing room at language switches / pair boundaries so a
 // sentence pair doesn't blur into the next one.
-function getDurationMs(token, wpm) {
+export function getDurationMs(token, wpm) {
+  if (token.type === 'gap') return token.durationMs;
   const base = 60000 / wpm;
   let duration = base * Math.min(2, 0.6 + token.text.length / 8);
   if (token.isLangSwitch) duration += base * 0.6;
   if (token.isPairEnd) duration += base * 0.9;
-  return duration;
+  // Give chunks time for each word, and complete sentences a quick but
+  // readable first pass before repetition accelerates them.
+  const wordCount = token.text.trim().split(/\s+/).length;
+  return Math.max(60, duration * Math.max(1, wordCount * 0.65) * (token.speedFactor ?? 1));
 }
 
 // `skipLang` passes over every token of one language (e.g. Swedish while it is
@@ -40,6 +44,7 @@ export function useRSVPPlayer(tokens, wpm, skipLang = null) {
       setIsPlaying(false);
       return undefined;
     }
+    if (token.type === 'quiz') return undefined;
 
     timerRef.current = setTimeout(() => {
       setRawIndex(index + 1);
@@ -61,6 +66,7 @@ export function useRSVPPlayer(tokens, wpm, skipLang = null) {
   }, [tokens.length]);
 
   const pause = useCallback(() => setIsPlaying(false), []);
+  const advance = useCallback(() => setRawIndex(index + 1), [index]);
 
   const restart = useCallback(() => {
     setRawIndex(0);
@@ -74,6 +80,7 @@ export function useRSVPPlayer(tokens, wpm, skipLang = null) {
     play,
     pause,
     restart,
+    advance,
     isFinished: tokens.length > 0 && index >= tokens.length,
   };
 }
