@@ -70,7 +70,7 @@ window.SAAS_APPS_CATALOG = [
       { name: 'BrainDump', href: 'BrainDump/', icon: 'braindump.svg' },
       { name: 'PostIt', href: 'PostIt/', icon: 'postit.svg' },
       { name: 'CopyLearner', href: 'CopyLearner/', icon: 'bullet-generator.svg' },
-      { name: 'LinguaFlash', href: 'LinguaFlash/', icon: 'linguaflash.svg' },
+      { name: 'LinguaFlash', href: 'https://linguaflash-alpha.vercel.app/', icon: 'linguaflash.svg' },
     ],
   },
   {
