@@ -78,7 +78,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         </div>
         <form onSubmit={handleSave} className="settings-form">
           <p className="settings-hint">
-            API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, PowerWriter, etc.).
+            API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, PowerWriter, etc.).
           </p>
           <label className="settings-label">
             OpenAI API Key

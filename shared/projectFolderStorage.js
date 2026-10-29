@@ -178,7 +178,7 @@ async function getProjectFolderHandle(appFolderHandle, projectName, create = tru
 /**
  * Save project data to the connected folder.
  * Structure: {appName}/{projectName}/project.json
- * @param {string} appName - e.g. 'PitchDeck', 'InfoGraphics', 'ColorWriter'
+ * @param {string} appName - e.g. 'PitchDeck', 'InfoGraphics'
  * @param {string} projectName - display name (will be sanitized for folder name)
  * @param {object|(() => object)} dataOrGetter - project data or function that returns it
  * @returns {Promise<{ path: string } | null>} Path if saved, null if no connected folder

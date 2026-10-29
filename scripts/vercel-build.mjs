@@ -21,11 +21,9 @@ const VITE_APPS = [
   ["webquizgenerator", "/webquizgenerator/"],
   ["CopyWriter", "/CopyWriter/"],
   ["StoryWriter", "/StoryWriter/"],
-  ["ColorWriter", "/ColorWriter/"],
   ["PostIt", "/PostIt/"],
   ["BulletGenerator", "/BulletGenerator/"],
   ["PitchDeck", "/PitchDeck/"],
-  ["CarouselDesigner", "/CarouselDesigner/"],
   ["VIdeoRecorder", "/VIdeoRecorder/"],
   ["ReelRecorder", "/ReelRecorder/"],
   ["InfoGraphics", "/InfoGraphics/"],
@@ -78,7 +76,7 @@ copyRecursive(path.join(docs, "ContentGenerator"), path.join(DEPLOY, "ContentGen
 
 // Static app folders (no build)
 console.log("Copying static apps...");
-for (const dir of ["conversation-generator", "ConversationFunnelBuilder", "Typography", "VSLWriter"]) {
+for (const dir of ["conversation-generator", "VSLWriter"]) {
   const src = path.join(ROOT, dir);
   if (existsSync(src)) copyRecursive(src, path.join(DEPLOY, dir));
 }
@@ -150,36 +148,6 @@ for (const [projectPath, basePath] of VITE_APPS) {
   const deploySub = path.join(DEPLOY, basePath.replace(/^\/|\/$/g, ""));
   copyRecursive(dist, deploySub);
   console.log("  →", deploySub);
-}
-
-// Build ContentCreator (Next.js static export)
-const contentCreatorPath = path.join(ROOT, "ContentCreator");
-if (existsSync(path.join(contentCreatorPath, "package.json"))) {
-  console.log("Building ContentCreator with base /ContentCreator/");
-  run("npm install", contentCreatorPath);
-  run("npm run build", contentCreatorPath, { NEXT_PUBLIC_BASE_PATH: "/ContentCreator" });
-  const outDir = path.join(contentCreatorPath, "out");
-  if (existsSync(outDir)) {
-    copyRecursive(outDir, path.join(DEPLOY, "ContentCreator"));
-    console.log("  →", path.join(DEPLOY, "ContentCreator"));
-  } else {
-    console.warn("No out folder after ContentCreator build");
-  }
-}
-
-// Build HookTransformer (Next.js static export)
-const hookTransformerPath = path.join(ROOT, "HookTransformer");
-if (existsSync(path.join(hookTransformerPath, "package.json"))) {
-  console.log("Building HookTransformer with base /HookTransformer/");
-  run("npm install", hookTransformerPath);
-  run("npm run build", hookTransformerPath, { NEXT_PUBLIC_BASE_PATH: "/HookTransformer" });
-  const outDirHt = path.join(hookTransformerPath, "out");
-  if (existsSync(outDirHt)) {
-    copyRecursive(outDirHt, path.join(DEPLOY, "HookTransformer"));
-    console.log("  →", path.join(DEPLOY, "HookTransformer"));
-  } else {
-    console.warn("No out folder after HookTransformer build");
-  }
 }
 
 console.log("Done. Output in ./deploy");

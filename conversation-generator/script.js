@@ -1252,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSettingsOverlay() {
         const keys = API_KEYS.loadApiKeys();
         const content = `
-            <p class="settings-hint" style="margin-bottom: 1rem;">API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, PowerWriter, StoryWriter, etc.).</p>
+            <p class="settings-hint" style="margin-bottom: 1rem;">API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, PowerWriter, StoryWriter, etc.).</p>
             <div class="form-group">
                 <label>OpenAI API Key</label>
                 <input type="password" id="overlay-openai-key" value="${(keys.openai || '').replace(/"/g, '&quot;')}" placeholder="sk-..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--input-bg); color: var(--text-primary);">

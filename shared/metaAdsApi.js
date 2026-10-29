@@ -138,7 +138,7 @@ export async function createCarouselAdCreative({
   url.searchParams.set('access_token', accessToken)
 
   const body = {
-    name: creativeName || 'Carousel Designer creative',
+    name: creativeName || 'Carousel creative',
     object_story_spec: {
       page_id: pageId,
       link_data: {

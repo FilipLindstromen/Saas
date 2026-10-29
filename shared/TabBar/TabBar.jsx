@@ -1,6 +1,6 @@
 /**
  * Shared TabBar component.
- * Used by StoryWriter, InfoGraphics, ColorWriter.
+ * Used by StoryWriter, InfoGraphics.
  */
 import { useState, useRef, useEffect } from 'react';
 import './TabBar.css';

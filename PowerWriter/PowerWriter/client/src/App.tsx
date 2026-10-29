@@ -3945,7 +3945,7 @@ export default function App() {
               </button>
             </div>
             <p className="settings-hint">
-              API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, ColorWriter, StoryWriter, etc.).
+              API keys are stored once and shared across all Saas apps (PitchDeck, InfoGraphics, StoryWriter, etc.).
             </p>
           </div>
         ) : null}

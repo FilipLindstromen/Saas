@@ -18,7 +18,6 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Video Quiz | `/VideoQuiz` | Video-based quiz app |
 | CopyWriter | `/CopyWriter` | AI-powered copywriting tool |
 | Story Writer | `/StoryWriter` | Story writing application |
-| Color Writer | `/ColorWriter` | Color-focused writing tool |
 | PostIt | `/PostIt` | Plan & brainstorm app |
 | InfoGraphics | `/InfoGraphics` | Infographic generator |
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
@@ -28,12 +27,9 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Power Writer | `/PowerWriter/PowerWriter/client` | Writing assistant |
 | Video Recorder | `/VIdeoRecorder` | Video recording tool |
 | Reel Recorder | `/ReelRecorder` | Reel/short-form video recorder |
-| Typography | `/Typography` | Typography tools |
 | VSL Writer | `/VSLWriter` | Video sales letter writer |
 | Content Generator | `/ContentGenerator` | Reddit pain points → video questions for personal development |
-| Content Creator | `/ContentCreator` | AI content machine workflow for research → post |
 | Conversation Generator | `/conversation-generator` | Conversation generation tool |
-| Conversation Funnel Builder | `/ConversationFunnelBuilder` | Visual conversation funnel editor with HTML export for Systeme.io |
 | BrainDump | `/BrainDump` | Voice capture & thought organization (requires server; deploy to Vercel or run locally) |
 | MetaConnect | `/MetaConnect` | Meta (FB/IG) comment-to-DM automation + lead form sync to Systeme.io (requires server; deploy to Vercel or run locally) |
 | TypoAnimation | `/TypoAnimation` | Kinetic-typography VSL video generator: script → styled animated scenes, webcam voice sync, MP4 export (requires server; deploy to Vercel or run locally) |
@@ -58,7 +54,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 When you push to `main` or `master`, the workflow automatically:
 
 1. Builds each Vite app with the correct base path for your repo
-2. Copies static apps (Conversation Generator, Typography, VSL Writer)
+2. Copies static apps (Conversation Generator, VSL Writer)
 3. Deploys everything to GitHub Pages
 
 Your site will be at `https://<username>.github.io/<repo-name>/` (e.g. `https://username.github.io/Saas/`).
@@ -107,7 +103,6 @@ Use the default base path (`/`) for local development; only use the `--base` fla
 ├── webquizgenerator/
 ├── CopyWriter/
 ├── StoryWriter/
-├── ColorWriter/
 ├── PostIt/
 ├── PitchDeck/
 ├── PowerWriter/
@@ -115,7 +110,6 @@ Use the default base path (`/`) for local development; only use the `--base` fla
 │       └── client/      # Power Writer app
 ├── VIdeoRecorder/
 ├── ReelRecorder/
-├── Typography/
 ├── VSLWriter/
 ├── conversation-generator/
 └── .github/workflows/   # GitHub Actions deployment

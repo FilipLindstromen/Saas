@@ -26,11 +26,9 @@ exclude:
   - webquizgenerator
   - CopyWriter
   - StoryWriter
-  - ColorWriter
   - PostIt
   - PitchDeck
   - VIdeoRecorder
-  - MosaicTypography
   - VSLWriter
   - PowerWriter
   - ReelRecorder
@@ -38,7 +36,6 @@ exclude:
   - NativeAdsGenerator
   - Quiz
   - conversation-generator
-  - ConversationFunnelBuilder
   - "conversation-generator - Copy"
   - "quiz-generator - Copy"
   - VoideDepth

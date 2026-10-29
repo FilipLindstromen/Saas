@@ -6,10 +6,8 @@ window.SAAS_APPS_CATALOG = [
     description: 'Decks, graphics, and design',
     apps: [
       { name: 'Pitch Deck', href: 'PitchDeck/', icon: 'pitch-deck.svg' },
-      { name: 'Carousel Designer', href: 'CarouselDesigner/', icon: 'pitch-deck.svg' },
       { name: 'Info Graphics', href: 'InfoGraphics/', icon: 'info-graphics.svg' },
       { name: 'Native Ads', href: 'NativeAdsGenerator/', icon: 'native-ads.svg' },
-      { name: 'Mosaic Typography', href: 'MosaicTypography/', icon: 'typography.svg' },
       { name: 'SketchGen', href: 'SketchGen/', icon: 'info-graphics.svg' },
     ],
   },
@@ -21,7 +19,6 @@ window.SAAS_APPS_CATALOG = [
       { name: 'Reel Recorder', href: 'ReelRecorder/', icon: 'reel-recorder.svg' },
       { name: 'Video Recorder', href: 'VIdeoRecorder/', icon: 'video-recorder.svg' },
       { name: 'AutoCaptions', href: 'AutoCaptions/', icon: 'auto-captions.svg' },
-      { name: 'Uploader', href: 'Uploader/', icon: 'uploader.svg' },
       { name: 'VSL Writer', href: 'VSLWriter/', icon: 'vsl-writer.svg' },
       { name: 'TypoAnimation', href: 'TypoAnimation/', icon: 'typo-animation.svg' },
       { name: 'BRollEditor', href: 'BRollEditor/', icon: 'broll-editor.svg' },
@@ -34,7 +31,6 @@ window.SAAS_APPS_CATALOG = [
     apps: [
       { name: 'Story Writer', href: 'StoryWriter/', icon: 'story-writer.svg' },
       { name: 'Power Writer', href: 'PowerWriter/', icon: 'power-writer.svg' },
-      { name: 'Color Writer', href: 'ColorWriter/', icon: 'color-writer.svg' },
       { name: 'CopyWriter', href: 'CopyWriter/', icon: 'copywriter.svg' },
       { name: 'Conversation Gen', href: 'conversation-generator/', icon: 'conversation.svg' },
     ],
@@ -45,9 +41,7 @@ window.SAAS_APPS_CATALOG = [
     description: 'Ideas, bullets, and generators',
     apps: [
       { name: 'Content Generator', href: 'ContentGenerator/', icon: 'content-generator.svg' },
-      { name: 'Content Creator', href: 'ContentCreator/', icon: 'content-generator.svg' },
       { name: 'Bullet Generator', href: 'BulletGenerator/', icon: 'bullet-generator.svg' },
-      { name: 'Hook Transformer', href: 'HookTransformer/', icon: 'bullet-generator.svg' },
     ],
   },
   {
@@ -57,7 +51,6 @@ window.SAAS_APPS_CATALOG = [
     apps: [
       { name: 'Video Quiz', href: 'VideoQuiz/', icon: 'video-quiz.svg' },
       { name: 'Web Quiz', href: 'webquizgenerator/', icon: 'web-quiz.svg' },
-      { name: 'Funnel Builder', href: 'ConversationFunnelBuilder/', icon: 'conversation.svg' },
     ],
   },
   {

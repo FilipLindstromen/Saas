@@ -17,7 +17,7 @@ Configurable API keys modal. Use `fields` to show specific keys (openai, unsplas
 Theme toggle button for toolbars. Uses `@shared/theme`.
 
 ### TabBar (`TabBar/`)
-Tab bar with add, rename, delete. Used by StoryWriter, InfoGraphics, ColorWriter.
+Tab bar with add, rename, delete. Used by StoryWriter, InfoGraphics.
 
 ### Stock Media (`stockMedia/`)
 - **Services:** `unsplash.js`, `pexels.js`, `pixabay.js`, `giphy.js`
