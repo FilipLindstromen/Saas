@@ -5,6 +5,7 @@ window.SAAS_APPS_CATALOG = [
     title: 'Slides & Visuals',
     description: 'Decks, graphics, and design',
     apps: [
+      { name: 'Portfolio', href: 'Portfolio/', icon: 'pitch-deck.svg' },
       { name: 'Pitch Deck', href: 'PitchDeck/', icon: 'pitch-deck.svg' },
       { name: 'Info Graphics', href: 'InfoGraphics/', icon: 'info-graphics.svg' },
       { name: 'Native Ads', href: 'NativeAdsGenerator/', icon: 'native-ads.svg' },

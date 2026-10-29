@@ -43,6 +43,7 @@ jobs:
           cp docs/robots.txt deploy/
           cp -r conversation-generator deploy/
           cp -r VSLWriter deploy/
+          cp -r Portfolio deploy/
           cp -r docs/ContentGenerator deploy/
 
       - name: Add BrainDump landing page

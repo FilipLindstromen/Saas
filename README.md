@@ -20,6 +20,7 @@ See **[VERCEL-DEPLOY.md](./VERCEL-DEPLOY.md)** for step-by-step setup (root proj
 | Story Writer | `/StoryWriter` | Story writing application |
 | PostIt | `/PostIt` | Plan & brainstorm app |
 | InfoGraphics | `/InfoGraphics` | Infographic generator |
+| Portfolio | `/Portfolio` | Bento portfolio editor with image frames, text boxes, and PDF/webpage export |
 | Pitch Deck | `/PitchDeck` | Pitch deck creator |
 | SketchGen | `/SketchGen` | Draw a sketch, generate a styled illustration with AI |
 | CopyLearner | `/CopyLearner` | Swipeable micro-lessons generated from your own uploaded content, with spaced repetition |
